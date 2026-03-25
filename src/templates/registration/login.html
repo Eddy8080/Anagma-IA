@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="greeting-container" style="flex-direction: column;">
+    <div style="background-color: #1e1f20; padding: 40px; border-radius: 28px; width: 100%; max-width: 400px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+        <h2 style="text-align: center; margin-bottom: 30px; font-weight: 500; color: #a8c7fa;">Entrar na Anagma IA</h2>
+        
+        <form method="post">
+            {% csrf_token %}
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-size: 0.9rem; color: #888;">Usuário</label>
+                <input type="text" name="username" style="width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #333; background: #131314; color: white; outline: none; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 30px;">
+                <label style="display: block; margin-bottom: 8px; font-size: 0.9rem; color: #888;">Senha</label>
+                <input type="password" name="password" style="width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #333; background: #131314; color: white; outline: none; box-sizing: border-box;">
+            </div>
+            
+            <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" name="remember_me" id="remember_me" style="accent-color: #a8c7fa; width: 16px; height: 16px;">
+                <label for="remember_me" style="font-size: 0.85rem; color: #888; cursor: pointer;">Lembrar-me</label>
+            </div>
+            
+            <button type="submit" style="width: 100%; padding: 14px; border-radius: 28px; border: none; background: linear-gradient(to right, #4285f4, #9b72cb); color: white; font-weight: 600; cursor: pointer; transition: opacity 0.2s;">
+                Acessar Banco de Ideias
+            </button>
+            
+            <div style="text-align: center; margin-top: 20px; font-size: 0.9rem; display: flex; flex-direction: column; gap: 10px;">
+                <a href="{% url 'register' %}" style="color: #a8c7fa; text-decoration: none;">Criar conta com E-mail Anagma</a>
+                <a href="{% url 'password_reset' %}" style="color: #888; text-decoration: none;">Esqueceu a senha?</a>
+            </div>
+            
+            {% if form.errors %}
+                <p style="color: #d96570; font-size: 0.8rem; text-align: center; margin-top: 15px;">Usuário ou senha inválidos.</p>
+            {% endif %}
+
+            {% if messages %}
+                {% for message in messages %}
+                    <p style="color: {% if message.tags == 'success' %}#81c995{% else %}#d96570{% endif %}; font-size: 0.8rem; text-align: center; margin-top: 15px;">
+                        {{ message }}
+                    </p>
+                {% endfor %}
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<style>
+    /* Ocultar sidebar na tela de login */
+    .sidebar { display: none !important; }
+    .main-content { padding-bottom: 0 !important; }
+    .prompt-container { display: none !important; }
+</style>
+{% endblock %}

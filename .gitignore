@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Ambiente Virtual
+venv/
+ENV/
+.venv/
+
+# Django
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+src/db.sqlite3
+src/db.sqlite3-journal
+media/
+staticfiles/
+
+# Variáveis de Ambiente
+.env
+
+# Modelos de IA e Assets Pesados
+# (Geralmente não queremos versionar arquivos .gguf ou binários pesados)
+assets/models/
+*.gguf
+*.bin
+*.pt
+*.onnx
+
+# Vector Store (ChromaDB, etc)
+assets/vector_store/
+*.sqlite3
+chroma/
+
+# IDEs e Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db

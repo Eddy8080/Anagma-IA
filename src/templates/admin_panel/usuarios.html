@@ -1,0 +1,155 @@
+{% extends 'admin_panel/base_admin.html' %}
+
+{% block title %}Usuários — Painel Admin{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px;">
+    <div class="page-title" style="margin:0;">👥 Usuários</div>
+    <button id="toggle-form-btn" onclick="toggleForm()"
+            style="background:#a8c7fa; color:#131314; border:none; border-radius:10px;
+                   padding:9px 20px; font-size:0.9rem; font-weight:600; cursor:pointer;">
+        + Novo Usuário
+    </button>
+</div>
+
+{% if messages %}
+    {% for msg in messages %}
+        <div style="padding:10px 16px; border-radius:8px; margin-bottom:16px;
+            {% if msg.tags == 'error' %}background:#3b1a1a; color:#f87171; border:1px solid #7f1d1d;
+            {% else %}background:#1a3b2a; color:#4ade80; border:1px solid #166534;{% endif %}">
+            {{ msg }}
+        </div>
+    {% endfor %}
+{% endif %}
+
+{# ── Formulário de criação ── #}
+<div id="create-form" style="display:none; margin-bottom:24px;">
+    <div class="card" style="padding:24px;">
+        <div style="color:#a8c7fa; font-weight:600; margin-bottom:16px;">Cadastrar Novo Usuário</div>
+        <p style="color:#555; font-size:0.8rem; margin:0 0 16px;">
+            Todos os campos são obrigatórios. O usuário é criado como <strong style="color:#a8c7fa;">usuário comum</strong> — use "Promover" na tabela para conceder acesso de superusuário.
+        </p>
+        <form method="post" action="{% url 'admin_panel:criar_usuario' %}">
+            {% csrf_token %}
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+                <div>
+                    <label style="display:block; color:#888; font-size:0.8rem; margin-bottom:4px;">Username *</label>
+                    <input type="text" name="username" required autocomplete="off"
+                           style="width:100%; box-sizing:border-box; background:#131314; border:1px solid #3c4043;
+                                  border-radius:8px; color:#e3e3e3; padding:9px 12px; font-size:0.9rem; outline:none; font-family:inherit;">
+                </div>
+                <div>
+                    <label style="display:block; color:#888; font-size:0.8rem; margin-bottom:4px;">Nome Completo *</label>
+                    <input type="text" name="nome_completo" required
+                           style="width:100%; box-sizing:border-box; background:#131314; border:1px solid #3c4043;
+                                  border-radius:8px; color:#e3e3e3; padding:9px 12px; font-size:0.9rem; outline:none; font-family:inherit;">
+                </div>
+                <div>
+                    <label style="display:block; color:#888; font-size:0.8rem; margin-bottom:4px;">E-mail * <span style="color:#555;">(fora de @anagma.com.br → criado suspenso)</span></label>
+                    <input type="email" name="email" required placeholder="nome@anagma.com.br"
+                           style="width:100%; box-sizing:border-box; background:#131314; border:1px solid #3c4043;
+                                  border-radius:8px; color:#e3e3e3; padding:9px 12px; font-size:0.9rem; outline:none; font-family:inherit;">
+                </div>
+                <div>
+                    <label style="display:block; color:#888; font-size:0.8rem; margin-bottom:4px;">Senha *</label>
+                    <input type="password" name="password" required autocomplete="new-password"
+                           style="width:100%; box-sizing:border-box; background:#131314; border:1px solid #3c4043;
+                                  border-radius:8px; color:#e3e3e3; padding:9px 12px; font-size:0.9rem; outline:none; font-family:inherit;">
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" onclick="toggleForm()"
+                        style="background:#333537; color:#e3e3e3; border:1px solid #444; border-radius:8px;
+                               padding:9px 20px; font-size:0.9rem; cursor:pointer;">Cancelar</button>
+                <button type="submit"
+                        style="background:#a8c7fa; color:#131314; border:none; border-radius:8px;
+                               padding:9px 20px; font-size:0.9rem; font-weight:600; cursor:pointer;">Criar Usuário</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# ── Tabela de usuários ── #}
+<div class="card" style="padding:0; overflow:hidden;">
+    <table>
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Usuário</th>
+                <th>E-mail</th>
+                <th>Cadastrado em</th>
+                <th>Perfil</th>
+                <th>Status</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in usuarios %}
+            <tr style="{% if not u.is_active %}opacity:0.55;{% endif %}">
+                <td>{{ u.nome_completo|default:"—" }}</td>
+                <td style="color:#a8c7fa;">{{ u.username }}</td>
+                <td style="color:#888; font-size:0.85rem;">{{ u.email|default:"—" }}</td>
+                <td style="color:#888; font-size:0.85rem;">{{ u.date_joined|date:"d/m/Y" }}</td>
+                <td>
+                    {% if u.is_superuser %}
+                        <span class="badge badge-blue">Superusuário</span>
+                    {% else %}
+                        <span class="badge badge-green">Usuário</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if u.is_active %}
+                        <span class="badge badge-green">Ativo</span>
+                    {% else %}
+                        <span class="badge" style="background:#3b2a10; color:#fbbf24; border:1px solid #78350f;">Pausado</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if u != request.user %}
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <form class="inline" method="post" action="{% url 'admin_panel:toggle_superuser' u.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline" title="{% if u.is_superuser %}Rebaixar para usuário comum{% else %}Promover a superusuário{% endif %}">
+                                {% if u.is_superuser %}Rebaixar{% else %}Promover{% endif %}
+                            </button>
+                        </form>
+                        <form class="inline" method="post" action="{% url 'admin_panel:toggle_ativo' u.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline"
+                                    style="{% if u.is_active %}color:#fbbf24; border-color:#78350f;{% else %}color:#4ade80; border-color:#166534;{% endif %}"
+                                    title="{% if u.is_active %}Pausar acesso deste usuário{% else %}Reativar acesso{% endif %}">
+                                {% if u.is_active %}Pausar{% else %}Reativar{% endif %}
+                            </button>
+                        </form>
+                        <form class="inline" method="post" action="{% url 'admin_panel:deletar_usuario' u.pk %}"
+                              onsubmit="return confirm('Excluir permanentemente o usuário {{ u.username|escapejs }}?')">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline"
+                                    style="color:#f87171; border-color:#7f1d1d;" title="Excluir usuário">
+                                Excluir
+                            </button>
+                        </form>
+                    </div>
+                    {% else %}
+                    <span style="color:#888; font-size:0.82rem;">Você</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" style="text-align:center; color:#888; padding:32px;">Nenhum usuário encontrado.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+function toggleForm() {
+    const f = document.getElementById('create-form');
+    f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+{% if messages %}
+// Abre o formulário automaticamente se houver erro de criação
+{% for msg in messages %}{% if msg.tags == 'error' %}document.getElementById('create-form').style.display = 'block';{% endif %}{% endfor %}
+{% endif %}
+</script>
+{% endblock %}

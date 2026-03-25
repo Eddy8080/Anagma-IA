@@ -1,0 +1,106 @@
+{% extends 'admin_panel/base_admin.html' %}
+
+{% block title %}Perfil Anagma — Painel Admin{% endblock %}
+
+{% block content %}
+<div class="page-title">🏢 Perfil Anagma</div>
+
+<!-- Quill CSS -->
+<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+<style>
+    .ql-toolbar.ql-snow {
+        background: #1e1f20;
+        border: 1px solid #3c4043;
+        border-bottom: none;
+        border-radius: 10px 10px 0 0;
+    }
+    .ql-container.ql-snow {
+        background: #131314;
+        border: 1px solid #3c4043;
+        border-radius: 0 0 10px 10px;
+        min-height: 320px;
+        font-size: 0.95rem;
+        color: #e3e3e3;
+    }
+    .ql-editor { min-height: 320px; line-height: 1.7; color: #e3e3e3; }
+    .ql-editor.ql-blank::before { color: #555; font-style: normal; }
+    /* Ícones e texto da toolbar */
+    .ql-snow .ql-stroke { stroke: #888; }
+    .ql-snow .ql-fill  { fill: #888; }
+    .ql-snow .ql-picker-label { color: #888; }
+    .ql-snow .ql-picker-options { background: #1e1f20; border-color: #3c4043; }
+    .ql-snow .ql-picker-item { color: #e3e3e3; }
+    .ql-snow button:hover .ql-stroke,
+    .ql-snow .ql-picker-label:hover .ql-stroke { stroke: #a8c7fa; }
+    .ql-snow button:hover .ql-fill { fill: #a8c7fa; }
+    .ql-snow button.ql-active .ql-stroke { stroke: #a8c7fa; }
+    .ql-snow button.ql-active .ql-fill  { fill: #a8c7fa; }
+</style>
+
+<div class="card">
+    <p style="color:#888; font-size:0.85rem; margin-bottom:20px; line-height:1.6;">
+        Este texto define o <strong style="color:#a8c7fa;">tom e a cultura</strong> da empresa nas respostas da IA.<br>
+        Inclua a história, valores e identidade da Anagma. A IA usará esse contexto naturalmente —
+        sem citar a empresa a menos que o usuário pergunte diretamente.
+    </p>
+    {% if perfil.atualizado_em %}
+    <p style="color:#555; font-size:0.78rem; margin-bottom:16px;">
+        Última atualização: {{ perfil.atualizado_em|date:"d/m/Y \à\s H:i" }}
+    </p>
+    {% endif %}
+
+    <form method="post" id="perfil-form">
+        {% csrf_token %}
+        <!-- Campo oculto enviado ao Django — preenchido pelo JS antes do submit -->
+        <input type="hidden" name="texto" id="texto-hidden">
+
+        <!-- Editor Quill -->
+        <div id="quill-editor" spellcheck="true" lang="pt-BR">{{ perfil.texto }}</div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+            <button type="button" onclick="limparEditor()"
+                    style="background:transparent; color:#f87171; border:1px solid #7f1d1d;
+                           border-radius:10px; padding:10px 20px; font-size:0.9rem; cursor:pointer;">
+                🗑 Limpar texto
+            </button>
+            <button type="submit"
+                    style="background:#a8c7fa; color:#131314; border:none; border-radius:10px;
+                           padding:10px 28px; font-size:0.95rem; font-weight:600; cursor:pointer;">
+                Salvar Perfil
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Quill JS -->
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+<script>
+    const quill = new Quill('#quill-editor', {
+        theme: 'snow',
+        placeholder: 'Escreva a história, missão, valores e cultura da Anagma…',
+        modules: {
+            toolbar: [
+                [{ header: [1, 2, 3, false] }],
+                ['bold', 'italic', 'underline'],
+                [{ list: 'ordered' }, { list: 'bullet' }],
+                ['clean']
+            ]
+        }
+    });
+
+    // Habilita corretor ortográfico no editor
+    quill.root.setAttribute('spellcheck', 'true');
+    quill.root.setAttribute('lang', 'pt-BR');
+
+    // Antes de submeter, copia o texto puro (sem HTML) para o campo oculto
+    document.getElementById('perfil-form').addEventListener('submit', () => {
+        document.getElementById('texto-hidden').value = quill.getText().trim();
+    });
+
+    function limparEditor() {
+        if (confirm('Limpar todo o texto do perfil?')) {
+            quill.setText('');
+        }
+    }
+</script>
+{% endblock %}

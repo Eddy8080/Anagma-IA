@@ -1,0 +1,550 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+/* ── Mensagens ── */
+#chat-window {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 20px 20px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    scroll-behavior: smooth;
+}
+.message-row {
+    display: flex;
+    flex-direction: column;
+    max-width: 850px;
+    width: 100%;
+    margin: 0 auto;
+}
+.message-row.user-row { align-items: flex-end; }
+.message-row.ai-row   { align-items: flex-start; }
+
+.message-bubble {
+    padding: 12px 18px;
+    border-radius: 18px;
+    max-width: 82%;
+    font-size: 1.02rem;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.user-bubble {
+    background: #2a2b2e;
+    color: #fff;
+    border-bottom-right-radius: 4px;
+}
+.ai-bubble {
+    background: transparent;
+    color: #e3e3e3;
+    padding-left: 0;
+    max-width: 92%;
+}
+.ai-label {
+    color: var(--accent-color);
+    font-weight: 600;
+    font-size: 0.88rem;
+    display: block;
+    margin-bottom: 6px;
+    letter-spacing: 0.02em;
+}
+.msg-time {
+    font-size: 0.71rem;
+    color: #484848;
+    margin-top: 4px;
+    padding: 0 4px;
+}
+
+/* ── Toolbar de cópia ── */
+.message-toolbar {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    align-self: flex-start;
+}
+.message-row:hover .message-toolbar { opacity: 1; }
+.copy-btn {
+    background: #232426;
+    border: 1px solid #3a3b3e;
+    color: #888;
+    cursor: pointer;
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    font-family: inherit;
+}
+.copy-btn:hover {
+    background: #2e2f32;
+    color: #e3e3e3;
+    border-color: #555;
+}
+.copy-btn.copied {
+    color: #4ade80;
+    border-color: #4ade80;
+}
+
+/* ── Toast ── */
+#copy-toast {
+    position: fixed;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #2e2f32;
+    color: #e3e3e3;
+    padding: 8px 20px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.18s;
+    pointer-events: none;
+    border: 1px solid #444;
+}
+
+/* ── Indicador pensando ── */
+.thinking-dots { display: inline-flex; gap: 3px; align-items: center; height: 22px; }
+.thinking-dots span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    animation: blink-dot 1.4s infinite;
+    display: inline-block;
+}
+.thinking-dots span:nth-child(2) { animation-delay: 0.22s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.44s; }
+@keyframes blink-dot {
+    0%, 80%, 100% { opacity: 0.15; transform: scale(0.8); }
+    40%            { opacity: 1;    transform: scale(1);   }
+}
+</style>
+{% endblock %}
+
+{# ── Sidebar: histórico agrupado ── #}
+{% block sidebar_history %}
+{% for group_label, group_sessions in grouped_sessions %}
+<div class="history-group" data-group="{{ group_label }}">
+    <div class="history-group-label">{{ group_label }}</div>
+    {% for session in group_sessions %}
+    <div class="history-item{% if current_session and session.id == current_session.id %} active{% endif %}"
+         data-session-id="{{ session.id }}"
+         data-session-title="{{ session.titulo|escapejs }}">
+        <a class="session-link" href="/chat/s/{{ session.id }}/" title="{{ session.titulo }}">
+            <span class="session-title">{{ session.titulo }}</span>
+        </a>
+        <div class="session-actions">
+            <button class="session-action-btn"
+                    data-action="rename"
+                    data-session-id="{{ session.id }}"
+                    title="Renomear" type="button">✏️</button>
+            <button class="session-action-btn"
+                    data-action="delete"
+                    data-session-id="{{ session.id }}"
+                    title="Excluir" type="button">🗑️</button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% empty %}
+<p id="empty-history" style="font-size:0.8rem; color:#555; text-align:center; margin-top:24px;">
+    Nenhum histórico ainda.
+</p>
+{% endfor %}
+{% endblock %}
+
+{# ── Área de chat ── #}
+{% block content %}
+<div id="chat-window">
+    <div id="greeting" class="greeting-container">
+        <div style="text-align:center;">
+            <h1 style="background:linear-gradient(to right,#4285f4,#9b72cb,#d96570);
+                        -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+                        font-size:3.5rem; margin-bottom:12px; font-weight:500;">
+                Olá, {{ nome_usuario }}
+            </h1>
+            <p style="color:#666; font-size:1.4rem;">{{ saudacao }}. Como posso ajudar?</p>
+        </div>
+    </div>
+    <div id="messages-container" style="display:none; flex-direction:column; gap:20px; width:100%;"></div>
+</div>
+
+<div id="copy-toast">Copiado!</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if messages_json %}{{ messages_json|json_script:"messages-data" }}{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // ── Elementos ───────────────────────────────────────────
+    const chatInput    = document.getElementById('chat-input');
+    const sendBtn      = document.getElementById('send-btn');
+    const attachBtn    = document.getElementById('attach-btn');
+    const fileInput    = document.getElementById('file-input');
+    const chatWindow   = document.getElementById('chat-window');
+    const greeting     = document.getElementById('greeting');
+    const msgContainer = document.getElementById('messages-container');
+    const filePreview  = document.getElementById('file-preview');
+    const historyList  = document.querySelector('.history-list');
+    const copyToast    = document.getElementById('copy-toast');
+
+    // ── Estado ──────────────────────────────────────────────
+    let currentSessionId     = {% if current_session %}{{ current_session.id }}{% else %}null{% endif %};
+    let hoveredMsgContent    = null;
+    let isSending            = false;
+
+    // ── Utilitários ─────────────────────────────────────────
+    const scrollToBottom = () =>
+        setTimeout(() => chatWindow.scrollTo({ top: chatWindow.scrollHeight, behavior: 'smooth' }), 60);
+
+    function getCsrf() {
+        // Prefere o meta tag injetado pelo Django (mais confiável que cookie)
+        return document.querySelector('meta[name="csrf-token"]')?.content
+            ?? document.cookie.split(';').map(c => c.trim())
+               .find(c => c.startsWith('csrftoken='))?.split('=')[1]
+            ?? '';
+    }
+
+    function escHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── Toast de cópia ──────────────────────────────────────
+    let toastTimer = null;
+    function showToast() {
+        copyToast.style.opacity = '1';
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { copyToast.style.opacity = '0'; }, 1600);
+    }
+
+    async function copyText(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none;';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+        showToast();
+    }
+
+    // Ctrl+C sem seleção = copiar mensagem sob o cursor
+    document.addEventListener('keydown', e => {
+        if (e.ctrlKey && e.key === 'c' && hoveredMsgContent && !window.getSelection().toString()) {
+            e.preventDefault();
+            copyText(hoveredMsgContent);
+        }
+    });
+
+    // ── Construção de mensagem ───────────────────────────────
+    function buildMessage(role, content, time, scroll) {
+        if (greeting.style.display !== 'none') {
+            greeting.style.display = 'none';
+            msgContainer.style.display = 'flex';
+        }
+
+        const row = document.createElement('div');
+        row.className = `message-row ${role === 'user' ? 'user-row' : 'ai-row'}`;
+
+        const bubble = document.createElement('div');
+        bubble.className = `message-bubble ${role === 'user' ? 'user-bubble' : 'ai-bubble'}`;
+
+        if (role === 'assistant') {
+            const lbl = document.createElement('span');
+            lbl.className = 'ai-label';
+            lbl.textContent = 'Anagma IA';
+            bubble.appendChild(lbl);
+        }
+
+        const txt = document.createElement('div');
+        txt.textContent = content;
+        bubble.appendChild(txt);
+        row.appendChild(bubble);
+
+        if (time) {
+            const ts = document.createElement('div');
+            ts.className = 'msg-time';
+            ts.textContent = time;
+            row.appendChild(ts);
+        }
+
+        // Toolbar com botão de cópia (apenas mensagens da IA)
+        if (role === 'assistant') {
+            const toolbar = document.createElement('div');
+            toolbar.className = 'message-toolbar';
+
+            const btn = document.createElement('button');
+            btn.className = 'copy-btn';
+            btn.title = 'Copiar resposta (ou Ctrl+C ao passar o mouse)';
+            btn.innerHTML = '⎘ Copiar';
+
+            btn.addEventListener('click', async () => {
+                await copyText(content);
+                btn.innerHTML = '✓ Copiado';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.innerHTML = '⎘ Copiar';
+                    btn.classList.remove('copied');
+                }, 1800);
+            });
+
+            toolbar.appendChild(btn);
+            row.appendChild(toolbar);
+        }
+
+        // Rastreia mensagem sob cursor para Ctrl+C
+        row.addEventListener('mouseenter', () => { hoveredMsgContent = content; });
+        row.addEventListener('mouseleave', () => { hoveredMsgContent = null; });
+
+        msgContainer.appendChild(row);
+        if (scroll) scrollToBottom();
+        return row;
+    }
+
+    // ── Indicador "pensando" ─────────────────────────────────
+    function addLoader() {
+        if (greeting.style.display !== 'none') {
+            greeting.style.display = 'none';
+            msgContainer.style.display = 'flex';
+        }
+        const row = document.createElement('div');
+        row.id = 'loading-row';
+        row.className = 'message-row ai-row';
+        row.innerHTML =
+            '<div class="message-bubble ai-bubble">' +
+                '<span class="ai-label">Anagma IA</span>' +
+                '<span class="thinking-dots"><span></span><span></span><span></span></span>' +
+            '</div>';
+        msgContainer.appendChild(row);
+        scrollToBottom();
+        return row;
+    }
+
+    // ── Hidratação inicial da sessão ─────────────────────────
+    const msgsEl = document.getElementById('messages-data');
+    if (msgsEl) {
+        const initial = JSON.parse(msgsEl.textContent);
+        if (initial.length > 0) {
+            initial.forEach(m => buildMessage(m.role, m.content, m.time, false));
+            scrollToBottom();
+        }
+    }
+
+    // ── Controle de loading ──────────────────────────────────
+    function setLoading(state) {
+        isSending = state;
+        chatInput.disabled = state;
+        sendBtn.classList.toggle('disabled', state);
+        if (!state) chatInput.focus();
+    }
+
+    // ── Envio de mensagem ────────────────────────────────────
+    async function handleSend() {
+        if (isSending) return;
+        const text = chatInput.value.trim();
+        if (!text) return;
+
+        const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        buildMessage('user', text, now, true);
+
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+        filePreview.innerHTML = '';
+        setLoading(true);
+
+        const loader = addLoader();
+
+        try {
+            const res  = await fetch('/chat/send/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrf(),
+                },
+                body: JSON.stringify({ message: text, session_id: currentSessionId }),
+            });
+            const data = await res.json();
+            loader.remove();
+
+            if (data.status === 'success') {
+                if (!currentSessionId) {
+                    currentSessionId = data.session_id;
+                    window.history.replaceState(null, '', `/chat/s/${data.session_id}/`);
+                }
+                if (data.is_new) addToSidebar(data.session_id, data.session_title);
+                buildMessage('assistant', data.response, data.time || null, true);
+            } else {
+                buildMessage('assistant', 'Desculpe, tive um erro ao processar sua mensagem.', null, true);
+            }
+        } catch {
+            loader.remove();
+            buildMessage('assistant', 'Erro de conexão com o servidor.', null, true);
+        } finally {
+            setLoading(false);
+            fileInput.value = '';
+        }
+    }
+
+    // ── Sidebar: adicionar nova sessão ───────────────────────
+    function addToSidebar(id, title) {
+        // Remove mensagem "Nenhum histórico ainda."
+        const empty = document.getElementById('empty-history');
+        if (empty) empty.remove();
+
+        let grupo = historyList.querySelector('[data-group="Hoje"]');
+        if (!grupo) {
+            grupo = document.createElement('div');
+            grupo.className = 'history-group';
+            grupo.dataset.group = 'Hoje';
+            grupo.innerHTML = '<div class="history-group-label">Hoje</div>';
+            historyList.prepend(grupo);
+        }
+
+        // <div> wrapper — botões FORA do <a> de navegação
+        const div = document.createElement('div');
+        div.className = 'history-item active';
+        div.dataset.sessionId    = id;
+        div.dataset.sessionTitle = title;
+        div.innerHTML =
+            `<a class="session-link" href="/chat/s/${id}/" title="${escHtml(title)}">` +
+                `<span class="session-title">${escHtml(title)}</span>` +
+            `</a>` +
+            `<div class="session-actions">` +
+                `<button class="session-action-btn" data-action="rename" data-session-id="${id}" title="Renomear" type="button">✏️</button>` +
+                `<button class="session-action-btn" data-action="delete" data-session-id="${id}" title="Excluir" type="button">🗑️</button>` +
+            `</div>`;
+
+        // Remove active de outros itens
+        historyList.querySelectorAll('.history-item.active').forEach(el => el.classList.remove('active'));
+
+        const label = grupo.querySelector('.history-group-label');
+        label.insertAdjacentElement('afterend', div);
+    }
+
+    // ── Sidebar: renomear e excluir via delegação ────────────
+    if (historyList) {
+        historyList.addEventListener('click', e => {
+            const btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            const action    = btn.dataset.action;
+            const sessionId = btn.dataset.sessionId;
+            const item      = btn.closest('.history-item');
+
+            if (action === 'rename') startRename(sessionId, item);
+            else if (action === 'delete') doDelete(sessionId, item);
+        });
+    }
+
+    function startRename(sessionId, item) {
+        // Substitui o <a class="session-link"> inteiro — evita navegação acidental durante digitação
+        const linkEl     = item.querySelector('.session-link');
+        const savedTitle = item.dataset.sessionTitle;
+
+        const input = document.createElement('input');
+        input.type      = 'text';
+        input.value     = savedTitle;
+        input.className = 'rename-input';
+        linkEl.replaceWith(input);
+        input.focus();
+        input.select();
+
+        let done = false;
+        const save = async () => {
+            if (done) return;
+            done = true;
+            const nova = input.value.trim();
+            if (!nova || nova === savedTitle) { input.replaceWith(linkEl); return; }
+            try {
+                const r = await fetch(`/chat/s/${sessionId}/rename/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                    body: JSON.stringify({ titulo: nova }),
+                });
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const d = await r.json();
+                if (d.status === 'success') {
+                    // Atualiza texto dentro do <a> e os atributos do container
+                    linkEl.querySelector('.session-title').textContent = d.titulo;
+                    linkEl.title = d.titulo;
+                    item.dataset.sessionTitle = d.titulo;
+                }
+            } catch (err) {
+                console.error('Erro ao renomear:', err);
+            } finally {
+                input.replaceWith(linkEl);
+            }
+        };
+
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter')  { e.preventDefault(); save(); }
+            if (e.key === 'Escape') { done = true; input.replaceWith(linkEl); }
+        });
+        input.addEventListener('blur', save);
+    }
+
+    async function doDelete(sessionId, item) {
+        if (!confirm('Excluir esta conversa permanentemente?')) return;
+        try {
+            const r = await fetch(`/chat/s/${sessionId}/delete/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCsrf() },
+            });
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const d = await r.json();
+            if (d.status !== 'success') return;
+
+            if (String(currentSessionId) === String(sessionId)) {
+                window.location.href = '/chat/';
+                return;
+            }
+
+            const grupo = item.closest('.history-group');
+            item.remove();
+
+            if (grupo && !grupo.querySelector('.history-item')) {
+                grupo.remove();
+                if (!historyList.querySelector('.history-group')) {
+                    historyList.innerHTML =
+                        '<p id="empty-history" style="font-size:0.8rem;color:#555;text-align:center;margin-top:24px;">Nenhum histórico ainda.</p>';
+                }
+            }
+        } catch (err) {
+            console.error('Erro ao excluir sessão:', err);
+        }
+    }
+
+    // ── Eventos ──────────────────────────────────────────────
+    chatInput?.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    });
+    sendBtn?.addEventListener('click', e => { e.preventDefault(); handleSend(); });
+    attachBtn?.addEventListener('click', () => fileInput.click());
+    fileInput?.addEventListener('change', () => {
+        filePreview.innerHTML = '';
+        for (const f of fileInput.files) {
+            const chip = document.createElement('div');
+            chip.style.cssText = 'background:#2a2b2e;padding:4px 12px;border-radius:12px;font-size:0.8rem;border:1px solid #444;';
+            chip.textContent = `📎 ${f.name}`;
+            filePreview.appendChild(chip);
+        }
+    });
+
+    chatInput?.focus();
+});
+</script>
+{% endblock %}

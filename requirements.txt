@@ -1,0 +1,17 @@
+django==6.0.3
+llama-cpp-python==0.3.18
+psycopg2-binary
+transformers==5.3.0
+torch==2.11.0
+python-dotenv
+django-environ==0.13.0
+langchain==1.2.13
+langchain-community==0.4.1
+langchain-huggingface==1.2.1
+langchain-chroma
+chromadb==1.5.5
+sentence-transformers==5.3.0
+unstructured==0.21.5
+pandas==3.0.1
+openpyxl==3.1.5
+psutil==7.2.2
