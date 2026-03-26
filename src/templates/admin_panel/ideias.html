@@ -21,7 +21,7 @@
             <tr>
                 <td style="max-width:300px;">
                     <div style="font-weight:500;">{{ ideia.titulo }}</div>
-                    <div style="color:#888; font-size:0.8rem; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:280px;">{{ ideia.conteudo }}</div>
+                    <div style="color:#888; font-size:0.8rem; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:280px;">{{ ideia.conteudo|striptags }}</div>
                 </td>
                 <td style="color:#a8c7fa;">{{ ideia.autor.username|default:"—" }}</td>
                 <td style="color:#888; font-size:0.85rem;">{{ ideia.criado_em|date:"d/m/Y H:i" }}</td>
@@ -33,6 +33,11 @@
                     {% endif %}
                 </td>
                 <td style="white-space:nowrap;">
+                    <button type="button" class="btn btn-outline"
+                        style="margin-right:6px; color:var(--accent); border-color:#2a3f5f;"
+                        onclick="abrirEditor({{ ideia.pk }})">
+                        ✏️ Editar
+                    </button>
                     <form class="inline" method="post" action="{% url 'admin_panel:toggle_ideia' ideia.pk %}">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-outline" style="margin-right:6px;">
@@ -52,4 +57,138 @@
         </tbody>
     </table>
 </div>
+
+<!-- Dados das ideias para o editor (serialização segura via json_script) -->
+{{ ideias_data|json_script:"ideias-data" }}
+
+<!-- Modal Editor -->
+<div id="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background:#1e1f20; border:1px solid #333; border-radius:16px; width:760px; max-width:96vw; max-height:92vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+
+        <!-- Header -->
+        <div style="padding:18px 24px; border-bottom:1px solid #333; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+            <span style="font-weight:600; font-size:1rem; color:#a8c7fa;">✏️ Editar Ideia</span>
+            <button onclick="fecharEditor()" style="background:none; border:none; color:#888; font-size:1.3rem; cursor:pointer; line-height:1;">✕</button>
+        </div>
+
+        <!-- Campo Título -->
+        <div style="padding:16px 24px 0; flex-shrink:0;">
+            <label style="display:block; font-size:0.8rem; color:#888; margin-bottom:6px; text-transform:uppercase; letter-spacing:.05em;">Título</label>
+            <input type="text" id="editor-titulo"
+                style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid #333; background:#131314; color:#e3e3e3; font-size:0.95rem; outline:none; transition:border-color .15s;"
+                onfocus="this.style.borderColor='#4285f4'" onblur="this.style.borderColor='#333'">
+        </div>
+
+        <!-- Toolbar -->
+        <div style="padding:12px 24px 0; display:flex; gap:4px; flex-wrap:wrap; align-items:center; flex-shrink:0;">
+            <button class="tb-btn" onclick="fmt('bold')"             title="Negrito (Ctrl+B)"><strong>N</strong></button>
+            <button class="tb-btn" onclick="fmt('italic')"           title="Itálico (Ctrl+I)"><em>I</em></button>
+            <button class="tb-btn" onclick="fmt('underline')"        title="Sublinhado (Ctrl+U)"><u>S</u></button>
+            <button class="tb-btn" onclick="fmt('strikeThrough')"    title="Tachado"><s>T</s></button>
+            <div class="tb-sep"></div>
+            <button class="tb-btn" onclick="fmt('formatBlock','h2')" title="Título">H2</button>
+            <button class="tb-btn" onclick="fmt('formatBlock','h3')" title="Subtítulo">H3</button>
+            <button class="tb-btn" onclick="fmt('formatBlock','p')"  title="Parágrafo">¶</button>
+            <div class="tb-sep"></div>
+            <button class="tb-btn" onclick="fmt('insertUnorderedList')" title="Lista com marcadores">• Lista</button>
+            <button class="tb-btn" onclick="fmt('insertOrderedList')"   title="Lista numerada">1. Lista</button>
+            <div class="tb-sep"></div>
+            <button class="tb-btn" onclick="fmt('indent')"           title="Recuar">→</button>
+            <button class="tb-btn" onclick="fmt('outdent')"          title="Remover recuo">←</button>
+            <div class="tb-sep"></div>
+            <button class="tb-btn" onclick="fmt('removeFormat')"     title="Limpar formatação" style="color:#888; font-size:0.75rem;">✕ Fmt</button>
+        </div>
+
+        <!-- Área do editor -->
+        <div id="editor-conteudo" contenteditable="true" spellcheck="true"
+            style="flex:1; margin:12px 24px; padding:14px 16px; border-radius:10px; border:1px solid #333; background:#131314; color:#e3e3e3; font-size:0.93rem; line-height:1.75; min-height:220px; max-height:380px; overflow-y:auto; outline:none; transition:border-color .15s;"
+            onfocus="this.style.borderColor='#4285f4'" onblur="this.style.borderColor='#333'">
+        </div>
+
+        <!-- Footer -->
+        <div style="padding:16px 24px; border-top:1px solid #333; display:flex; justify-content:flex-end; gap:10px; flex-shrink:0;">
+            <button onclick="fecharEditor()" class="btn btn-outline">Cancelar</button>
+            <button onclick="salvarIdeia()" class="btn" style="background:linear-gradient(to right,#4285f4,#9b72cb); color:white; border:none; padding:8px 22px;">Salvar alterações</button>
+        </div>
+    </div>
+</div>
+
+<!-- Form oculto para submit -->
+<form id="form-editar" method="post" action="" style="display:none;">
+    {% csrf_token %}
+    <input type="hidden" name="titulo"   id="hidden-titulo">
+    <input type="hidden" name="conteudo" id="hidden-conteudo">
+</form>
+
+<style>
+.tb-btn {
+    background: #131314;
+    border: 1px solid #333;
+    color: #e3e3e3;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    min-width: 32px;
+}
+.tb-btn:hover { background: #2a2b2c; border-color: #555; }
+.tb-sep { width: 1px; background: #333; margin: 0 4px; align-self: stretch; }
+
+#editor-conteudo h2 { font-size: 1.2rem; font-weight: 600; margin: 10px 0 4px; color: #a8c7fa; }
+#editor-conteudo h3 { font-size: 1rem;  font-weight: 600; margin: 8px 0 4px;  color: #c8d8f0; }
+#editor-conteudo p  { margin: 4px 0; }
+#editor-conteudo ul, #editor-conteudo ol { margin-left: 22px; }
+#editor-conteudo li { margin-bottom: 4px; }
+#editor-conteudo strong { color: #fff; }
+#editor-conteudo em  { color: #c8d8f0; }
+</style>
+
+<script>
+const overlay   = document.getElementById('modal-overlay');
+const ideiaMap  = {};
+
+// Carrega os dados das ideias de forma segura (via json_script)
+JSON.parse(document.getElementById('ideias-data').textContent)
+    .forEach(function(i) { ideiaMap[i.pk] = i; });
+
+function abrirEditor(pk) {
+    const ideia = ideiaMap[pk];
+    if (!ideia) return;
+    document.getElementById('editor-titulo').value       = ideia.titulo;
+    document.getElementById('editor-conteudo').innerHTML = ideia.conteudo;
+    document.getElementById('form-editar').action        = '/admin-panel/ideias/' + pk + '/editar/';
+    overlay.style.display = 'flex';
+    document.getElementById('editor-titulo').focus();
+}
+
+function fecharEditor() {
+    overlay.style.display = 'none';
+}
+
+function fmt(cmd, val) {
+    document.getElementById('editor-conteudo').focus();
+    document.execCommand(cmd, false, val || null);
+}
+
+function salvarIdeia() {
+    const titulo   = document.getElementById('editor-titulo').value.trim();
+    const conteudo = document.getElementById('editor-conteudo').innerHTML.trim();
+    if (!titulo)   { document.getElementById('editor-titulo').focus(); return; }
+    if (!conteudo) { document.getElementById('editor-conteudo').focus(); return; }
+    document.getElementById('hidden-titulo').value   = titulo;
+    document.getElementById('hidden-conteudo').value = conteudo;
+    document.getElementById('form-editar').submit();
+}
+
+// Fecha ao clicar fora do modal
+overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) fecharEditor();
+});
+
+// Atalho ESC para fechar
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && overlay.style.display === 'flex') fecharEditor();
+});
+</script>
 {% endblock %}

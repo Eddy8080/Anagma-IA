@@ -1,0 +1,43 @@
+{% extends 'admin_panel/base_admin.html' %}
+
+{% block title %}Feedback {{ label }} — Painel Admin{% endblock %}
+
+{% block content %}
+<div class="page-title" style="display:flex; justify-content:space-between; align-items:center;">
+    <div>
+        <a href="{% url 'admin_panel:dashboard' %}" style="text-decoration:none; color:inherit;">📊 Dashboard</a> 
+        / {{ label }}
+    </div>
+    <a href="{% url 'admin_panel:dashboard' %}" 
+       style="background:#333537; border:1px solid #444; color:#e3e3e3; border-radius:8px; 
+              padding:6px 16px; text-decoration:none; font-size:0.85rem; transition:background 0.2s;"
+       onmouseover="this.style.background='#444'" onmouseout="this.style.background='#333537'">
+        ← Voltar ao Dashboard
+    </a>
+</div>
+
+<div class="card">
+    <h3 style="margin-top:0; font-weight:500;">Usuários que enviaram feedbacks</h3>
+    <p style="color:#888; font-size:0.9rem; margin-bottom:24px;">Clique em um usuário para ver as mensagens específicas.</p>
+
+    <div style="display:flex; flex-direction:column; gap:8px;">
+        {% for usuario in usuarios %}
+        <a href="{% url 'admin_panel:feedback_messages' user_id=usuario.id tipo=tipo %}" style="text-decoration:none;">
+            <div class="card" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition:background 0.2s;" onmouseover="this.style.background='#2a2b2e'" onmouseout="this.style.background='var(--sidebar-bg)'">
+                <div>
+                    <div style="font-weight:600; color:#e3e3e3;">{{ usuario.nome_completo|default:usuario.username }}</div>
+                    <div style="font-size:0.8rem; color:#666;">{{ usuario.email }}</div>
+                </div>
+                <div style="background:{% if tipo == 'like' %}#1a2e1a{% else %}#2e1a1a{% endif %}; 
+                            color:{% if tipo == 'like' %}#4ade80{% else %}#f87171{% endif %}; 
+                            padding:4px 12px; border-radius:12px; font-weight:600; font-size:0.9rem;">
+                    {{ usuario.total_feedback }}
+                </div>
+            </div>
+        </a>
+        {% empty %}
+        <p style="text-align:center; color:#555; padding:40px;">Nenhum feedback deste tipo registrado ainda.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

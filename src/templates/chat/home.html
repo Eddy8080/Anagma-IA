@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block extra_css %}
 <style>
@@ -90,6 +91,23 @@
     color: #4ade80;
     border-color: #4ade80;
 }
+.feedback-btn {
+    background: #232426;
+    border: 1px solid #3a3b3e;
+    color: #888;
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    font-family: inherit;
+}
+.feedback-btn:hover { background: #2e2f32; color: #e3e3e3; border-color: #555; }
+.feedback-btn.active-like    { color: #4ade80; border-color: #4ade80; background: #1a2e1a; }
+.feedback-btn.active-dislike { color: #f87171; border-color: #f87171; background: #2e1a1a; }
 
 /* ── Toast ── */
 #copy-toast {
@@ -125,6 +143,18 @@
     0%, 80%, 100% { opacity: 0.15; transform: scale(0.8); }
     40%            { opacity: 1;    transform: scale(1);   }
 }
+/* ── Itens fixados ── */
+.history-group-label.pinned-label { color: #9b72cb; }
+.history-item.pinned-item { border-color: #4a3070; background: #1c1828; }
+.history-item.pinned-item:hover { border-color: #6b4fa0; background: #221d30; }
+.history-item.pinned-item.active { border-color: #9b72cb; border-left: 3px solid #9b72cb; background: #1e1535; padding-left: 8px; }
+/* ── Item pendente (nova conversa aguardando) ── */
+.history-item.pending { border: 1px dashed #4285f4 !important; background: #111827; animation: pendingPulse 2s ease-in-out infinite; }
+.pending-title { font-style: italic; color: #6a8fc0; }
+@keyframes pendingPulse {
+    0%, 100% { border-color: #4285f4; box-shadow: 0 0 0 0 rgba(66,133,244,0); }
+    50%       { border-color: #9b72cb; box-shadow: 0 0 6px 1px rgba(155,114,203,0.2); }
+}
 </style>
 {% endblock %}
 
@@ -132,21 +162,26 @@
 {% block sidebar_history %}
 {% for group_label, group_sessions in grouped_sessions %}
 <div class="history-group" data-group="{{ group_label }}">
-    <div class="history-group-label">{{ group_label }}</div>
+    <div class="history-group-label{% if group_label == 'Fixadas' %} pinned-label{% endif %}">
+        {% if group_label == 'Fixadas' %}📌 {% endif %}{{ group_label }}
+    </div>
     {% for session in group_sessions %}
-    <div class="history-item{% if current_session and session.id == current_session.id %} active{% endif %}"
+    <div class="history-item{% if current_session and session.id == current_session.id %} active{% endif %}{% if session.pinned %} pinned-item{% endif %}"
          data-session-id="{{ session.id }}"
-         data-session-title="{{ session.titulo|escapejs }}">
+         data-session-title="{{ session.titulo|escapejs }}"
+         data-pinned="{{ session.pinned|yesno:'1,0' }}">
         <a class="session-link" href="/chat/s/{{ session.id }}/" title="{{ session.titulo }}">
             <span class="session-title">{{ session.titulo }}</span>
         </a>
         <div class="session-actions">
-            <button class="session-action-btn"
-                    data-action="rename"
+            <button class="session-action-btn" data-action="pin"
+                    data-session-id="{{ session.id }}"
+                    title="{% if session.pinned %}Desafixar{% else %}Fixar{% endif %}"
+                    type="button">{% if session.pinned %}📍{% else %}📌{% endif %}</button>
+            <button class="session-action-btn" data-action="rename"
                     data-session-id="{{ session.id }}"
                     title="Renomear" type="button">✏️</button>
-            <button class="session-action-btn"
-                    data-action="delete"
+            <button class="session-action-btn" data-action="delete"
                     data-session-id="{{ session.id }}"
                     title="Excluir" type="button">🗑️</button>
         </div>
@@ -177,6 +212,20 @@
 </div>
 
 <div id="copy-toast">Copiado!</div>
+
+{# ── Modal de Confirmação Customizado ── #}
+<div id="confirm-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
+                               background:rgba(0,0,0,0.7); z-index:10000; align-items:center; justify-content:center; backdrop-filter:blur(3px);">
+    <div style="background:#1e1f20; border:1px solid #3c4043; border-radius:16px; padding:24px; width:90%; max-width:380px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+        <div style="font-size:2rem; margin-bottom:16px;">🗑️</div>
+        <h3 style="margin:0 0 12px; color:#e3e3e3; font-weight:500;">Excluir esta conversa?</h3>
+        <p style="color:#999; font-size:0.9rem; line-height:1.5; margin-bottom:24px;">Esta ação é permanente e não poderá ser desfeita.</p>
+        <div style="display:flex; gap:12px; justify-content:center;">
+            <button id="modal-cancel-btn" style="background:#333537; color:#e3e3e3; border:1px solid #444; border-radius:10px; padding:10px 24px; cursor:pointer; font-weight:500; transition:background 0.2s;">Não</button>
+            <button id="modal-confirm-btn" style="background:#d93025; color:white; border:none; border-radius:10px; padding:10px 24px; cursor:pointer; font-weight:500; transition:background 0.2s;">Sim, excluir</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -200,6 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSessionId     = {% if current_session %}{{ current_session.id }}{% else %}null{% endif %};
     let hoveredMsgContent    = null;
     let isSending            = false;
+    let pendingItem          = null;
 
     // ── Utilitários ─────────────────────────────────────────
     const scrollToBottom = () =>
@@ -249,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ── Construção de mensagem ───────────────────────────────
-    function buildMessage(role, content, time, scroll) {
+    function buildMessage(role, content, time, scroll, msgId = null, initialFeedback = null) {
         if (greeting.style.display !== 'none') {
             greeting.style.display = 'none';
             msgContainer.style.display = 'flex';
@@ -262,10 +312,21 @@ document.addEventListener('DOMContentLoaded', () => {
         bubble.className = `message-bubble ${role === 'user' ? 'user-bubble' : 'ai-bubble'}`;
 
         if (role === 'assistant') {
+            const aiHeader = document.createElement('div');
+            aiHeader.style.cssText = 'display:flex; align-items:center; gap:10px; margin-bottom:8px;';
+
+            const avatar = document.createElement('div');
+            avatar.className = 'ai-avatar';
+            avatar.innerHTML = '<img src="{% static "Logo.png" %}" alt="Logo" style="width:100%; height:100%; object-fit:contain;">';
+
             const lbl = document.createElement('span');
             lbl.className = 'ai-label';
+            lbl.style.marginBottom = '0';
             lbl.textContent = 'Anagma IA';
-            bubble.appendChild(lbl);
+
+            aiHeader.appendChild(avatar);
+            aiHeader.appendChild(lbl);
+            bubble.appendChild(aiHeader);
         }
 
         const txt = document.createElement('div');
@@ -280,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
             row.appendChild(ts);
         }
 
-        // Toolbar com botão de cópia (apenas mensagens da IA)
+        // Toolbar com botões de cópia e feedback (apenas mensagens da IA)
         if (role === 'assistant') {
             const toolbar = document.createElement('div');
             toolbar.className = 'message-toolbar';
@@ -301,6 +362,26 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             toolbar.appendChild(btn);
+
+            // Botões de feedback (somente se tiver ID da mensagem)
+            if (msgId) {
+                const likeBtn = document.createElement('button');
+                likeBtn.className = 'feedback-btn' + (initialFeedback === 'like' ? ' active-like' : '');
+                likeBtn.title = 'Curtir resposta';
+                likeBtn.innerHTML = '👍';
+
+                const dislikeBtn = document.createElement('button');
+                dislikeBtn.className = 'feedback-btn' + (initialFeedback === 'dislike' ? ' active-dislike' : '');
+                dislikeBtn.title = 'Não curtir resposta';
+                dislikeBtn.innerHTML = '👎';
+
+                likeBtn.addEventListener('click',    () => doFeedback(msgId, 'like',    likeBtn, dislikeBtn));
+                dislikeBtn.addEventListener('click', () => doFeedback(msgId, 'dislike', likeBtn, dislikeBtn));
+
+                toolbar.appendChild(likeBtn);
+                toolbar.appendChild(dislikeBtn);
+            }
+
             row.appendChild(toolbar);
         }
 
@@ -324,7 +405,10 @@ document.addEventListener('DOMContentLoaded', () => {
         row.className = 'message-row ai-row';
         row.innerHTML =
             '<div class="message-bubble ai-bubble">' +
-                '<span class="ai-label">Anagma IA</span>' +
+                '<div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">' +
+                    '<div class="ai-avatar ai-avatar-thinking"><img src="{% static "Logo.png" %}" alt="Pensando..." style="width:100%; height:100%; object-fit:cover; transform: scale(1.1);"></div>' +
+                    '<span class="ai-label" style="margin:0;">Anagma IA</span>' +
+                '</div>' +
                 '<span class="thinking-dots"><span></span><span></span><span></span></span>' +
             '</div>';
         msgContainer.appendChild(row);
@@ -337,7 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (msgsEl) {
         const initial = JSON.parse(msgsEl.textContent);
         if (initial.length > 0) {
-            initial.forEach(m => buildMessage(m.role, m.content, m.time, false));
+            initial.forEach(m => buildMessage(m.role, m.content, m.time, false, m.id || null, m.feedback || null));
             scrollToBottom();
         }
     }
@@ -383,8 +467,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentSessionId = data.session_id;
                     window.history.replaceState(null, '', `/chat/s/${data.session_id}/`);
                 }
-                if (data.is_new) addToSidebar(data.session_id, data.session_title);
-                buildMessage('assistant', data.response, data.time || null, true);
+                if (data.is_new) {
+                    if (pendingItem) { pendingItem.remove(); pendingItem = null; }
+                    addToSidebar(data.session_id, data.session_title);
+                }
+                buildMessage('assistant', data.response, data.time || null, true, data.message_id || null, null);
             } else {
                 buildMessage('assistant', 'Desculpe, tive um erro ao processar sua mensagem.', null, true);
             }
@@ -417,13 +504,15 @@ document.addEventListener('DOMContentLoaded', () => {
         div.className = 'history-item active';
         div.dataset.sessionId    = id;
         div.dataset.sessionTitle = title;
+        div.dataset.pinned       = '0';
         div.innerHTML =
             `<a class="session-link" href="/chat/s/${id}/" title="${escHtml(title)}">` +
                 `<span class="session-title">${escHtml(title)}</span>` +
             `</a>` +
             `<div class="session-actions">` +
+                `<button class="session-action-btn" data-action="pin"    data-session-id="${id}" title="Fixar"    type="button">📌</button>` +
                 `<button class="session-action-btn" data-action="rename" data-session-id="${id}" title="Renomear" type="button">✏️</button>` +
-                `<button class="session-action-btn" data-action="delete" data-session-id="${id}" title="Excluir" type="button">🗑️</button>` +
+                `<button class="session-action-btn" data-action="delete" data-session-id="${id}" title="Excluir"  type="button">🗑️</button>` +
             `</div>`;
 
         // Remove active de outros itens
@@ -445,7 +534,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const sessionId = btn.dataset.sessionId;
             const item      = btn.closest('.history-item');
 
-            if (action === 'rename') startRename(sessionId, item);
+            if (action === 'pin')    doPin(sessionId, item, btn);
+            else if (action === 'rename') startRename(sessionId, item);
             else if (action === 'delete') doDelete(sessionId, item);
         });
     }
@@ -497,36 +587,161 @@ document.addEventListener('DOMContentLoaded', () => {
         input.addEventListener('blur', save);
     }
 
-    async function doDelete(sessionId, item) {
-        if (!confirm('Excluir esta conversa permanentemente?')) return;
+    async function doFeedback(msgId, type, likeBtn, dislikeBtn) {
         try {
-            const r = await fetch(`/chat/s/${sessionId}/delete/`, {
+            const r = await fetch(`/chat/msg/${msgId}/feedback/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify({ feedback: type }),
+            });
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const d = await r.json();
+            if (d.status !== 'success') return;
+            likeBtn.classList.toggle('active-like',    d.feedback === 'like');
+            dislikeBtn.classList.toggle('active-dislike', d.feedback === 'dislike');
+        } catch (err) {
+            console.error('Erro ao enviar feedback:', err);
+        }
+    }
+
+    const confirmModal   = document.getElementById('confirm-modal');
+    const modalCancelBtn  = document.getElementById('modal-cancel-btn');
+    const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+    let deleteCallback = null;
+
+    modalCancelBtn.addEventListener('click', () => {
+        confirmModal.style.display = 'none';
+        deleteCallback = null;
+    });
+
+    modalConfirmBtn.addEventListener('click', () => {
+        if (deleteCallback) deleteCallback();
+        confirmModal.style.display = 'none';
+        deleteCallback = null;
+    });
+
+    async function doPin(sessionId, item, btn) {
+        try {
+            const r = await fetch(`/chat/s/${sessionId}/pin/`, {
                 method: 'POST',
                 headers: { 'X-CSRFToken': getCsrf() },
             });
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const d = await r.json();
             if (d.status !== 'success') return;
-
-            if (String(currentSessionId) === String(sessionId)) {
-                window.location.href = '/chat/';
-                return;
-            }
-
-            const grupo = item.closest('.history-group');
-            item.remove();
-
-            if (grupo && !grupo.querySelector('.history-item')) {
-                grupo.remove();
-                if (!historyList.querySelector('.history-group')) {
-                    historyList.innerHTML =
-                        '<p id="empty-history" style="font-size:0.8rem;color:#555;text-align:center;margin-top:24px;">Nenhum histórico ainda.</p>';
-                }
-            }
+            // Reload para reorganizar grupos corretamente
+            window.location.reload();
         } catch (err) {
-            console.error('Erro ao excluir sessão:', err);
+            console.error('Erro ao fixar sessão:', err);
         }
     }
+
+    async function doDelete(sessionId, item) {
+        // Define o que fazer se o usuário confirmar
+        deleteCallback = async () => {
+            try {
+                const r = await fetch(`/chat/s/${sessionId}/delete/`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': getCsrf() },
+                });
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const d = await r.json();
+                if (d.status !== 'success') return;
+
+                if (String(currentSessionId) === String(sessionId)) {
+                    window.location.href = '/chat/';
+                    return;
+                }
+
+                const grupo = item.closest('.history-group');
+                item.remove();
+
+                if (grupo && !grupo.querySelector('.history-item')) {
+                    grupo.remove();
+                    if (!historyList.querySelector('.history-group')) {
+                        historyList.innerHTML =
+                            '<p id="empty-history" style="font-size:0.8rem;color:#555;text-align:center;margin-top:24px;">Nenhum histórico ainda.</p>';
+                    }
+                }
+            } catch (err) {
+                console.error('Erro ao excluir sessão:', err);
+            }
+        };
+        
+        // Abre o modal em vez do confirm nativo
+        confirmModal.style.display = 'flex';
+    }
+
+    // ── Nova Conversa sem reload ─────────────────────────────
+    const newChatBtn = document.querySelector('.new-chat-btn');
+    if (newChatBtn) {
+        newChatBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+
+            // Reseta estado
+            currentSessionId = null;
+            window.history.replaceState(null, '', '/chat/');
+
+            // Limpa janela de chat
+            msgContainer.innerHTML = '';
+            msgContainer.style.display = 'none';
+            greeting.style.display = '';
+
+            // Remove active de todos os itens
+            historyList.querySelectorAll('.history-item.active').forEach(el => el.classList.remove('active'));
+
+            // Cria item pendente na sidebar
+            _criarItemPendente();
+
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+            chatInput.focus();
+        });
+    }
+
+    function _criarItemPendente() {
+        if (pendingItem) { pendingItem.remove(); pendingItem = null; }
+
+        pendingItem = document.createElement('div');
+        pendingItem.className = 'history-item pending active';
+
+        const link = document.createElement('div');
+        link.style.cssText = 'flex:1;min-width:0;overflow:hidden;display:flex;align-items:center;';
+        const span = document.createElement('span');
+        span.className = 'session-title pending-title';
+        span.textContent = 'Nova conversa…';
+        link.appendChild(span);
+        pendingItem.appendChild(link);
+
+        // Garante grupo "Hoje" no topo (após Fixadas se existir)
+        let grupoHoje = historyList.querySelector('[data-group="Hoje"]');
+        if (!grupoHoje) {
+            grupoHoje = document.createElement('div');
+            grupoHoje.className = 'history-group';
+            grupoHoje.dataset.group = 'Hoje';
+            grupoHoje.innerHTML = '<div class="history-group-label">Hoje</div>';
+            const grupoFixadas = historyList.querySelector('[data-group="Fixadas"]');
+            if (grupoFixadas) grupoFixadas.insertAdjacentElement('afterend', grupoHoje);
+            else historyList.prepend(grupoHoje);
+        }
+        const label = grupoHoje.querySelector('.history-group-label');
+        label.insertAdjacentElement('afterend', pendingItem);
+
+        const empty = document.getElementById('empty-history');
+        if (empty) empty.remove();
+    }
+
+    // Atualiza título do item pendente ao digitar
+    chatInput?.addEventListener('input', function() {
+        if (!pendingItem) return;
+        const text = this.value.trim();
+        const titleEl = pendingItem.querySelector('.pending-title');
+        if (titleEl) {
+            titleEl.textContent = text
+                ? (text.length > 46 ? text.substring(0, 46) + '…' : text)
+                : 'Nova conversa…';
+        }
+    });
 
     // ── Eventos ──────────────────────────────────────────────
     chatInput?.addEventListener('keydown', e => {

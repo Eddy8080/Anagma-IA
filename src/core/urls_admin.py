@@ -4,12 +4,15 @@ from .views import (
     admin_usuarios,
     admin_criar_usuario,
     admin_deletar_usuario,
-    admin_toggle_ativo,
-    admin_toggle_superuser,
+    admin_update_user_status,
     admin_ideias,
     admin_deletar_ideia,
     admin_toggle_ideia,
+    admin_editar_ideia,
     admin_perfil_anagma,
+    admin_feedback_list,
+    admin_feedback_messages,
+    admin_save_correction,
 )
 
 app_name = 'admin_panel'
@@ -19,10 +22,15 @@ urlpatterns = [
     path('usuarios/', admin_usuarios, name='usuarios'),
     path('usuarios/criar/', admin_criar_usuario, name='criar_usuario'),
     path('usuarios/<int:user_id>/deletar/', admin_deletar_usuario, name='deletar_usuario'),
-    path('usuarios/<int:user_id>/ativo/', admin_toggle_ativo, name='toggle_ativo'),
-    path('usuarios/<int:user_id>/toggle/', admin_toggle_superuser, name='toggle_superuser'),
+    path('usuarios/<int:user_id>/status/', admin_update_user_status, name='update_user_status'),
     path('ideias/', admin_ideias, name='ideias'),
+    path('ideias/<int:ideia_id>/editar/', admin_editar_ideia, name='editar_ideia'),
     path('ideias/<int:ideia_id>/deletar/', admin_deletar_ideia, name='deletar_ideia'),
     path('ideias/<int:ideia_id>/toggle/', admin_toggle_ideia, name='toggle_ideia'),
     path('perfil/', admin_perfil_anagma, name='perfil_anagma'),
+
+    # Feedback e Curadoria IA
+    path('feedback/<str:tipo>/', admin_feedback_list, name='feedback_list'),
+    path('feedback/user/<int:user_id>/<str:tipo>/', admin_feedback_messages, name='feedback_messages'),
+    path('feedback/message/<int:message_id>/save/', admin_save_correction, name='save_correction'),
 ]

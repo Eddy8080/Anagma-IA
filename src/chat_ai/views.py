@@ -3,8 +3,10 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.core.cache import cache
 from django.utils import timezone
+from django.utils.html import strip_tags
 from datetime import timedelta
 from .models import ChatSession, ChatMessage
+from django.views.decorators.http import require_POST
 from .llm_engine import AnagmaLLMEngine
 import json
 
@@ -28,26 +30,30 @@ def _get_saudacao():
 
 
 def _get_ideias_ativas():
-    """Retorna GlobalIdeias ativas com cache de 5 minutos."""
+    """Retorna GlobalIdeias ativas com cache de 5 minutos. Strip de HTML antes de alimentar o LLM."""
     ideias = cache.get('global_ideias')
     if ideias is None:
         from core.models import GlobalIdeia
-        ideias = list(GlobalIdeia.objects.filter(ativa=True).values('titulo', 'conteudo').order_by('criado_em'))
+        qs = GlobalIdeia.objects.filter(ativa=True).values('titulo', 'conteudo').order_by('criado_em')
+        ideias = [{'titulo': i['titulo'], 'conteudo': strip_tags(i['conteudo'])} for i in qs]
         cache.set('global_ideias', ideias, timeout=300)
     return ideias
 
 
 def _group_sessions(sessions):
-    """Agrupa sessões por faixas de tempo para exibição na sidebar."""
+    """Agrupa sessões por faixas de tempo. Fixadas aparecem primeiro."""
     today = timezone.localdate()
     yesterday = today - timedelta(days=1)
     last_7 = today - timedelta(days=7)
     last_30 = today - timedelta(days=30)
 
-    order = ['Hoje', 'Ontem', 'Últimos 7 dias', 'Últimos 30 dias', 'Anteriores']
+    order = ['Fixadas', 'Hoje', 'Ontem', 'Últimos 7 dias', 'Últimos 30 dias', 'Anteriores']
     groups = {g: [] for g in order}
 
     for s in sessions:
+        if s.pinned:
+            groups['Fixadas'].append(s)
+            continue
         d = timezone.localtime(s.atualizado_em).date()
         if d == today:
             groups['Hoje'].append(s)
@@ -127,7 +133,7 @@ def send_message(request):
         traceback.print_exc()
         ai_response = 'Desculpe, ocorreu um erro interno ao processar sua mensagem. Tente novamente.'
 
-    ChatMessage.objects.create(session=session, role='assistant', content=ai_response)
+    ai_msg = ChatMessage.objects.create(session=session, role='assistant', content=ai_response)
 
     # Atualiza atualizado_em para manter ordenação correta na sidebar
     session.save()
@@ -138,6 +144,7 @@ def send_message(request):
         'session_title': session.titulo,
         'is_new': is_new,
         'response': ai_response,
+        'message_id': ai_msg.id,
         'time': timezone.localtime().strftime('%H:%M'),
     })
 
@@ -153,9 +160,11 @@ def chat_session(request, session_id):
 
     messages_data = [
         {
+            'id': m.id,
             'role': m.role,
             'content': m.content,
             'time': timezone.localtime(m.timestamp).strftime('%H:%M'),
+            'feedback': m.feedback,
         }
         for m in session.messages.order_by('timestamp')
     ]
@@ -188,6 +197,43 @@ def rename_session(request, session_id):
     session.titulo = titulo[:255]
     session.save(update_fields=['titulo'])
     return JsonResponse({'status': 'success', 'titulo': session.titulo})
+
+
+@login_required
+def pin_session(request, session_id):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error'}, status=400)
+    try:
+        session = ChatSession.objects.get(id=session_id, user=request.user)
+    except ChatSession.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Sessão não encontrada'}, status=404)
+    session.pinned = not session.pinned
+    session.save(update_fields=['pinned'])
+    return JsonResponse({'status': 'success', 'pinned': session.pinned})
+
+
+@login_required
+def message_feedback(request, message_id):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error'}, status=400)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error'}, status=400)
+
+    feedback = data.get('feedback')
+    if feedback not in ('like', 'dislike', None):
+        return JsonResponse({'status': 'error', 'message': 'Feedback inválido'}, status=400)
+
+    try:
+        msg = ChatMessage.objects.get(id=message_id, role='assistant', session__user=request.user)
+    except ChatMessage.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Mensagem não encontrada'}, status=404)
+
+    # Toggle: clicar no mesmo valor limpa (None)
+    msg.feedback = None if msg.feedback == feedback else feedback
+    msg.save(update_fields=['feedback'])
+    return JsonResponse({'status': 'success', 'feedback': msg.feedback})
 
 
 @login_required

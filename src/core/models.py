@@ -7,8 +7,17 @@ class CustomUser(AbstractUser):
     Modelo de usuário customizado para o Banco de Ideias.
     Permite saudações personalizadas e identificação clara.
     """
+    STATUS_CHOICES = [
+        ('active', 'Ativo'),
+        ('inactive', 'Inativo'),
+        ('paused', 'Pausado'),
+    ]
     nome_completo = models.CharField(max_length=255, blank=True)
+    account_status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
     
+    class Meta:
+        ordering = ['nome_completo', 'username']
+
     def get_saudacao(self):
         hora = datetime.now().hour
         if 5 <= hora < 12:

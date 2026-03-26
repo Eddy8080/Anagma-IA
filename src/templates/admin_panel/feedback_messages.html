@@ -1,0 +1,62 @@
+{% extends 'admin_panel/base_admin.html' %}
+
+{% block title %}Mensagens de {{ usuario.username }} — Painel Admin{% endblock %}
+
+{% block content %}
+<div class="page-title" style="display:flex; justify-content:space-between; align-items:center;">
+    <div>
+        <a href="{% url 'admin_panel:dashboard' %}" style="text-decoration:none; color:inherit;">📊 Dashboard</a> 
+        / <a href="{% url 'admin_panel:feedback_list' tipo=tipo %}" style="text-decoration:none; color:inherit;">{{ label }}</a>
+        / {{ usuario.nome_completo|default:usuario.username }}
+    </div>
+    <a href="{% url 'admin_panel:feedback_list' tipo=tipo %}" 
+       style="background:#333537; border:1px solid #444; color:#e3e3e3; border-radius:8px; 
+              padding:6px 16px; text-decoration:none; font-size:0.85rem; transition:background 0.2s;"
+       onmouseover="this.style.background='#444'" onmouseout="this.style.background='#333537'">
+        ← Voltar à Lista
+    </a>
+</div>
+
+<div style="display:flex; flex-direction:column; gap:20px;">
+    {% for msg in mensagens %}
+    <div class="card" style="border-left: 4px solid {% if tipo == 'like' %}#4ade80{% else %}#f87171{% endif %};">
+        <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:0.85rem; color:#888;">
+            <span>📅 {{ msg.timestamp|date:"d/m/Y H:i" }}</span>
+            <span>Conversa: {{ msg.session.titulo }}</span>
+        </div>
+
+        <div style="margin-bottom:16px;">
+            <div style="color:var(--accent-color); font-weight:600; font-size:0.9rem; margin-bottom:4px;">Anagma IA respondeu:</div>
+            <div style="background:#131314; padding:12px; border-radius:10px; border:1px solid #333; color:#e3e3e3; white-space:pre-wrap;">{{ msg.content }}</div>
+        </div>
+
+        <div style="margin-top:20px; padding-top:16px; border-top:1px dashed #333;">
+            <div style="font-weight:600; margin-bottom:12px; color:#a8c7fa;">✍️ Sugestão de Melhoria (Curadoria)</div>
+            <form action="{% url 'admin_panel:save_correction' message_id=msg.id %}" method="post">
+                {% csrf_token %}
+                <textarea name="sugestao" rows="4" 
+                          style="width:100%; background:#2a2b2e; border:1px solid #444; border-radius:10px; color:white; 
+                                 padding:12px; font-family:inherit; font-size:1rem; outline:none; resize:vertical; display:block; margin-bottom:12px;"
+                          placeholder="Escreva aqui como a IA deveria ter respondido...">{% if msg.correction %}{{ msg.correction.suggested_improvement }}{% endif %}</textarea>
+                
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    {% if msg.correction %}
+                    <span style="color:#4ade80; font-size:0.85rem;">✓ Sugestão gravada em {{ msg.correction.curated_at|date:"d/m/Y" }}</span>
+                    {% else %}
+                    <span style="color:#666; font-size:0.85rem;">Ainda não revisado.</span>
+                    {% endif %}
+                    <button type="submit" 
+                            style="background:#4285f4; color:white; border:none; border-radius:8px; 
+                                   padding:8px 24px; cursor:pointer; font-weight:500; transition:background 0.2s;"
+                            onmouseover="this.style.background='#5591f5'" onmouseout="this.style.background='#4285f4'">
+                        Gravar Melhoria
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% empty %}
+    <p style="text-align:center; color:#555; padding:40px;">Nenhuma mensagem encontrada para este usuário.</p>
+    {% endfor %}
+</div>
+{% endblock %}
