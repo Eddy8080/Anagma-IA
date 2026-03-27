@@ -8,9 +8,83 @@ from datetime import timedelta
 from .models import ChatSession, ChatMessage
 from django.views.decorators.http import require_POST
 from .llm_engine import AnagmaLLMEngine
+from .document_processor import AnagmaDocumentProcessor
+from core.models import DocumentoBiblioteca
 import json
 
 _llm_engine = None
+
+@login_required
+@require_POST
+def upload_document(request):
+    """
+    Recebe um arquivo, extrai texto via OCR e salva na Biblioteca para auditoria.
+    Retorna a resposta padrão da IA confirmando o recebimento.
+    """
+    if 'file' not in request.FILES:
+        return JsonResponse({'status': 'error', 'message': 'Nenhum arquivo enviado'}, status=400)
+
+    uploaded_file = request.FILES['file']
+    session_id = request.POST.get('session_id')
+    nome_original = uploaded_file.name
+    ext = nome_original.split('.')[-1].lower() if '.' in nome_original else ''
+
+    if ext not in ['pdf', 'png', 'jpg', 'jpeg']:
+        return JsonResponse({'status': 'error', 'message': 'Extensão não suportada'}, status=400)
+
+    try:
+        # 1. Salva na Biblioteca
+        doc_bib = DocumentoBiblioteca.objects.create(
+            nome_arquivo=nome_original,
+            arquivo=uploaded_file,
+            extensao=ext,
+            status='pending'
+        )
+
+        # 2. Extrai texto (com limite de 10 páginas embutido no processador)
+        # Precisamos reabrir o arquivo pois o create() pode ter movido o ponteiro
+        doc_bib.arquivo.open('rb')
+        texto_extraido = AnagmaDocumentProcessor.extrair_texto(doc_bib.arquivo, ext)
+        doc_bib.conteudo_extraido = texto_extraido
+        doc_bib.processado_em = timezone.now()
+        doc_bib.save(update_fields=['conteudo_extraido', 'processado_em'])
+
+        # 3. Gerenciar Sessão de Chat
+        if session_id:
+            session = ChatSession.objects.get(id=session_id, user=request.user)
+        else:
+            session = ChatSession.objects.create(user=request.user, titulo=f"Anexo: {nome_original}")
+
+        # 4. Registra no Chat (Mensagem do Usuário)
+        ChatMessage.objects.create(session=session, role='user', content=f"[Anexo enviado: {nome_original}]")
+
+        # 5. Resposta Padrão da IA (UX)
+        # Geramos um mini-resumo para a resposta ser mais inteligente
+        trecho = texto_extraido[:300].replace('\n', ' ')
+        ai_response = (
+            f"Recebi o documento **{nome_original}**. "
+            f"Identifiquei preliminarmente que ele contém informações sobre: *{trecho}...* "
+            f"\n\nO conteúdo já foi encaminhado para a nossa **Biblioteca de Curadoria** e está em **processo de auditoria** "
+            f"para garantir a precisão técnica antes de ser integrado definitivamente ao meu aprendizado contábil."
+            f"\n\nEnquanto isso, no que mais posso ajudar você hoje?"
+        )
+
+        ai_msg = ChatMessage.objects.create(session=session, role='assistant', content=ai_response)
+        session.save()
+
+        return JsonResponse({
+            'status': 'success',
+            'session_id': session.id,
+            'session_title': session.titulo,
+            'response': ai_response,
+            'message_id': ai_msg.id,
+            'time': timezone.localtime().strftime('%H:%M'),
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
 def get_llm_engine():

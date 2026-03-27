@@ -4,6 +4,7 @@ from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.contrib.auth.views import LoginView
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.utils import timezone
 from .forms import CustomUserRegistrationForm
 from .models import GlobalIdeia, CustomUser, PerfilAnagma
 from .decorators import superuser_required
@@ -264,6 +265,62 @@ def admin_perfil_anagma(request):
         messages.success(request, 'Perfil Anagma atualizado.')
         return redirect('admin_panel:perfil_anagma')
     return render(request, 'admin_panel/perfil_anagma.html', {'perfil': perfil})
+
+
+# ---------------------------------------------------------------------------
+# Gestão da Biblioteca de Curadoria (Documentos para IA)
+# ---------------------------------------------------------------------------
+
+@superuser_required
+def admin_biblioteca(request):
+    """
+    Lista documentos enviados pelos usuários para auditoria.
+    """
+    from .models import DocumentoBiblioteca
+    documentos = DocumentoBiblioteca.objects.all().select_related('auditado_por')
+    return render(request, 'admin_panel/biblioteca.html', {'documentos': documentos})
+
+
+@superuser_required
+def admin_auditar_documento(request, doc_id):
+    """
+    Aprova ou Rejeita um documento para a base de conhecimento da IA.
+    """
+    from .models import DocumentoBiblioteca
+    if request.method == 'POST':
+        doc = get_object_or_404(DocumentoBiblioteca, pk=doc_id)
+        acao = request.POST.get('acao') # 'approve' ou 'reject'
+        motivo = request.POST.get('motivo_rejeicao', '').strip()
+
+        if acao == 'approve':
+            doc.status = 'approved'
+            doc.motivo_rejeicao = ''
+            messages.success(request, f'Documento "{doc.nome_arquivo}" aprovado para a base da IA.')
+        elif acao == 'reject':
+            doc.status = 'rejected'
+            doc.motivo_rejeicao = motivo
+            messages.warning(request, f'Documento "{doc.nome_arquivo}" rejeitado.')
+        
+        doc.auditado_por = request.user
+        doc.processado_em = timezone.now()
+        doc.save()
+
+    return redirect('admin_panel:biblioteca')
+
+
+@superuser_required
+def admin_deletar_documento(request, doc_id):
+    """
+    Exclui permanentemente um documento e seu arquivo físico.
+    """
+    from .models import DocumentoBiblioteca
+    if request.method == 'POST':
+        doc = get_object_or_404(DocumentoBiblioteca, pk=doc_id)
+        nome = doc.nome_arquivo
+        doc.arquivo.delete() # Remove o arquivo físico
+        doc.delete()
+        messages.success(request, f'Documento "{nome}" removido permanentemente.')
+    return redirect('admin_panel:biblioteca')
 
 
 # ---------------------------------------------------------------------------

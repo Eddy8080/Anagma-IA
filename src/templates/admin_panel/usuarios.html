@@ -95,12 +95,12 @@
                 </td>
                 <td style="color:#a8c7fa; font-size:0.9rem;">{{ u.username }}</td>
                 <td>
-                    <form method="post" action="{% url 'admin_panel:update_user_status' u.id %}" style="margin:0; position:relative; z-index:100;">
+                    <form method="post" action="{% url 'admin_panel:update_user_status' u.id %}" style="margin:0; position:relative;">
                         {% csrf_token %}
                         <select name="nivel" onchange="this.form.submit()" 
                                 style="background:#1e1f20; border:1px solid #444; color:{% if u.is_superuser %}#a8c7fa{% else %}#4ade80{% endif %}; 
                                        border-radius:6px; padding:6px 10px; font-size:0.85rem; outline:none; cursor:pointer; width:135px;
-                                       display:block; -webkit-appearance:menulist; -moz-appearance:menulist; appearance:menulist;"
+                                       display:inline-block; -webkit-appearance:auto; -moz-appearance:auto; appearance:auto;"
                                 {% if u == request.user %}disabled{% endif %}>
                             <option value="user" {% if not u.is_superuser %}selected{% endif %}>Usuário</option>
                             <option value="admin" {% if u.is_superuser %}selected{% endif %}>Superusuário</option>
@@ -108,11 +108,11 @@
                     </form>
                 </td>
                 <td>
-                    <form method="post" action="{% url 'admin_panel:update_user_status' u.id %}" style="margin:0; position:relative; z-index:100;">
+                    <form method="post" action="{% url 'admin_panel:update_user_status' u.id %}" style="margin:0; position:relative;">
                         {% csrf_token %}
                         <select name="status" onchange="this.form.submit()" 
                                 style="background:#1e1f20; border:1px solid #444; border-radius:6px; padding:6px 10px; font-size:0.85rem; outline:none; cursor:pointer; width:115px;
-                                       display:block; -webkit-appearance:menulist; -moz-appearance:menulist; appearance:menulist;
+                                       display:inline-block; -webkit-appearance:auto; -moz-appearance:auto; appearance:auto;
                                        color:{% if u.account_status == 'active' %}#4ade80{% elif u.account_status == 'paused' %}#fbbf24{% else %}#f87171{% endif %};"
                                 {% if u == request.user %}disabled{% endif %}>
                             <option value="active" {% if u.account_status == 'active' %}selected{% endif %}>Ativo</option>

@@ -10,6 +10,9 @@ from .views import (
     admin_toggle_ideia,
     admin_editar_ideia,
     admin_perfil_anagma,
+    admin_biblioteca,
+    admin_auditar_documento,
+    admin_deletar_documento,
     admin_feedback_list,
     admin_feedback_messages,
     admin_save_correction,
@@ -28,6 +31,11 @@ urlpatterns = [
     path('ideias/<int:ideia_id>/deletar/', admin_deletar_ideia, name='deletar_ideia'),
     path('ideias/<int:ideia_id>/toggle/', admin_toggle_ideia, name='toggle_ideia'),
     path('perfil/', admin_perfil_anagma, name='perfil_anagma'),
+
+    # Biblioteca de Curadoria
+    path('biblioteca/', admin_biblioteca, name='biblioteca'),
+    path('biblioteca/<int:doc_id>/auditar/', admin_auditar_documento, name='auditar_documento'),
+    path('biblioteca/<int:doc_id>/deletar/', admin_deletar_documento, name='deletar_documento'),
 
     # Feedback e Curadoria IA
     path('feedback/<str:tipo>/', admin_feedback_list, name='feedback_list'),

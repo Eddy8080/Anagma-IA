@@ -163,7 +163,8 @@ REGRAS INVIOLÁVEIS:
 1. SEMPRE responda em português brasileiro — sem exceção.
 2. NUNCA saia do domínio contábil/fiscal/financeiro.
 3. Cite normas, artigos de lei e prazos legais quando aplicável.
-4. Seja preciso, técnico e objetivo."""
+4. Seja preciso, técnico e objetivo.
+5. JAMAIS inclua notas explicativas, metadados, justificativas ou comentários sobre a sua própria resposta (ex: "Note:", "(Observação:)", etc.). Responda APENAS o conteúdo solicitado."""
 
         if perfil_anagma:
             system_msg += f'\n\nCONTEXTO DA EMPRESA:\n{perfil_anagma}'
@@ -198,8 +199,27 @@ REGRAS INVIOLÁVEIS:
         messages.append({'role': 'user', 'content': user_query})
 
         if self._backend == 'gguf':
-            return self._gerar_gguf(messages)
-        return self._gerar_safetensors(messages)
+            res = self._gerar_gguf(messages)
+        else:
+            res = self._gerar_safetensors(messages)
+            
+        return self._limpar_resposta(res)
+
+    def _limpar_resposta(self, texto):
+        """Remove notas explicativas ou metadados que o modelo possa anexar por erro de instrução."""
+        if not texto: return texto
+        
+        import re
+        # Remove blocos como (Note: ...), (Observação: ...), [Note: ...], etc.
+        padroes = [
+            r'\(Note:.*?\)', r'\[Note:.*?\]', r'\(Observação:.*?\)', r'\[Observação:.*?\]',
+            r'\nNote:.*$', r'\nObservação:.*$', r'^\s*Note:.*$', r'^\s*Observação:.*$'
+        ]
+        for p in padroes:
+            texto = re.sub(p, '', texto, flags=re.IGNORECASE | re.DOTALL).strip()
+            
+        # Limpeza adicional de quebras de linha duplas no final
+        return texto.strip()
 
     def _gerar_gguf(self, messages):
         if not self._llm:

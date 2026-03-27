@@ -434,32 +434,52 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!state) chatInput.focus();
     }
 
-    // ── Envio de mensagem ────────────────────────────────────
+    // ── Envio de mensagem ou arquivo ─────────────────────────
     async function handleSend() {
         if (isSending) return;
+        
         const text = chatInput.value.trim();
-        if (!text) return;
+        const hasFiles = fileInput.files && fileInput.files.length > 0;
+        
+        if (!text && !hasFiles) return;
 
-        const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        buildMessage('user', text, now, true);
-
-        chatInput.value = '';
-        chatInput.style.height = 'auto';
-        filePreview.innerHTML = '';
         setLoading(true);
-
         const loader = addLoader();
 
         try {
-            const res  = await fetch('/chat/send/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCsrf(),
-                },
-                body: JSON.stringify({ message: text, session_id: currentSessionId }),
-            });
-            const data = await res.json();
+            let res, data;
+            const csrf = getCsrf();
+
+            if (hasFiles) {
+                // Lógica de Upload de Arquivo
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]); // Pega o primeiro arquivo
+                if (currentSessionId) formData.append('session_id', currentSessionId);
+
+                const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                buildMessage('user', `[Anexo: ${fileInput.files[0].name}]`, now, true);
+
+                res = await fetch('/chat/upload/', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrf },
+                    body: formData
+                });
+            } else {
+                // Lógica de Mensagem de Texto
+                const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                buildMessage('user', text, now, true);
+
+                res = await fetch('/chat/send/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrf,
+                    },
+                    body: JSON.stringify({ message: text, session_id: currentSessionId }),
+                });
+            }
+
+            data = await res.json();
             loader.remove();
 
             if (data.status === 'success') {
@@ -473,14 +493,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 buildMessage('assistant', data.response, data.time || null, true, data.message_id || null, null);
             } else {
-                buildMessage('assistant', 'Desculpe, tive um erro ao processar sua mensagem.', null, true);
+                buildMessage('assistant', `Erro: ${data.message || 'Falha ao processar.'}`, null, true);
             }
-        } catch {
-            loader.remove();
+        } catch (err) {
+            console.error(err);
+            if (loader) loader.remove();
             buildMessage('assistant', 'Erro de conexão com o servidor.', null, true);
         } finally {
             setLoading(false);
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
             fileInput.value = '';
+            filePreview.innerHTML = '';
         }
     }
 

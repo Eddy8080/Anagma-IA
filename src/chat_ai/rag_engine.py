@@ -76,14 +76,41 @@ class AnagmaRAGEngine:
 
     def buscar_conhecimento(self, query, k=3):
         """
-        Busca semântica nos documentos vetorizados.
-        Retorna string vazia se não houver documentos indexados.
+        Busca semântica nos documentos vetorizados (ChromaDB)
+        E busca textual nos documentos aprovados na Biblioteca.
         """
+        contexto_final = []
+
+        # 1. Busca no ChromaDB (Documentos Fixos)
         try:
             results = self.vector_store.similarity_search(query, k=k)
-            if not results:
-                return ""
-            return "\n---\n".join([doc.page_content for doc in results])
+            if results:
+                contexto_final.append("\n---\n".join([doc.page_content for doc in results]))
         except Exception as e:
-            print(f"[RAG] Erro na busca: {e}")
-            return ""
+            print(f"[RAG Chroma] Erro: {e}")
+
+        # 2. Busca na Biblioteca de Curadoria (Documentos Aprovados)
+        try:
+            from core.models import DocumentoBiblioteca
+            from django.db.models import Q
+            
+            # Busca simples por palavras-chave na query (melhor performance para banco)
+            palavras = [p for p in query.split() if len(p) > 3]
+            query_db = Q(status='approved')
+            
+            if palavras:
+                # Filtra documentos aprovados que contenham as palavras da busca
+                sub_query = Q()
+                for p in palavras[:5]: # Limita a 5 palavras para evitar queries gigantes
+                    sub_query |= Q(conteudo_extraido__icontains=p) | Q(nome_arquivo__icontains=p)
+                query_db &= sub_query
+
+            docs_biblioteca = DocumentoBiblioteca.objects.filter(query_db).only('conteudo_extraido', 'nome_arquivo')[:2]
+            
+            for doc in docs_biblioteca:
+                contexto_final.append(f"DOCUMENTO APROVADO ({doc.nome_arquivo}):\n{doc.conteudo_extraido[:2000]}")
+
+        except Exception as e:
+            print(f"[RAG Biblioteca] Erro: {e}")
+
+        return "\n\n=== CONTEXTO ADICIONAL ===\n\n".join(contexto_final)

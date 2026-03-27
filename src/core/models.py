@@ -59,3 +59,34 @@ class GlobalIdeia(models.Model):
 
     def __str__(self):
         return self.titulo
+
+class DocumentoBiblioteca(models.Model):
+    """
+    Central de Inteligência Documental. Armazena arquivos para auditoria e aprendizado da IA.
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pendente de Auditoria'),
+        ('approved', 'Aprovado (Na Memória)'),
+        ('rejected', 'Rejeitado (Conteúdo Irrelevante)'),
+    ]
+
+    nome_arquivo = models.CharField(max_length=255)
+    arquivo = models.FileField(upload_to='biblioteca/documentos/')
+    extensao = models.CharField(max_length=10)
+    conteudo_extraido = models.TextField(blank=True, help_text="Texto bruto extraído via OCR/Parsing")
+    resumo_ia = models.TextField(blank=True, help_text="Resumo inicial gerado pela IA para triagem")
+    
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    
+    criado_em = models.DateTimeField(auto_now_add=True)
+    processado_em = models.DateTimeField(null=True, blank=True)
+    auditado_por = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='documentos_auditados')
+    motivo_rejeicao = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = 'Documento da Biblioteca'
+        verbose_name_plural = 'Documentos da Biblioteca'
+        ordering = ['-criado_em']
+
+    def __str__(self):
+        return f"{self.nome_arquivo} ({self.get_status_display()})"

@@ -140,6 +140,7 @@
         <a href="{% url 'admin_panel:dashboard' %}" {% if request.resolver_match.url_name == 'dashboard' %}class="active"{% endif %}>📊 Dashboard</a>
         <a href="{% url 'admin_panel:usuarios' %}" {% if 'usuario' in request.resolver_match.url_name %}class="active"{% endif %}>👥 Usuários</a>
         <a href="{% url 'admin_panel:ideias' %}" {% if 'ideia' in request.resolver_match.url_name %}class="active"{% endif %}>💡 Ideias</a>
+        <a href="{% url 'admin_panel:biblioteca' %}" {% if 'biblioteca' in request.resolver_match.url_name %}class="active"{% endif %}>📚 Biblioteca</a>
         <a href="{% url 'admin_panel:perfil_anagma' %}" {% if request.resolver_match.url_name == 'perfil_anagma' %}class="active"{% endif %}>🏢 Perfil Anagma</a>
         <div class="sidebar-footer">
             <a href="/chat/" style="color:var(--muted); font-size:0.85rem;">← Voltar ao Chat</a>
