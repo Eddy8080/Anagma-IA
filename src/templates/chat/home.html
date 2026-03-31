@@ -155,6 +155,34 @@
     0%, 100% { border-color: #4285f4; box-shadow: 0 0 0 0 rgba(66,133,244,0); }
     50%       { border-color: #9b72cb; box-shadow: 0 0 6px 1px rgba(155,114,203,0.2); }
 }
+
+/* ── Status de Anexo ── */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-top: 8px;
+    border: 1px solid transparent;
+}
+.status-approved {
+    background: rgba(74, 222, 128, 0.1);
+    color: #4ade80;
+    border-color: rgba(74, 222, 128, 0.2);
+}
+.status-rejected {
+    background: rgba(248, 113, 113, 0.1);
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.2);
+}
+.status-pending {
+    background: rgba(251, 191, 36, 0.1);
+    color: #fbbf24;
+    border-color: rgba(251, 191, 36, 0.2);
+}
 </style>
 {% endblock %}
 
@@ -236,6 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Elementos ───────────────────────────────────────────
     const chatInput    = document.getElementById('chat-input');
     const sendBtn      = document.getElementById('send-btn');
+    const stopBtn      = document.getElementById('stop-btn');
     const attachBtn    = document.getElementById('attach-btn');
     const fileInput    = document.getElementById('file-input');
     const chatWindow   = document.getElementById('chat-window');
@@ -250,6 +279,27 @@ document.addEventListener('DOMContentLoaded', () => {
     let hoveredMsgContent    = null;
     let isSending            = false;
     let pendingItem          = null;
+    let abortController      = null;
+
+    // ── Interromper Geração ──────────────────────────────────
+    function stopGeneration() {
+        if (abortController) {
+            abortController.abort();
+            abortController = null;
+            setLoading(false);
+            const loader = document.getElementById('loading-row');
+            if (loader) loader.remove();
+        }
+    }
+
+    if (stopBtn) stopBtn.addEventListener('click', stopGeneration);
+
+    // Atalho Esc para interromper
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && isSending) {
+            stopGeneration();
+        }
+    });
 
     // ── Utilitários ─────────────────────────────────────────
     const scrollToBottom = () =>
@@ -299,7 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ── Construção de mensagem ───────────────────────────────
-    function buildMessage(role, content, time, scroll, msgId = null, initialFeedback = null) {
+    function buildMessage(role, content, time, scroll, msgId = null, initialFeedback = null, statusAnexo = null) {
         if (greeting.style.display !== 'none') {
             greeting.style.display = 'none';
             msgContainer.style.display = 'flex';
@@ -332,6 +382,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const txt = document.createElement('div');
         txt.textContent = content;
         bubble.appendChild(txt);
+
+        // Se houver status de anexo, renderiza a badge
+        if (statusAnexo) {
+            const badge = document.createElement('div');
+            badge.className = `status-badge status-${statusAnexo}`;
+            
+            let icon = '⏳';
+            let label = 'Pendente';
+            
+            if (statusAnexo === 'approved') { icon = '✓'; label = 'Aprovado'; }
+            else if (statusAnexo === 'rejected') { icon = '✕'; label = 'Reprovado'; }
+
+            badge.innerHTML = `<span>${icon}</span> <span>${label}</span>`;
+            bubble.appendChild(badge);
+        }
+
         row.appendChild(bubble);
 
         if (time) {
@@ -421,7 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (msgsEl) {
         const initial = JSON.parse(msgsEl.textContent);
         if (initial.length > 0) {
-            initial.forEach(m => buildMessage(m.role, m.content, m.time, false, m.id || null, m.feedback || null));
+            initial.forEach(m => buildMessage(m.role, m.content, m.time, false, m.id || null, m.feedback || null, m.status_anexo || null));
             scrollToBottom();
         }
     }
@@ -429,14 +495,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Controle de loading ──────────────────────────────────
     function setLoading(state) {
         isSending = state;
-        chatInput.disabled = state;
-        sendBtn.classList.toggle('disabled', state);
+        // Agora o input NÃO é mais desativado, permitindo edição.
+        if (state) {
+            sendBtn.style.display = 'none';
+            stopBtn.style.display = 'flex';
+        } else {
+            sendBtn.style.display = 'flex';
+            stopBtn.style.display = 'none';
+        }
         if (!state) chatInput.focus();
     }
 
     // ── Envio de mensagem ou arquivo ─────────────────────────
     async function handleSend() {
-        if (isSending) return;
+        // Se já está enviando, interrompe a anterior e começa a nova (requisito: "a IA continuará")
+        if (isSending) {
+            stopGeneration();
+        }
         
         const text = chatInput.value.trim();
         const hasFiles = fileInput.files && fileInput.files.length > 0;
@@ -445,6 +520,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setLoading(true);
         const loader = addLoader();
+        abortController = new AbortController();
+
+        // Limpa o campo IMEDIATAMENTE após o envio para melhor UX
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+        fileInput.value = '';
+        filePreview.innerHTML = '';
 
         try {
             let res, data;
@@ -453,7 +535,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (hasFiles) {
                 // Lógica de Upload de Arquivo
                 const formData = new FormData();
-                formData.append('file', fileInput.files[0]); // Pega o primeiro arquivo
+                formData.append('file', fileInput.files[0]);
                 if (currentSessionId) formData.append('session_id', currentSessionId);
 
                 const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -462,7 +544,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 res = await fetch('/chat/upload/', {
                     method: 'POST',
                     headers: { 'X-CSRFToken': csrf },
-                    body: formData
+                    body: formData,
+                    signal: abortController.signal
                 });
             } else {
                 // Lógica de Mensagem de Texto
@@ -476,6 +559,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         'X-CSRFToken': csrf,
                     },
                     body: JSON.stringify({ message: text, session_id: currentSessionId }),
+                    signal: abortController.signal
                 });
             }
 
@@ -492,19 +576,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     addToSidebar(data.session_id, data.session_title);
                 }
                 buildMessage('assistant', data.response, data.time || null, true, data.message_id || null, null);
+                
+                // Força reload se for upload para atualizar a badge de "Pendente"
+                if (hasFiles) {
+                    setTimeout(() => window.location.reload(), 800);
+                }
             } else {
                 buildMessage('assistant', `Erro: ${data.message || 'Falha ao processar.'}`, null, true);
             }
         } catch (err) {
-            console.error(err);
-            if (loader) loader.remove();
-            buildMessage('assistant', 'Erro de conexão com o servidor.', null, true);
+            if (err.name === 'AbortError') {
+                console.log('Geração interrompida pelo usuário.');
+                buildMessage('assistant', 'Geração interrompida.', null, true);
+            } else {
+                console.error(err);
+                if (loader) loader.remove();
+                buildMessage('assistant', 'Erro de conexão com o servidor.', null, true);
+            }
         } finally {
             setLoading(false);
-            chatInput.value = '';
-            chatInput.style.height = 'auto';
-            fileInput.value = '';
-            filePreview.innerHTML = '';
+            abortController = null;
         }
     }
 

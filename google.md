@@ -74,6 +74,12 @@ O sistema foi projetado de forma modular, permitindo a substituição do modelo 
 
 - **Git:** Arquivo `google.md` mantido na pasta física para acesso da IA e persistência de memória técnica.
 
+## 10. Estratégia de Aprendizado Adaptativo e Curadoria de Respostas
+- **Estado Inicial (Fase de Aprendizado):** Se o Banco de Ideias e a Biblioteca estiverem vazios, a IA deve adotar uma postura de transparência, informando que está em fase inicial de aprendizado e coletando dados.
+- **Integração de Conhecimento Híbrido:** A IA deve priorizar respostas que combinem o conteúdo bruto da **Biblioteca** (fatos) com a camada de inteligência do **Banco de Ideias** (estratégia/sugestões).
+    - *Exemplo:* Se uma ideia sugere que "o documento A é melhor analisado focando no campo X", a IA deve usar essa instrução como um "filtro de atenção" ao ler o documento A para o usuário.
+- **Evolução por Feedback Humano:** O Banco de Ideias serve como um manual de instruções dinâmico para a IA. Cada ideia aprovada calibra a forma como a IA interpreta a legislação e os documentos contábeis da empresa.
+
 ---
-*Assinado: Arquiteta e Engenheira de Software Sênior (Sessão 27/03/2026).*
+*Assinado: Arquiteta e Engenheira de Software Sênior (Sessão 31/03/2026).*
 

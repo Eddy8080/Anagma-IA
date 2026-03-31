@@ -55,7 +55,7 @@ class GlobalIdeia(models.Model):
     conteudo = models.TextField()
     criado_em = models.DateTimeField(auto_now_add=True)
     autor = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True)
-    ativa = models.BooleanField(default=True)
+    ativa = models.BooleanField(default=False)
 
     def __str__(self):
         return self.titulo

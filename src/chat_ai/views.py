@@ -195,12 +195,15 @@ def send_message(request):
 
     try:
         llm_engine = get_llm_engine()
+        # Envia a query do usuário + o título da sessão como contexto extra de busca (RAG)
+        query_contextual = f"{user_prompt} {session.titulo}"
         ai_response = llm_engine.gerar_resposta(
             user_query=user_prompt,
             chat_history=chat_history,
             user_name=user_name,
             saudacao=saudacao,
             ideias=ideias,
+            search_query=query_contextual
         )
     except Exception:
         import traceback
@@ -232,16 +235,30 @@ def chat_session(request, session_id):
 
     sessions = ChatSession.objects.filter(user=request.user)
 
-    messages_data = [
-        {
+    messages_data = []
+    for m in session.messages.order_by('timestamp'):
+        status_anexo = None
+        nome_arquivo = None
+        
+        # Se for mensagem de anexo, tenta capturar o status
+        if m.content.startswith('[Anexo enviado:') and ']' in m.content:
+            try:
+                nome_arquivo = m.content.split('[Anexo enviado: ')[1].split(']')[0]
+                doc = DocumentoBiblioteca.objects.filter(nome_arquivo=nome_arquivo).first()
+                if doc:
+                    status_anexo = doc.status
+            except Exception:
+                pass
+
+        messages_data.append({
             'id': m.id,
             'role': m.role,
             'content': m.content,
             'time': timezone.localtime(m.timestamp).strftime('%H:%M'),
             'feedback': m.feedback,
-        }
-        for m in session.messages.order_by('timestamp')
-    ]
+            'status_anexo': status_anexo,
+            'nome_arquivo': nome_arquivo
+        })
 
     context = {
         'grouped_sessions': _group_sessions(sessions),

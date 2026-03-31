@@ -236,6 +236,17 @@
         }
         .icon-btn:hover { background: rgba(168, 199, 250, 0.1); }
         .icon-btn.disabled { opacity: 0.35; pointer-events: none; }
+        
+        #stop-btn {
+            background-color: #d93025;
+            color: white;
+            display: none;
+            width: 32px;
+            height: 32px;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+        }
+        #stop-btn:hover { background-color: #b2261e; }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
@@ -282,6 +293,7 @@
                 <textarea id="chat-input" class="prompt-input" rows="1"
                           placeholder="Pergunte qualquer coisa à Anagma IA…"
                           autocomplete="off"></textarea>
+                <button class="icon-btn" id="stop-btn" title="Interromper (Esc)" type="button">■</button>
                 <button class="icon-btn" id="send-btn" title="Enviar (Enter)" type="button">➔</button>
             </div>
             <div id="file-preview" style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;"></div>

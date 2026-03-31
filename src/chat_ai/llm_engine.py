@@ -128,14 +128,15 @@ class AnagmaLLMEngine:
             cache.set('perfil_anagma', perfil, timeout=300)
         return perfil
 
-    def gerar_resposta(self, user_query, chat_history=None, user_name=None, saudacao=None, ideias=None):
+    def gerar_resposta(self, user_query, chat_history=None, user_name=None, saudacao=None, ideias=None, search_query=None):
         """
         Gera resposta usando RAG + Phi-3 com gestão de contexto e thread-safety.
         """
         if not self.pronto:
             return 'Desculpe, o motor de IA não está disponível. Verifique os logs do servidor.'
 
-        contexto_rag = self.rag.buscar_conhecimento(user_query)
+        # Usa search_query (contextualizada) para busca no RAG, mas responde ao user_query original
+        contexto_rag = self.rag.buscar_conhecimento(search_query or user_query)
         perfil_anagma = self._get_perfil_anagma()
 
         # --- Monta o system prompt ---
@@ -145,38 +146,35 @@ class AnagmaLLMEngine:
         _periodo_map = {'Bom dia': 'manhã', 'Boa tarde': 'tarde', 'Boa noite': 'noite'}
         periodo = _periodo_map.get(cumprimento, 'tarde')
 
-        system_msg = f"""IDIOMA OBRIGATÓRIO: Você DEVE responder EXCLUSIVAMENTE em português brasileiro. NUNCA responda em inglês ou qualquer outro idioma. Se o usuário escrever em outro idioma, responda em português brasileiro mesmo assim.
+        system_msg = f"""IDENTIDADE E MANDATO SUPREMO:
+- Você é a **Anagma IA**, a inteligência artificial especialista e oficial da empresa **Anagma**.
+- Sua comunicação deve ser em **Português Brasileiro de alto nível**, técnico, claro e sem erros gramaticais.
+- Você opera em um ambiente **100% DIGITAL**. NÃO existem bibliotecas físicas, salas, atendentes humanos ou contatos externos. Toda a gestão de documentos é feita pelo sistema Anagma que o usuário está acessando agora.
 
-DOMÍNIO OBRIGATÓRIO: Você é a Anagma IA, assistente EXCLUSIVAMENTE especialista em contabilidade brasileira da empresa Anagma. Você ONLY fala sobre contabilidade, finanças, tributos, legislação fiscal e temas relacionados. Para qualquer pergunta fora desse escopo, diga educadamente que só pode ajudar com temas contábeis e fiscais.
+SAUDAÇÃO OBRIGATÓRIA:
+- Comece SEMPRE com: "{cumprimento}, {nome}!".
 
-IDENTIDADE: Você está conversando com {nome}. Saudação obrigatória: "{cumprimento}, {nome}!". Use SEMPRE essa saudação ao iniciar — nunca outra.
+REGRAS DE RESPOSTA E AUTORIDADE:
+1. **Prioridade de Dados:** Se a informação estiver no CONTEXTO INTERNO abaixo (Biblioteca ou Banco de Ideias), use-a como VERDADE ABSOLUTA. Se o status de um arquivo for "Aprovado", você JÁ POSSUI o conhecimento dele. NÃO diga que "está em auditoria" ou que "precisa confirmar". Responda diretamente com base no conteúdo disponível.
+2. **Status de Documentos:** Se o status for "Pendente", informe que ele está em processamento. Se for "Aprovado", você deve ser a voz técnica que explica o que há no arquivo.
+3. **Fim das Alucinações:** JAMAIS sugira contatos externos ou locais físicos. Toda a gestão é digital.
+4. **Domínio:** Responda apenas sobre contabilidade, tributos e finanças brasileiras.
+5. **Honestidade Intelectual:** Se não encontrar o dado no contexto e não tiver certeza, admita que não encontrou. NUNCA invente informações.
 
-ESPECIALIDADE TÉCNICA:
-- Normas CPC e IFRS aplicadas ao Brasil
-- Legislação tributária: IRPJ, IRPF, CSLL, PIS, COFINS, ISS, ICMS, INSS, FGTS
-- Obrigações acessórias: SPED, eSocial, ECF, ECD, DCTF, PGDAS
-- Regimes tributários: Simples Nacional, Lucro Presumido, Lucro Real
-- Folha de pagamento, rescisões, pró-labore
-- Demonstrações financeiras: DRE, Balanço Patrimonial, Fluxo de Caixa
+CONTEXTO DA EMPRESA:
+{perfil_anagma if perfil_anagma else 'Empresa Anagma - Especialista em Contabilidade Digital.'}
 
-REGRAS INVIOLÁVEIS:
-1. SEMPRE responda em português brasileiro — sem exceção.
-2. NUNCA saia do domínio contábil/fiscal/financeiro.
-3. Cite normas, artigos de lei e prazos legais quando aplicável.
-4. Seja preciso, técnico e objetivo.
-5. JAMAIS inclua notas explicativas, metadados, justificativas ou comentários sobre a sua própria resposta (ex: "Note:", "(Observação:)", etc.). Responda APENAS o conteúdo solicitado."""
-
-        if perfil_anagma:
-            system_msg += f'\n\nCONTEXTO DA EMPRESA:\n{perfil_anagma}'
+"""
 
         if ideias:
             linhas_ideias = '\n'.join(f'- {i["titulo"]}: {i["conteudo"]}' for i in ideias)
-            system_msg += f'\n\nIdeias validadas:\n{linhas_ideias}'
+            system_msg += f'\n\nIDEIAS VALIDADAS (BANCO DE IDEIAS):\n{linhas_ideias}'
 
         if contexto_rag:
-            system_msg += f'\n\nContexto de documentos:\n{contexto_rag}'
+            system_msg += f'\n\nCONHECIMENTO TÉCNICO E DOCUMENTAL (BIBLIOTECA):\n{contexto_rag}'
 
-        # --- GESTÃO DE CONTEXTO (Poda de histórico) ---
+        # --- GESTÃO DE CONTEXTO ---
+        # (Restante do código de gestão de contexto ...)
         MAX_CONTEXT_TOKENS = 3500
         tokens_fixos = self._contar_tokens_aprox(system_msg) + self._contar_tokens_aprox(user_query)
         available_for_history = MAX_CONTEXT_TOKENS - tokens_fixos
@@ -229,10 +227,11 @@ REGRAS INVIOLÁVEIS:
             try:
                 resultado = self._llm.create_chat_completion(
                     messages=messages,
-                    max_tokens=500,
-                    temperature=0.3,
-                    top_p=0.95,
-                    stop=['<|end|>', '<|endoftext|>'],
+                    max_tokens=800,
+                    temperature=0.2,
+                    top_p=0.9,
+                    repeat_penalty=1.1,
+                    stop=['<|end|>', '<|endoftext|>', '<|user|>'],
                 )
                 return resultado['choices'][0]['message']['content'].strip()
             except Exception as e:
