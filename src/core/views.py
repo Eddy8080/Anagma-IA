@@ -4,10 +4,12 @@ from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.contrib.auth.views import LoginView
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from django.utils import timezone
 from .forms import CustomUserRegistrationForm
 from .models import GlobalIdeia, CustomUser, PerfilAnagma
 from .decorators import superuser_required
+from chat_ai.vocabulario import TERMOS_CONTABEIS
 
 class AnagmaLoginView(LoginView):
     """
@@ -30,9 +32,11 @@ class AnagmaLoginView(LoginView):
             
         return redirect(self.get_success_url())
 
+@require_POST
 def logout_view(request):
     """
     Garante o encerramento da sessão e redireciona para o login.
+    Requer POST para evitar logout por CSRF via GET.
     """
     auth_logout(request)
     return redirect('login')
@@ -50,28 +54,10 @@ def register_view(request):
     return render(request, 'registration/register.html', {'form': form})
 
 
-# Termos que identificam conteúdo do domínio contábil/fiscal/financeiro.
-# Verificação por substring com texto normalizado (espaços em volta evitam falsos positivos).
-_TERMOS_CONTABEIS = (
-    'contab', 'tribut', 'fiscal', ' imposto', 'irpj', 'irpf', 'irrf', 'csll',
-    ' pis ', 'cofins', ' iss ', 'icms', ' inss', ' fgts', 'simples nacional',
-    'lucro presumido', 'lucro real', ' mei ', 'balanço', 'balancete', ' dre ',
-    ' ativo', ' passivo', 'patrimônio', 'receita', 'despesa', 'provisão',
-    'depreciação', 'amortizaç', 'fluxo de caixa', ' sped', 'esocial',
-    ' ecf ', ' ecd ', ' dctf', 'pgdas', 'nota fiscal', ' nfe', ' nfse',
-    'folha de pagamento', 'rescisão', 'auditoria', 'perícia', 'escrituração',
-    'lançamento', ' cpc ', ' nbc ', ' cfc ', 'contador', 'tributário',
-    'capital social', 'conciliação', 'obrigação acessória', 'regime de caixa',
-    'regime de competência', 'demonstração financeira', 'demonstração contábil',
-    'custo', 'inventário', 'estoque', 'orçamento', 'financeiro', 'financeira',
-    'contabilista', 'escritório contábil', 'decore', 'holerite', 'décimo terceiro',
-)
-
-
 def _eh_ideia_contabil(titulo, conteudo):
     """Retorna True se o texto contém ao menos um termo do domínio contábil."""
     texto = f' {titulo} {conteudo} '.lower()
-    return any(termo in texto for termo in _TERMOS_CONTABEIS)
+    return any(termo in texto for termo in TERMOS_CONTABEIS)
 
 
 @login_required
@@ -87,9 +73,9 @@ def criar_ideia(request):
             autor=request.user,
             titulo=titulo,
             conteudo=conteudo,
-            ativa=True,
+            ativa=False, # Usuários comuns agora passam por auditoria
         )
-        messages.success(request, 'Ideia registrada e disponível na base de conhecimento.')
+        messages.success(request, 'Sua ideia foi enviada para análise técnica e estará disponível em breve.')
         return redirect('chat:home')
 
     return render(request, 'core/criar_ideia.html')
@@ -222,6 +208,25 @@ def admin_ideias(request):
 
 
 @superuser_required
+def admin_criar_ideia(request):
+    """
+    Permite ao Superusuário adicionar ideias diretamente (já ativas).
+    """
+    if request.method == 'POST':
+        titulo = request.POST.get('titulo', '').strip()
+        conteudo = request.POST.get('conteudo', '').strip()
+        if titulo and conteudo:
+            GlobalIdeia.objects.create(
+                autor=request.user,
+                titulo=titulo,
+                conteudo=conteudo,
+                ativa=True
+            )
+            messages.success(request, 'Nova ideia adicionada e ativada com sucesso.')
+    return redirect('admin_panel:ideias')
+
+
+@superuser_required
 def admin_editar_ideia(request, ideia_id):
     if request.method == 'POST':
         ideia = get_object_or_404(GlobalIdeia, pk=ideia_id)
@@ -282,6 +287,53 @@ def admin_biblioteca(request):
 
 
 @superuser_required
+def admin_upload_biblioteca(request):
+    """
+    Permite ao Superusuário subir documentos diretamente (já aprovados).
+    """
+    from .models import DocumentoBiblioteca
+    from chat_ai.document_processor import AnagmaDocumentProcessor
+    
+    if request.method == 'POST' and request.FILES.get('arquivo'):
+        uploaded_file = request.FILES['arquivo']
+        nome_original = uploaded_file.name
+        ext = nome_original.split('.')[-1].lower() if '.' in nome_original else ''
+        
+        if ext not in ['pdf', 'png', 'jpg', 'jpeg']:
+            messages.error(request, 'Extensão de arquivo não suportada.')
+            return redirect('admin_panel:biblioteca')
+
+        try:
+            # 1. Cria o registro aprovado
+            doc = DocumentoBiblioteca.objects.create(
+                nome_arquivo=nome_original,
+                arquivo=uploaded_file,
+                extensao=ext,
+                status='approved',
+                auditado_por=request.user,
+                processado_em=timezone.now()
+            )
+            
+            # 2. Processa o texto imediatamente para a IA aprender
+            doc.arquivo.open('rb')
+            try:
+                texto = AnagmaDocumentProcessor.extrair_texto(doc.arquivo, ext)
+            finally:
+                doc.arquivo.close()
+            doc.conteudo_extraido = texto
+            doc.save(update_fields=['conteudo_extraido'])
+
+            if not texto:
+                messages.warning(request, f'Documento "{nome_original}" adicionado, mas nenhum texto foi identificado.')
+            else:
+                messages.success(request, f'Documento "{nome_original}" adicionado e aprovado com sucesso.')
+        except Exception as e:
+            messages.error(request, f'Erro ao processar documento: {str(e)}')
+            
+    return redirect('admin_panel:biblioteca')
+
+
+@superuser_required
 def admin_auditar_documento(request, doc_id):
     """
     Aprova ou Rejeita um documento para a base de conhecimento da IA.
@@ -295,15 +347,25 @@ def admin_auditar_documento(request, doc_id):
         if acao == 'approve':
             doc.status = 'approved'
             doc.motivo_rejeicao = ''
-            messages.success(request, f'Documento "{doc.nome_arquivo}" aprovado para a base da IA.')
+            doc.auditado_por = request.user
+            doc.processado_em = timezone.now()
+            doc.save()
+            # Vetoriza no ChromaDB para habilitar busca semântica
+            if doc.conteudo_extraido:
+                try:
+                    from chat_ai.llm_engine import AnagmaLLMEngine
+                    AnagmaLLMEngine().rag.vetorizar_texto(doc.conteudo_extraido, doc.nome_arquivo)
+                except Exception as e:
+                    print(f"[RAG] Erro ao vetorizar documento aprovado: {e}", flush=True)
+            messages.success(request, f'Documento "{doc.nome_arquivo}" aprovado e integrado à base semântica da IA.')
         elif acao == 'reject':
             doc.status = 'rejected'
             doc.motivo_rejeicao = motivo
+            doc.auditado_por = request.user
+            doc.processado_em = timezone.now()
+            doc.save()
             messages.warning(request, f'Documento "{doc.nome_arquivo}" rejeitado.')
-        
-        doc.auditado_por = request.user
-        doc.processado_em = timezone.now()
-        doc.save()
+        return redirect('admin_panel:biblioteca')
 
     return redirect('admin_panel:biblioteca')
 
@@ -365,7 +427,7 @@ def admin_feedback_messages(request, user_id, tipo):
         session__user=usuario,
         feedback=tipo,
         role='assistant'
-    ).select_related('session', 'correction').order_by('-timestamp')
+    ).select_related('session').order_by('-timestamp')
 
     context = {
         'usuario': usuario,
@@ -380,23 +442,74 @@ def admin_feedback_messages(request, user_id, tipo):
 def admin_save_correction(request, message_id):
     """
     Grava a sugestão de melhoria do Superusuário para a IA.
+    Captura também a pergunta original do usuário para garantir aprendizado perpétuo.
     """
     from chat_ai.models import ChatMessage, AIConsistencyCorrection
     if request.method == 'POST':
         mensagem = get_object_or_404(ChatMessage, pk=message_id)
+        titulo   = request.POST.get('titulo_melhoria', '').strip()
         sugestao = request.POST.get('sugestao', '').strip()
 
         if sugestao:
-            correction, created = AIConsistencyCorrection.objects.get_or_create(
-                message=mensagem,
-                defaults={'original_response': mensagem.content}
-            )
+            # Busca a última mensagem do usuário antes desta resposta da IA
+            pergunta_usuario = ChatMessage.objects.filter(
+                session=mensagem.session,
+                role='user',
+                timestamp__lt=mensagem.timestamp
+            ).order_by('-timestamp').first()
+            
+            user_query_text = pergunta_usuario.content if pergunta_usuario else "Pergunta não localizada (histórico incompleto)"
+
+            # Como agora é ForeignKey, buscamos a primeira correção vinculada ou criamos uma nova
+            correction = AIConsistencyCorrection.objects.filter(message=mensagem).first()
+            if not correction:
+                correction = AIConsistencyCorrection(
+                    message=mensagem,
+                    original_response=mensagem.content,
+                    user_query=user_query_text
+                )
+            
+            correction.titulo_melhoria = titulo
             correction.suggested_improvement = sugestao
             correction.curated_by = request.user
+            
+            # Garante que a query esteja preenchida
+            if not correction.user_query or correction.user_query == "Pergunta não localizada (histórico incompleto)":
+                correction.user_query = user_query_text
+                
             correction.save()
-            messages.success(request, 'Melhoria gravada com sucesso para a Anagma IA.')
-        
-        return redirect('admin_panel:feedback_messages', user_id=mensagem.session.user.id, tipo=mensagem.feedback)
+            # Vetoriza a correção no ChromaDB para busca semântica (paráfrases encontram a regra)
+            try:
+                from chat_ai.llm_engine import AnagmaLLMEngine
+                titulo_rlhf = correction.titulo_melhoria or f"RLHF-{correction.id}"
+                texto_rlhf = f"Pergunta: {correction.user_query}\nResposta ideal: {correction.suggested_improvement}"
+                AnagmaLLMEngine().rag.vetorizar_texto(texto_rlhf, f"RLHF:{titulo_rlhf}")
+            except Exception as e:
+                print(f"[RAG] Erro ao vetorizar correção RLHF: {e}", flush=True)
+            messages.success(request, 'Melhoria técnica gravada com sucesso. Este aprendizado agora é permanente.')
+
+        user_id = mensagem.session.user.id if mensagem.session and mensagem.session.user else None
+        if user_id:
+            return redirect('admin_panel:feedback_messages', user_id=user_id, tipo=mensagem.feedback)
+        return redirect('admin_panel:dashboard')
     
+    return redirect('admin_panel:dashboard')
+
+
+@superuser_required
+def admin_deletar_feedback(request, message_id):
+    """
+    Exclui permanentemente uma mensagem de feedback da IA.
+    """
+    from chat_ai.models import ChatMessage
+    if request.method == 'POST':
+        msg = get_object_or_404(ChatMessage, pk=message_id, role='assistant')
+        user_id = msg.session.user.id if msg.session and msg.session.user else None
+        tipo = msg.feedback
+        msg.delete()
+        messages.success(request, 'Feedback removido permanentemente.')
+        if user_id:
+            return redirect('admin_panel:feedback_messages', user_id=user_id, tipo=tipo)
+        return redirect('admin_panel:dashboard')
     return redirect('admin_panel:dashboard')
 

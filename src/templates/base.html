@@ -8,6 +8,8 @@
     <link rel="shortcut icon" href="{% static "Anagma.ico" %}?v=1.0" type="image/x-icon">
     <link rel="icon" href="{% static "Anagma.ico" %}?v=1.0" type="image/x-icon">
     <meta name="csrf-token" content="{{ csrf_token }}">
+    <link rel="stylesheet" href="{% static 'css/theme.css' %}">
+    <script src="{% static 'js/theme.js' %}"></script>
     <style>
         :root {
             --bg-color: #131314;
@@ -251,6 +253,7 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <button id="theme-toggle" title="Modo claro">☀️</button>
     <div class="sidebar">
         <a class="new-chat-btn" href="/chat/">+ Nova Conversa</a>
         <div class="history-list">
@@ -292,7 +295,7 @@
                 <button class="icon-btn" id="attach-btn" title="Anexar arquivos" type="button">📎</button>
                 <textarea id="chat-input" class="prompt-input" rows="1"
                           placeholder="Pergunte qualquer coisa à Anagma IA…"
-                          autocomplete="off"></textarea>
+                          autocomplete="off" spellcheck="true"></textarea>
                 <button class="icon-btn" id="stop-btn" title="Interromper (Esc)" type="button">■</button>
                 <button class="icon-btn" id="send-btn" title="Enviar (Enter)" type="button">➔</button>
             </div>

@@ -1,9 +1,14 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="greeting-container" style="flex-direction: column;">
     <div style="background-color: #1e1f20; padding: 40px; border-radius: 28px; width: 100%; max-width: 400px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
-        <h2 style="text-align: center; margin-bottom: 30px; font-weight: 500; color: #a8c7fa;">Entrar na Anagma IA</h2>
+        <img id="digiana-logo"
+             src="{% static 'dark.png' %}"
+             data-dark="{% static 'dark.png' %}"
+             data-light="{% static 'light.png' %}"
+             alt="Digiana">
         
         <form method="post">
             {% csrf_token %}

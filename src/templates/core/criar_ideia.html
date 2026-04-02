@@ -37,14 +37,14 @@
         <form method="post">
             {% csrf_token %}
             <label style="display:block; color:#a8c7fa; font-size:0.85rem; margin-bottom:6px;">Título</label>
-            <input type="text" name="titulo" maxlength="255" required
+            <input type="text" name="titulo" maxlength="255" required spellcheck="true"
                    placeholder="Ex.: Cálculo do IRPJ pelo Lucro Presumido"
                    style="width:100%; box-sizing:border-box; background:#131314; border:1px solid #3c4043;
                           border-radius:10px; color:#e3e3e3; padding:12px 14px; font-size:0.97rem;
                           margin-bottom:18px; outline:none; font-family:inherit;">
 
             <label style="display:block; color:#a8c7fa; font-size:0.85rem; margin-bottom:6px;">Conteúdo</label>
-            <textarea name="conteudo" rows="7" required
+            <textarea name="conteudo" rows="7" required spellcheck="true"
                       placeholder="Descreva o conhecimento contábil, norma, procedimento ou orientação fiscal…"
                       style="width:100%; box-sizing:border-box; background:#131314; border:1px solid #3c4043;
                              border-radius:10px; color:#e3e3e3; padding:12px 14px; font-size:0.97rem;

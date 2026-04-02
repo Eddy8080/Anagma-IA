@@ -2,7 +2,6 @@ import fitz  # PyMuPDF
 import pytesseract
 from PIL import Image
 import io
-from pdf2image import convert_from_bytes
 import os
 
 class AnagmaDocumentProcessor:
@@ -30,6 +29,10 @@ class AnagmaDocumentProcessor:
     def _processar_pdf(file_obj):
         texto_final = []
         try:
+            # Garante que o ponteiro está no início se for um arquivo aberto
+            if hasattr(file_obj, 'seek'):
+                file_obj.seek(0)
+            
             # Abre o PDF da memória
             doc = fitz.open(stream=file_obj.read(), filetype="pdf")
             num_paginas = min(len(doc), AnagmaDocumentProcessor.MAX_PAGES)
@@ -57,6 +60,8 @@ class AnagmaDocumentProcessor:
     @staticmethod
     def _processar_imagem(file_obj):
         try:
+            if hasattr(file_obj, 'seek'):
+                file_obj.seek(0)
             img = Image.open(file_obj)
             texto = pytesseract.image_to_string(img, lang='por')
             return texto.strip()

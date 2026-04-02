@@ -9,6 +9,7 @@ import traceback
 import threading
 from django.conf import settings
 from .rag_engine import AnagmaRAGEngine
+from .vocabulario import SAUDACOES, GATILHOS_SOBRE_IA, PARES_SOBRE_IA
 
 
 class AnagmaLLMEngine:
@@ -128,15 +129,75 @@ class AnagmaLLMEngine:
             cache.set('perfil_anagma', perfil, timeout=300)
         return perfil
 
-    def gerar_resposta(self, user_query, chat_history=None, user_name=None, saudacao=None, ideias=None, search_query=None):
+    def _e_saudacao(self, texto):
+        return texto.strip().lower().rstrip('!.,') in SAUDACOES
+
+    def _e_pergunta_sobre_ia(self, texto):
+        t = texto.strip().lower()
+        if any(g in t for g in GATILHOS_SOBRE_IA):
+            return True
+        palavras = set(t.split())
+        return any(a in palavras and b in palavras for a, b in PARES_SOBRE_IA)
+
+    def gerar_resposta(self, user_query, chat_history=None, user_name=None, saudacao=None, search_query=None, user=None):
         """
         Gera resposta usando RAG + Phi-3 com gestão de contexto e thread-safety.
         """
         if not self.pronto:
             return 'Desculpe, o motor de IA não está disponível. Verifique os logs do servidor.'
 
+        # Intercepta saudações simples — o modelo pequeno não segue instruções sobre isso
+        if self._e_saudacao(user_query):
+            import random
+            nome = user_name or 'usuário'
+            primeiro_nome = nome.split()[0] if nome else nome
+            cumprimento = saudacao or 'Boa tarde'
+            texto_limpo = user_query.strip().lower().rstrip('!.,')
+            _informais = {'oi', 'olá', 'ola', 'hello', 'hi', 'hey', 'oi!', 'olá!'}
+            informal = texto_limpo in _informais
+            if informal:
+                opcoes = [
+                    f"Oi, {primeiro_nome}! Tudo bem? Como posso ajudar hoje?",
+                    f"Olá, {primeiro_nome}! Pode perguntar, estou aqui para ajudar.",
+                    f"Oi! Por aqui tudo certo, {primeiro_nome}. O que você precisa?",
+                ]
+            else:
+                opcoes = [
+                    f"{cumprimento}, {primeiro_nome}! Como posso ajudar você hoje?",
+                    f"{cumprimento}, {primeiro_nome}! Pronta para ajudar. O que precisa?",
+                    f"{cumprimento}, {primeiro_nome}! Em que posso ser útil?",
+                ]
+            return random.choice(opcoes)
+
+        # Intercepta perguntas sobre a própria IA — o modelo pequeno tende a virar "manual"
+        if self._e_pergunta_sobre_ia(user_query):
+            import random
+            primeiro_nome = (user_name or 'usuário').split()[0]
+            opcoes = [
+                (
+                    f"Sou a **Anagma IA**, sua assistente de contabilidade e tributos brasileiros, {primeiro_nome}! "
+                    f"Você pode me perguntar sobre IRPJ, CSLL, Simples Nacional, folha de pagamento, notas fiscais, "
+                    f"SPED, eSocial — qualquer coisa da área contábil e fiscal. "
+                    f"Também recebo documentos em PDF ou imagem direto no chat para analisar na hora. "
+                    f"O que você quer resolver hoje?"
+                ),
+                (
+                    f"Olha, {primeiro_nome}, sou especialista em contabilidade e tributação brasileira. "
+                    f"Tiro dúvidas sobre impostos, regimes tributários, obrigações acessórias, folha de pagamento e muito mais. "
+                    f"Se tiver um documento para analisar, é só anexar aqui no chat — leio PDF e imagem. "
+                    f"Por onde quer começar?"
+                ),
+                (
+                    f"Sou a Anagma IA! Funciono como um especialista contábil disponível aqui no sistema, {primeiro_nome}. "
+                    f"Pode me mandar perguntas sobre tributos, escrituração, IRRF, CSLL, ICMS, ISS, folha — tudo da área. "
+                    f"Também analiso documentos que você anexar. "
+                    f"Tem alguma dúvida específica?"
+                ),
+            ]
+            return random.choice(opcoes)
+
         # Usa search_query (contextualizada) para busca no RAG, mas responde ao user_query original
-        contexto_rag = self.rag.buscar_conhecimento(search_query or user_query)
+        contexto_rag = self.rag.buscar_conhecimento(search_query or user_query, user=user)
         perfil_anagma = self._get_perfil_anagma()
 
         # --- Monta o system prompt ---
@@ -160,21 +221,17 @@ REGRAS DE RESPOSTA E AUTORIDADE:
 3. **Fim das Alucinações:** JAMAIS sugira contatos externos ou locais físicos. Toda a gestão é digital.
 4. **Domínio:** Responda apenas sobre contabilidade, tributos e finanças brasileiras.
 5. **Honestidade Intelectual:** Se não encontrar o dado no contexto e não tiver certeza, admita que não encontrou. NUNCA invente informações.
+6. **Saudações:** Se o usuário enviar apenas uma saudação (ex: "Boa tarde", "Olá", "Bom dia", "Oi"), responda com a saudação, apresente-se brevemente como Anagma IA e pergunte em que pode ajudar. NUNCA explique o significado da saudação nem traduza para outros idiomas.
 
 CONTEXTO DA EMPRESA:
 {perfil_anagma if perfil_anagma else 'Empresa Anagma - Especialista em Contabilidade Digital.'}
 
 """
 
-        if ideias:
-            linhas_ideias = '\n'.join(f'- {i["titulo"]}: {i["conteudo"]}' for i in ideias)
-            system_msg += f'\n\nIDEIAS VALIDADAS (BANCO DE IDEIAS):\n{linhas_ideias}'
-
         if contexto_rag:
             system_msg += f'\n\nCONHECIMENTO TÉCNICO E DOCUMENTAL (BIBLIOTECA):\n{contexto_rag}'
 
         # --- GESTÃO DE CONTEXTO ---
-        # (Restante do código de gestão de contexto ...)
         MAX_CONTEXT_TOKENS = 3500
         tokens_fixos = self._contar_tokens_aprox(system_msg) + self._contar_tokens_aprox(user_query)
         available_for_history = MAX_CONTEXT_TOKENS - tokens_fixos

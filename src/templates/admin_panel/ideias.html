@@ -3,7 +3,13 @@
 {% block title %}Ideias — Painel Admin{% endblock %}
 
 {% block content %}
-<div class="page-title">💡 Base de Conhecimento</div>
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+    <div class="page-title" style="margin:0;">💡 Base de Conhecimento</div>
+    <button class="btn" style="background:linear-gradient(to right,#4285f4,#9b72cb); color:white; border:none; padding:10px 24px; font-weight:600;"
+            onclick="abrirCriador()">
+        ➕ Adicionar Nova Ideia
+    </button>
+</div>
 
 <div class="card" style="padding:0; overflow:hidden;">
     <table>
@@ -67,7 +73,7 @@
 
         <!-- Header -->
         <div style="padding:18px 24px; border-bottom:1px solid #333; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
-            <span style="font-weight:600; font-size:1rem; color:#a8c7fa;">✏️ Editar Ideia</span>
+            <span id="modal-header-text" style="font-weight:600; font-size:1rem; color:#a8c7fa;">✏️ Editar Ideia</span>
             <button onclick="fecharEditor()" style="background:none; border:none; color:#888; font-size:1.3rem; cursor:pointer; line-height:1;">✕</button>
         </div>
 
@@ -152,9 +158,19 @@ const ideiaMap  = {};
 JSON.parse(document.getElementById('ideias-data').textContent)
     .forEach(function(i) { ideiaMap[i.pk] = i; });
 
+function abrirCriador() {
+    document.getElementById('modal-header-text').textContent = '➕ Adicionar Nova Ideia';
+    document.getElementById('editor-titulo').value = '';
+    document.getElementById('editor-conteudo').innerHTML = '';
+    document.getElementById('form-editar').action = "{% url 'admin_panel:criar_ideia' %}";
+    overlay.style.display = 'flex';
+    document.getElementById('editor-titulo').focus();
+}
+
 function abrirEditor(pk) {
     const ideia = ideiaMap[pk];
     if (!ideia) return;
+    document.getElementById('modal-header-text').textContent = '✏️ Editar Ideia';
     document.getElementById('editor-titulo').value       = ideia.titulo;
     document.getElementById('editor-conteudo').innerHTML = ideia.conteudo;
     document.getElementById('form-editar').action        = '/admin-panel/ideias/' + pk + '/editar/';

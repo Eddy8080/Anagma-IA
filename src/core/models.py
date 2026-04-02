@@ -80,6 +80,7 @@ class DocumentoBiblioteca(models.Model):
     
     criado_em = models.DateTimeField(auto_now_add=True)
     processado_em = models.DateTimeField(null=True, blank=True)
+    enviado_por = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='documentos_enviados')
     auditado_por = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='documentos_auditados')
     motivo_rejeicao = models.TextField(blank=True)
 

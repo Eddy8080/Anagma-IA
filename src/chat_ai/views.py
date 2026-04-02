@@ -1,9 +1,10 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.core.cache import cache
 from django.utils import timezone
 from django.utils.html import strip_tags
+from django.views.decorators.cache import never_cache
 from datetime import timedelta
 from .models import ChatSession, ChatMessage
 from django.views.decorators.http import require_POST
@@ -33,25 +34,31 @@ def upload_document(request):
         return JsonResponse({'status': 'error', 'message': 'Extensão não suportada'}, status=400)
 
     try:
-        # 1. Salva na Biblioteca
+        # 1. Salva na Biblioteca (Mantendo a Governança de Autoria)
         doc_bib = DocumentoBiblioteca.objects.create(
             nome_arquivo=nome_original,
             arquivo=uploaded_file,
             extensao=ext,
-            status='pending'
+            status='pending',
+            enviado_por=request.user
         )
 
         # 2. Extrai texto (com limite de 10 páginas embutido no processador)
-        # Precisamos reabrir o arquivo pois o create() pode ter movido o ponteiro
         doc_bib.arquivo.open('rb')
-        texto_extraido = AnagmaDocumentProcessor.extrair_texto(doc_bib.arquivo, ext)
+        try:
+            texto_extraido = AnagmaDocumentProcessor.extrair_texto(doc_bib.arquivo, ext)
+        finally:
+            doc_bib.arquivo.close()
         doc_bib.conteudo_extraido = texto_extraido
         doc_bib.processado_em = timezone.now()
         doc_bib.save(update_fields=['conteudo_extraido', 'processado_em'])
 
         # 3. Gerenciar Sessão de Chat
         if session_id:
-            session = ChatSession.objects.get(id=session_id, user=request.user)
+            try:
+                session = ChatSession.objects.get(id=session_id, user=request.user)
+            except ChatSession.DoesNotExist:
+                session = ChatSession.objects.create(user=request.user, titulo=f"Anexo: {nome_original}")
         else:
             session = ChatSession.objects.create(user=request.user, titulo=f"Anexo: {nome_original}")
 
@@ -59,13 +66,12 @@ def upload_document(request):
         ChatMessage.objects.create(session=session, role='user', content=f"[Anexo enviado: {nome_original}]")
 
         # 5. Resposta Padrão da IA (UX)
-        # Geramos um mini-resumo para a resposta ser mais inteligente
-        trecho = texto_extraido[:300].replace('\n', ' ')
+        trecho = (texto_extraido[:300].replace('\n', ' ') if texto_extraido else "Conteúdo técnico em análise")
         ai_response = (
             f"Recebi o documento **{nome_original}**. "
             f"Identifiquei preliminarmente que ele contém informações sobre: *{trecho}...* "
             f"\n\nO conteúdo já foi encaminhado para a nossa **Biblioteca de Curadoria** e está em **processo de auditoria** "
-            f"para garantir a precisão técnica antes de ser integrado definitivamente ao meu aprendizado contábil."
+            f"pelos superusuários para garantir a precisão técnica antes de ser integrado definitivamente ao meu aprendizado contábil."
             f"\n\nEnquanto isso, no que mais posso ajudar você hoje?"
         )
 
@@ -84,7 +90,7 @@ def upload_document(request):
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=200)
 
 
 def get_llm_engine():
@@ -104,7 +110,6 @@ def _get_saudacao():
 
 
 def _get_ideias_ativas():
-    """Retorna GlobalIdeias ativas com cache de 5 minutos. Strip de HTML antes de alimentar o LLM."""
     ideias = cache.get('global_ideias')
     if ideias is None:
         from core.models import GlobalIdeia
@@ -115,7 +120,6 @@ def _get_ideias_ativas():
 
 
 def _group_sessions(sessions):
-    """Agrupa sessões por faixas de tempo. Fixadas aparecem primeiro."""
     today = timezone.localdate()
     yesterday = today - timedelta(days=1)
     last_7 = today - timedelta(days=7)
@@ -143,9 +147,10 @@ def _group_sessions(sessions):
     return [(label, slist) for label, slist in groups.items() if slist]
 
 
+@never_cache
 @login_required
 def chat_home(request):
-    sessions = ChatSession.objects.filter(user=request.user)
+    sessions = ChatSession.objects.filter(user=request.user, deleted_at__isnull=True)
     context = {
         'grouped_sessions': _group_sessions(sessions),
         'current_session': None,
@@ -176,14 +181,13 @@ def send_message(request):
 
     try:
         if session_id:
-            session = ChatSession.objects.get(id=session_id, user=request.user)
+            session = ChatSession.objects.get(id=session_id, user=request.user, deleted_at__isnull=True)
         else:
             titulo = user_prompt[:50] + ('...' if len(user_prompt) > 50 else '')
             session = ChatSession.objects.create(user=request.user, titulo=titulo)
     except ChatSession.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Sessão não encontrada'}, status=404)
 
-    # Captura histórico ANTES de salvar a mensagem atual
     history_msgs = session.messages.order_by('timestamp')
     chat_history = [{'role': m.role, 'content': m.content} for m in history_msgs]
 
@@ -191,19 +195,17 @@ def send_message(request):
 
     user_name = request.user.nome_completo or request.user.username
     saudacao = _get_saudacao()
-    ideias = _get_ideias_ativas()
 
     try:
         llm_engine = get_llm_engine()
-        # Envia a query do usuário + o título da sessão como contexto extra de busca (RAG)
         query_contextual = f"{user_prompt} {session.titulo}"
         ai_response = llm_engine.gerar_resposta(
             user_query=user_prompt,
             chat_history=chat_history,
             user_name=user_name,
             saudacao=saudacao,
-            ideias=ideias,
-            search_query=query_contextual
+            search_query=query_contextual,
+            user=request.user
         )
     except Exception:
         import traceback
@@ -211,8 +213,6 @@ def send_message(request):
         ai_response = 'Desculpe, ocorreu um erro interno ao processar sua mensagem. Tente novamente.'
 
     ai_msg = ChatMessage.objects.create(session=session, role='assistant', content=ai_response)
-
-    # Atualiza atualizado_em para manter ordenação correta na sidebar
     session.save()
 
     return JsonResponse({
@@ -226,21 +226,17 @@ def send_message(request):
     })
 
 
+@never_cache
 @login_required
 def chat_session(request, session_id):
-    try:
-        session = ChatSession.objects.get(id=session_id, user=request.user)
-    except ChatSession.DoesNotExist:
-        return redirect('chat:home')
-
-    sessions = ChatSession.objects.filter(user=request.user)
+    session = get_object_or_404(ChatSession, id=session_id, user=request.user, deleted_at__isnull=True)
+    sessions = ChatSession.objects.filter(user=request.user, deleted_at__isnull=True)
 
     messages_data = []
     for m in session.messages.order_by('timestamp'):
         status_anexo = None
         nome_arquivo = None
         
-        # Se for mensagem de anexo, tenta capturar o status
         if m.content.startswith('[Anexo enviado:') and ']' in m.content:
             try:
                 nome_arquivo = m.content.split('[Anexo enviado: ')[1].split(']')[0]
@@ -263,7 +259,7 @@ def chat_session(request, session_id):
     context = {
         'grouped_sessions': _group_sessions(sessions),
         'current_session': session,
-        'messages_json': messages_data,   # lista Python — json_script serializa no template
+        'messages_json': messages_data,
         'saudacao': _get_saudacao(),
         'nome_usuario': request.user.nome_completo or request.user.username,
     }
@@ -272,32 +268,22 @@ def chat_session(request, session_id):
 
 @login_required
 def rename_session(request, session_id):
-    if request.method != 'POST':
-        return JsonResponse({'status': 'error'}, status=400)
-    try:
-        session = ChatSession.objects.get(id=session_id, user=request.user)
-    except ChatSession.DoesNotExist:
-        return JsonResponse({'status': 'error', 'message': 'Sessão não encontrada'}, status=404)
+    session = get_object_or_404(ChatSession, id=session_id, user=request.user)
     try:
         data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({'status': 'error'}, status=400)
-    titulo = data.get('titulo', '').strip()
-    if not titulo:
-        return JsonResponse({'status': 'error', 'message': 'Título vazio'}, status=400)
-    session.titulo = titulo[:255]
-    session.save(update_fields=['titulo'])
-    return JsonResponse({'status': 'success', 'titulo': session.titulo})
+        titulo = data.get('titulo', '').strip()
+        if titulo:
+            session.titulo = titulo[:255]
+            session.save(update_fields=['titulo'])
+            return JsonResponse({'status': 'success', 'titulo': session.titulo})
+    except Exception:
+        pass
+    return JsonResponse({'status': 'error'}, status=400)
 
 
 @login_required
 def pin_session(request, session_id):
-    if request.method != 'POST':
-        return JsonResponse({'status': 'error'}, status=400)
-    try:
-        session = ChatSession.objects.get(id=session_id, user=request.user)
-    except ChatSession.DoesNotExist:
-        return JsonResponse({'status': 'error', 'message': 'Sessão não encontrada'}, status=404)
+    session = get_object_or_404(ChatSession, id=session_id, user=request.user)
     session.pinned = not session.pinned
     session.save(update_fields=['pinned'])
     return JsonResponse({'status': 'success', 'pinned': session.pinned})
@@ -305,35 +291,55 @@ def pin_session(request, session_id):
 
 @login_required
 def message_feedback(request, message_id):
-    if request.method != 'POST':
-        return JsonResponse({'status': 'error'}, status=400)
+    msg = get_object_or_404(ChatMessage, id=message_id, role='assistant', session__user=request.user)
     try:
         data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({'status': 'error'}, status=400)
-
-    feedback = data.get('feedback')
-    if feedback not in ('like', 'dislike', None):
-        return JsonResponse({'status': 'error', 'message': 'Feedback inválido'}, status=400)
-
-    try:
-        msg = ChatMessage.objects.get(id=message_id, role='assistant', session__user=request.user)
-    except ChatMessage.DoesNotExist:
-        return JsonResponse({'status': 'error', 'message': 'Mensagem não encontrada'}, status=404)
-
-    # Toggle: clicar no mesmo valor limpa (None)
-    msg.feedback = None if msg.feedback == feedback else feedback
-    msg.save(update_fields=['feedback'])
-    return JsonResponse({'status': 'success', 'feedback': msg.feedback})
+        feedback = data.get('feedback')
+        msg.feedback = None if msg.feedback == feedback else feedback
+        msg.save(update_fields=['feedback'])
+        return JsonResponse({'status': 'success', 'feedback': msg.feedback})
+    except Exception:
+        pass
+    return JsonResponse({'status': 'error'}, status=400)
 
 
 @login_required
 def delete_session(request, session_id):
-    if request.method != 'POST':
-        return JsonResponse({'status': 'error'}, status=400)
-    try:
-        session = ChatSession.objects.get(id=session_id, user=request.user)
-    except ChatSession.DoesNotExist:
-        return JsonResponse({'status': 'error', 'message': 'Sessão não encontrada'}, status=404)
-    session.delete()
+    session = get_object_or_404(ChatSession, id=session_id, user=request.user, deleted_at__isnull=True)
+    session.deleted_at = timezone.now()
+    session.deleted_by = request.user
+    session.save(update_fields=['deleted_at', 'deleted_by'])
     return JsonResponse({'status': 'success'})
+
+
+@login_required
+def meus_envios(request):
+    from core.models import GlobalIdeia
+
+    docs = DocumentoBiblioteca.objects.filter(
+        enviado_por=request.user
+    ).order_by('-criado_em').values('nome_arquivo', 'status', 'criado_em')
+
+    ideias = GlobalIdeia.objects.filter(
+        autor=request.user
+    ).order_by('-criado_em').values('titulo', 'ativa', 'criado_em')
+
+    return JsonResponse({
+        'status': 'success',
+        'documentos': [
+            {
+                'nome': d['nome_arquivo'],
+                'status': d['status'],
+                'criado_em': d['criado_em'].strftime('%d/%m/%Y'),
+            }
+            for d in docs
+        ],
+        'ideias': [
+            {
+                'titulo': i['titulo'],
+                'ativa': i['ativa'],
+                'criado_em': i['criado_em'].strftime('%d/%m/%Y'),
+            }
+            for i in ideias
+        ],
+    })

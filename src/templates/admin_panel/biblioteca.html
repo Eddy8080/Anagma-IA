@@ -3,11 +3,24 @@
 {% block title %}Biblioteca de Curadoria — Anagma IA{% endblock %}
 
 {% block content %}
-<div class="page-title">📚 Biblioteca de Curadoria</div>
-
-<p style="color:#888; margin-bottom:24px;">
-    Documentos enviados via Chat para aprendizado da IA. Revise o conteúdo extraído antes de aprovar.
-</p>
+<div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:24px;">
+    <div>
+        <div class="page-title" style="margin:0;">📚 Biblioteca de Curadoria</div>
+        <p style="color:#888; margin-top:8px; margin-bottom:0;">
+            Documentos enviados via Chat para aprendizado da IA. Revise o conteúdo extraído antes de aprovar.
+        </p>
+    </div>
+    
+    <!-- Upload Direto Superusuário -->
+    <div style="background:#1e1f20; border:1px solid #333; border-radius:12px; padding:12px 20px; display:flex; align-items:center; gap:16px;">
+        <span style="font-size:0.85rem; color:#a8c7fa; font-weight:500;">➕ Adicionar Manual/Documento:</span>
+        <form action="{% url 'admin_panel:upload_biblioteca' %}" method="post" enctype="multipart/form-data" style="display:flex; align-items:center; gap:10px; margin:0;">
+            {% csrf_token %}
+            <input type="file" name="arquivo" required style="font-size:0.8rem; color:#888; max-width:200px;">
+            <button type="submit" class="btn" style="background:var(--accent); color:white; border:none; padding:6px 16px; font-size:0.85rem;">Subir Direto</button>
+        </form>
+    </div>
+</div>
 
 <div class="card" style="padding:0;">
     <table style="width:100%;">

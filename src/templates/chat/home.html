@@ -306,11 +306,26 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => chatWindow.scrollTo({ top: chatWindow.scrollHeight, behavior: 'smooth' }), 60);
 
     function getCsrf() {
-        // Prefere o meta tag injetado pelo Django (mais confiável que cookie)
-        return document.querySelector('meta[name="csrf-token"]')?.content
-            ?? document.cookie.split(';').map(c => c.trim())
-               .find(c => c.startsWith('csrftoken='))?.split('=')[1]
-            ?? '';
+        // 1. Tenta pela meta tag (mais rápido)
+        const meta = document.querySelector('meta[name="csrf-token"]')?.content;
+        if (meta) return meta;
+
+        // 2. Tenta pelo cookie 'csrftoken' (padrão Django)
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, 10) === 'csrftoken=') {
+                    cookieValue = decodeURIComponent(cookie.substring(10));
+                    break;
+                }
+            }
+        }
+        if (cookieValue) return cookieValue;
+
+        // 3. Fallback final: busca em qualquer input oculto do Django na página
+        return document.querySelector('input[name="csrfmiddlewaretoken"]')?.value ?? '';
     }
 
     function escHtml(s) {
@@ -370,9 +385,9 @@ document.addEventListener('DOMContentLoaded', () => {
             avatar.innerHTML = '<img src="{% static "Logo.png" %}" alt="Logo" style="width:100%; height:100%; object-fit:contain;">';
 
             const lbl = document.createElement('span');
-            lbl.className = 'ai-label';
+            lbl.className = 'ai-label logo-digiana';
             lbl.style.marginBottom = '0';
-            lbl.textContent = 'Anagma IA';
+            lbl.innerHTML = 'Dig<span class="ia-glow">IA</span>na';
 
             aiHeader.appendChild(avatar);
             aiHeader.appendChild(lbl);
@@ -473,7 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
             '<div class="message-bubble ai-bubble">' +
                 '<div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">' +
                     '<div class="ai-avatar ai-avatar-thinking"><img src="{% static "Logo.png" %}" alt="Pensando..." style="width:100%; height:100%; object-fit:cover; transform: scale(1.1);"></div>' +
-                    '<span class="ai-label" style="margin:0;">Anagma IA</span>' +
+                    '<span class="ai-label logo-digiana" style="margin:0;">Dig<span class="ia-glow">IA</span>na</span>' +
                 '</div>' +
                 '<span class="thinking-dots"><span></span><span></span><span></span></span>' +
             '</div>';
@@ -506,17 +521,121 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!state) chatInput.focus();
     }
 
+    // ── Comando /lista ───────────────────────────────────────
+    function renderLista(data) {
+        const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+        const badgeDoc = (status) => {
+            if (status === 'approved') return '<span style="color:#4ade80;font-weight:600;">✓ Aprovado</span>';
+            if (status === 'rejected') return '<span style="color:#f87171;font-weight:600;">✗ Rejeitado</span>';
+            return '<span style="color:#fbbf24;font-weight:600;">● Pendente</span>';
+        };
+        const badgeIdeia = (ativa) => ativa
+            ? '<span style="color:#4ade80;font-weight:600;">✓ Aprovada</span>'
+            : '<span style="color:#fbbf24;font-weight:600;">● Pendente</span>';
+
+        let html = '<div style="font-size:0.93rem;line-height:1.8;">';
+
+        html += '<div style="font-weight:700;font-size:1rem;margin-bottom:12px;">📋 Seus Envios</div>';
+
+        html += '<div style="font-weight:600;margin-bottom:6px;">📄 Documentos</div>';
+        if (data.documentos.length === 0) {
+            html += '<div style="color:#888;margin-left:12px;margin-bottom:12px;">Nenhum documento enviado.</div>';
+        } else {
+            html += '<table style="width:100%;border-collapse:collapse;margin-bottom:14px;">';
+            data.documentos.forEach(d => {
+                html += `<tr>
+                    <td style="padding:4px 8px;color:var(--text-color);">• ${escHtml(d.nome)}</td>
+                    <td style="padding:4px 8px;text-align:right;white-space:nowrap;">${badgeDoc(d.status)}</td>
+                    <td style="padding:4px 8px;text-align:right;color:#888;font-size:0.82rem;white-space:nowrap;">${d.criado_em}</td>
+                </tr>`;
+            });
+            html += '</table>';
+        }
+
+        html += '<div style="font-weight:600;margin-bottom:6px;">💡 Ideias</div>';
+        if (data.ideias.length === 0) {
+            html += '<div style="color:#888;margin-left:12px;margin-bottom:12px;">Nenhuma ideia enviada.</div>';
+        } else {
+            html += '<table style="width:100%;border-collapse:collapse;margin-bottom:14px;">';
+            data.ideias.forEach(i => {
+                html += `<tr>
+                    <td style="padding:4px 8px;color:var(--text-color);">• ${escHtml(i.titulo)}</td>
+                    <td style="padding:4px 8px;text-align:right;white-space:nowrap;">${badgeIdeia(i.ativa)}</td>
+                    <td style="padding:4px 8px;text-align:right;color:#888;font-size:0.82rem;white-space:nowrap;">${i.criado_em}</td>
+                </tr>`;
+            });
+            html += '</table>';
+        }
+
+        html += '<div style="border-top:1px solid #333;padding-top:8px;font-size:0.8rem;color:#888;">';
+        html += '✓ Aprovado = Digiana tem acesso ao conteúdo &nbsp;|&nbsp; ● Pendente = aguardando auditoria';
+        html += '</div></div>';
+
+        if (greeting.style.display !== 'none') {
+            greeting.style.display = 'none';
+            msgContainer.style.display = 'flex';
+        }
+
+        const row = document.createElement('div');
+        row.className = 'message-row ai-row';
+
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble ai-bubble';
+
+        const header = document.createElement('div');
+        header.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:8px;';
+        header.innerHTML =
+            '<div class="ai-avatar"><img src="{% static "Logo.png" %}" alt="Digiana" style="width:100%;height:100%;object-fit:contain;"></div>' +
+            '<span class="ai-label logo-digiana" style="margin:0;">Dig<span class="ia-glow">IA</span>na</span>';
+
+        const body = document.createElement('div');
+        body.innerHTML = html;
+
+        const ts = document.createElement('div');
+        ts.className = 'msg-time';
+        ts.textContent = now;
+
+        bubble.appendChild(header);
+        bubble.appendChild(body);
+        row.appendChild(bubble);
+        row.appendChild(ts);
+        msgContainer.appendChild(row);
+        scrollToBottom();
+    }
+
+    async function handleLista() {
+        const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        buildMessage('user', '/lista', now, true);
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+        try {
+            const res = await fetch('/chat/meus-envios/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                renderLista(data);
+            }
+        } catch (err) {
+            console.error('Erro ao carregar /lista:', err);
+        }
+    }
+
     // ── Envio de mensagem ou arquivo ─────────────────────────
     async function handleSend() {
         // Se já está enviando, interrompe a anterior e começa a nova (requisito: "a IA continuará")
         if (isSending) {
             stopGeneration();
         }
-        
+
         const text = chatInput.value.trim();
         const hasFiles = fileInput.files && fileInput.files.length > 0;
-        
+        const selectedFile = hasFiles ? fileInput.files[0] : null;
+
         if (!text && !hasFiles) return;
+
+        if (text === '/lista') { await handleLista(); return; }
 
         setLoading(true);
         const loader = addLoader();
@@ -532,14 +651,14 @@ document.addEventListener('DOMContentLoaded', () => {
             let res, data;
             const csrf = getCsrf();
 
-            if (hasFiles) {
+            if (hasFiles && selectedFile) {
                 // Lógica de Upload de Arquivo
                 const formData = new FormData();
-                formData.append('file', fileInput.files[0]);
+                formData.append('file', selectedFile);
                 if (currentSessionId) formData.append('session_id', currentSessionId);
 
                 const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                buildMessage('user', `[Anexo: ${fileInput.files[0].name}]`, now, true);
+                buildMessage('user', `[Anexo: ${selectedFile.name}]`, now, true);
 
                 res = await fetch('/chat/upload/', {
                     method: 'POST',

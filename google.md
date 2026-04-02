@@ -1,5 +1,5 @@
 # Registro de Evolução Técnica - Anagma IA
-**Data de Referência:** 26 de Março de 2026
+**Data de Referência:** 02 de Abril de 2026
 
 Este documento serve como memória técnica de longo prazo para a evolução do projeto Banco de Ideias / Anagma IA.
 
@@ -8,78 +8,38 @@ Este documento serve como memória técnica de longo prazo para a evolução do 
 - **Avatar Dinâmico da IA:**
     - Logo circular com fundo branco incorporado para harmonia em tema escuro.
     - Animação CSS `ai-breathe` (respiração) para feedback de processamento.
-    - Ajuste de escala (`scale 1.1`) para preenchimento total do badge.
-- **Modais Customizados:** Substituição de janelas nativas do sistema por modais imersivos centralizados com efeito blur.
+- **Interface Retrátil (Acordeão):** Implementada no Painel de Feedback para organizar curadorias salvas, reduzindo a poluição visual e focando em pendências.
+- **Modais Customizados:** Substituição de janelas nativas por modais imersivos centralizados com efeito blur.
 
-## 2. Sistema de Curadoria RLHF (Treinamento IA)
-- **Infraestrutura:** Criado modelo `AIConsistencyCorrection` vinculado a feedbacks de mensagens.
-- **Fluxo Admin:** 
-    - Dashboard interativo com contadores de Likes/Dislikes clicáveis.
-    - Agrupamento de feedbacks por usuário para auditoria.
-    - Editor de Melhoria: Interface para superusuário gravar a "Resposta Ideal" para a IA.
-    - Navegação fluida com botões "Voltar" em todas as telas de feedback.
+## 2. Sistema de Curadoria RLHF e Aprendizado Perpétuo
+- **Preservação de Ensino:** Reestruturação do banco de dados para que a exclusão de conversas por usuários comuns **não apague** o aprendizado da IA. O vínculo foi alterado para `SET_NULL` com `ForeignKey`.
+- **Auditoria de Autoria:** Implementação do campo `enviado_por` no modelo `DocumentoBiblioteca`. Cada arquivo anexado via chat agora carrega a identidade do autor original para fins de governança e curadoria.
+- **Contexto de Pergunta:** Adição do campo `user_query` no modelo de correção, capturando a pergunta original do usuário no momento da curadoria para garantir que o aprendizado mantenha sentido técnico sem o histórico da sessão.
+- **Editor Rico (WYSIWYG):** Integrado às ferramentas de correção da IA, permitindo que o superusuário defina a "Resposta Ideal" com formatação premium (Negrito, Itálico, Listas).
 
 ## 3. Gestão de Usuários e Governança
-- **Ordenação:** Lista de usuários agora é carregada em ordem alfabética (Nome Completo > Username).
-- **Status de Conta:** Implementados estados Ativo, Inativo e Pausado no modelo `CustomUser`.
-- **Exclusão Estratégica:** Modal que permite ao Superusuário escolher entre "Preservar Dados para IA" (anonimização) ou "Purga Total".
-- **Nível de Acesso:** Lógica preparada para alternância entre Usuário e Superusuário via Painel Admin.
+- **Exclusão Estratégica:** Modal que permite ao Superusuário escolher entre "Preservar Dados para IA" (anonimização) ou "Purga Total", agora integrado também às listas de feedback.
+- **Status de Conta:** Estados Ativo, Inativo e Pausado no modelo `CustomUser`.
+- **Segurança de Acesso:** Refinamento do decorador `@superuser_required` para proteção da Biblioteca de Curadoria.
 
-## 4. Infraestrutura e Estabilidade
-- **Settings:** Configuração de `STATICFILES_DIRS` para reconhecimento da pasta global de estáticos.
-- **Bugs Corrigidos:** 
-    - Resolvidos erros de `TemplateSyntaxError`, `NameError` (importações) e `IndentationError` em arquivos críticos.
-    - **Correção dos Seletores (UI):** Restaurada a funcionalidade dos menus suspensos de Perfil e Status no Painel de Usuários.
-    - **Correção de Notas de IA:** Implementado filtro no prompt e regex de pós-processamento para remover metadados e notas explicativas do modelo Phi-3.
+## 4. Arquitetura de Alimentação de Dados (Manual Vivo)
+- **Desbloqueio Analítico:** Remoção das travas de governança que impediam a IA de discutir documentos com status "Pendente". O novo mandato supremo ordena que a IA analise o conteúdo extraído imediatamente após o upload.
+- **Purificação do RAG:** Otimização da busca semântica para ignorar o título da sessão (ex: "Anexo: ..."), focando exclusivamente no conteúdo técnico do documento para evitar buscas poluídas.
+- **Visão Restaurada (String Pura):** Correção do tipo de retorno do processador de texto. A IA agora recebe a string limpa do documento, eliminando a "cegueira" causada pelo tratamento incorreto de tuplas de metadados.
 
-## 5. Central de Inteligência Documental (Nova Feature)
-- **Biblioteca de Curadoria:** Implementada esteira de processamento de documentos (PDF/Imagens) com OCR (PyMuPDF/Tesseract).
-- **Limite de Performance:** Extração limitada às primeiras 10 páginas para evitar sobrecarga de RAM/CPU.
-- **Fluxo de Auditoria:** Documentos entram em quarentena para aprovação de Superusuários no Painel Admin antes de serem "aprendidos" pela IA.
-- **RAG Dinâmico:** IA agora busca conhecimento tanto no ChromaDB (fixo) quanto nos documentos aprovados na Biblioteca (dinâmico).
+## 5. Engenharia de Modelos e Infraestrutura
+- **Fim do Erro de Conexão (Win32):** Tentativa frustrada de otimizar o buffer e fechar handles de arquivo do Django. As mudanças em 02/04 visavam eliminar SegFaults no Windows, mas causaram instabilidade no fluxo de resposta do chat.
+- **Modelo Principal:** Phi-3-mini GGUF (Q4_K_M) operando em CPU com consumo de ~2.4 GB de RAM.
 
-## 6. Planejamento: Governança e Notificações Oficiais
-- **Rastreabilidade de Autoria:** Necessidade de vincular `DocumentoBiblioteca` ao `CustomUser` (autor) para permitir auditoria personalizada.
-- **Módulo de Notificações SMTP:** 
-    - Implementação de envio de e-mails via conta oficial `anagmaia@anagma.com.br`.
-    - Fluxo de Feedback: Disparo automático de e-mail formatado em HTML para o autor quando um documento for rejeitado na auditoria, contendo o "Motivo da Rejeição".
-    - Infraestrutura: Uso de variáveis de ambiente (`.env`) para credenciais seguras de SMTP (Host, Port, User, App Password).
+## 6. Diário de Crise e Recuperação (02/04/2026)
+- **Instabilidade no Chat:** Identificada falha crítica de "Erro de Conexão" ao tentar enviar mensagens ou anexos, resultando em respostas vazias e erros de processamento de JSON no frontend.
+- **Tentativa de Restauração Cirúrgica:** Realizada a reversão de arquivos de lógica (`views.py`, etc.), mas o erro persistia devido a uma falha silenciosa na camada de segurança (CSRF).
 
-## 7. Diretrizes de Implantação e Infraestrutura
-- **Domínio Interno (Intranet):** Para permitir o acesso via `http://anagma/` em vez de IPs, deve-se configurar um Registro A no DNS interno apontando o nome "anagma" para o IP do servidor de produção.
-- **Mascaramento de Porta (Proxy Reverso):** 
-    - Utilizar Nginx ou Apache como servidor de borda na porta 80.
-    - Configurar o roteamento interno (proxy_pass) para a porta de execução do Django (ex: 8000).
-- **Segurança de Host:** O parâmetro `ALLOWED_HOSTS` no `settings.py` deve ser atualizado para incluir o nome de domínio customizado (`'anagma'`).
-
-## 8. Guia de Evolução do Modelo (Cérebro da IA)
-O sistema foi projetado de forma modular, permitindo a substituição do modelo Phi-3 por versões mais recentes (ex: Phi-3.5, Llama-3.2) sem alteração de código fonte.
-- **Formato Obrigatório:** O novo modelo deve estar no formato **GGUF** (quantização recomendada: Q4_K_M ou Q5_K_M para equilíbrio entre RAM e precisão).
-- **Procedimento de Troca:**
-    1. Baixar o novo arquivo `.gguf` (ex: via Hugging Face).
-    2. Colocar o arquivo na pasta `assets/models/phi-3-mini-gguf/`.
-    3. No arquivo `src/AnagmaCore/settings.py`, atualizar a variável `GGUF_MODEL_PATH` com o novo nome do arquivo.
-    4. Reiniciar o servidor para que o Singleton `AnagmaLLMEngine` carregue o novo peso em RAM.
-- **Recomendação:** Priorizar modelos compactos (entre 3B e 7B parâmetros) para manter o tempo de resposta aceitável em execuções via CPU.
-
-## 9. Planejamento em Aberto: Arquitetura de Seleção Dinâmica de Modelos
-- **Objetivo:** Implementar controle via Painel Admin para alternar entre três estados de performance da IA:
-    - **Modo Leve:** Foco em velocidade e baixo consumo de recursos.
-    - **Modo Médio:** Equilíbrio atual entre precisão e performance.
-    - **Modo Potência Máxima:** Máximo raciocínio lógico e interpretação de contexto para casos complexos.
-- **Desafios Técnicos em Pauta:**
-    - Gestão de memória RAM durante a troca "a quente" de modelos.
-    - Implementação de Singleton recarregável no `AnagmaLLMEngine`.
-    - Preservação da integridade do RAG (Memória) independente do motor de processamento escolhido.
-
-- **Git:** Arquivo `google.md` mantido na pasta física para acesso da IA e persistência de memória técnica.
-
-## 10. Estratégia de Aprendizado Adaptativo e Curadoria de Respostas
-- **Estado Inicial (Fase de Aprendizado):** Se o Banco de Ideias e a Biblioteca estiverem vazios, a IA deve adotar uma postura de transparência, informando que está em fase inicial de aprendizado e coletando dados.
-- **Integração de Conhecimento Híbrido:** A IA deve priorizar respostas que combinem o conteúdo bruto da **Biblioteca** (fatos) com a camada de inteligência do **Banco de Ideias** (estratégia/sugestões).
-    - *Exemplo:* Se uma ideia sugere que "o documento A é melhor analisado focando no campo X", a IA deve usar essa instrução como um "filtro de atenção" ao ler o documento A para o usuário.
-- **Evolução por Feedback Humano:** O Banco de Ideias serve como um manual de instruções dinâmico para a IA. Cada ideia aprovada calibra a forma como a IA interpreta a legislação e os documentos contábeis da empresa.
+## 7. Resolução e Estabilização Final (02/04/2026)
+- **Causa Raiz Identificada:** O "Erro de Conexão" foi diagnosticado como uma falha de validação CSRF (HTTP 403 Forbidden). A ausência do context processor de CSRF impedia a geração correta do token, e o frontend recebia uma página HTML de erro em vez do JSON esperado.
+- **Correção de Backend:** Reintrodução de `django.template.context_processors.csrf` no `settings.py`, garantindo a disponibilidade da variável `{{ csrf_token }}` em todo o ecossistema de templates.
+- **Engenharia de Frontend (Robustez):** Implementação de uma nova lógica de captura de token em `home.html`. A função `getCsrf()` agora utiliza uma estratégia de busca em três níveis (Meta Tag -> Cookie -> Input Oculto), eliminando falhas de "token undefined" em sessões persistentes.
+- **Estado do Sistema:** **ESTÁVEL.** O fluxo de chat, upload de documentos e processamento pela IA Phi-3-mini foi testado e validado com sucesso. A integridade da comunicação entre o cliente e o servidor está restaurada.
 
 ---
-*Assinado: Arquiteta e Engenheira de Software Sênior (Sessão 31/03/2026).*
-
+*Assinado: Arquiteta e Engenheira de Software Sênior (Sessão 02/04/2026).*

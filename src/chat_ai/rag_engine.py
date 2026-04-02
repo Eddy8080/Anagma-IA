@@ -2,6 +2,7 @@ import os
 import pandas as pd
 from langchain_community.document_loaders import UnstructuredFileLoader, PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from .vocabulario import STOPWORDS_RAG
 try:
     from langchain_chroma import Chroma
 except ImportError:
@@ -62,19 +63,25 @@ class AnagmaRAGEngine:
 
     def _vetorizar_documentos(self, docs):
         """
-        Transforma documentos em vetores e salva no ChromaDB.
+        Adiciona documentos ao ChromaDB existente sem apagar o conteúdo anterior.
         """
         chunks = self.text_splitter.split_documents(docs)
-        # Adiciona ao vector_store existente e atualiza a referência local
-        self.vector_store = Chroma.from_documents(
-            documents=chunks,
-            embedding=self.embeddings,
-            persist_directory=self.persist_directory
-        )
-        print(f"Sucesso: {len(chunks)} fragmentos vetorizados.")
+        self.vector_store.add_documents(chunks)
+        print(f"[RAG] {len(chunks)} fragmentos adicionados ao ChromaDB.", flush=True)
         return True
 
-    def buscar_conhecimento(self, query, k=3):
+    def vetorizar_texto(self, texto, source_name):
+        """
+        Vetoriza uma string já extraída (texto de documento aprovado ou correção RLHF).
+        Evita re-processar o arquivo do disco quando o texto já está disponível.
+        """
+        if not texto or not texto.strip():
+            return False
+        from langchain_core.documents import Document
+        doc = Document(page_content=texto, metadata={"source": source_name})
+        return self._vetorizar_documentos([doc])
+
+    def buscar_conhecimento(self, query, k=3, user=None):
         """
         Busca semântica nos documentos vetorizados (ChromaDB)
         E busca textual nos documentos aprovados na Biblioteca.
@@ -89,23 +96,43 @@ class AnagmaRAGEngine:
         except Exception as e:
             print(f"[RAG Chroma] Erro: {e}")
 
-        # 2. Busca na Biblioteca de Curadoria (Documentos Aprovados)
+        # 2. Busca na Biblioteca de Curadoria (Documentos Aprovados e Correções RLHF)
         try:
             from core.models import DocumentoBiblioteca, GlobalIdeia
+            from .models import AIConsistencyCorrection
             from django.db.models import Q
             
             # Busca simples por palavras-chave na query (melhor performance para banco)
             palavras = [p for p in query.split() if len(p) > 3]
             
-            # --- BUSCA NA BIBLIOTECA ---
+            # --- 2.1 BUSCA EM CORREÇÕES DE CONSISTÊNCIA (RLHF - APRENDIZADO PERPÉTUO) ---
+            # Prioridade máxima: se o superusuário já corrigiu algo similar, a IA deve saber.
+            if palavras:
+                # Filtramos palavras técnicas e ignoramos saudações comuns para evitar o "modo dicionário"
+                palavras_tecnicas = [p for p in palavras if p.lower() not in STOPWORDS_RAG and len(p) > 4]
+                
+                if palavras_tecnicas:
+                    query_rlhf = Q()
+                    for p in palavras_tecnicas[:5]:
+                        query_rlhf |= Q(user_query__icontains=p) | Q(titulo_melhoria__icontains=p)
+                    
+                    correcoes = AIConsistencyCorrection.objects.filter(query_rlhf).only('user_query', 'suggested_improvement', 'titulo_melhoria')[:2]
+                    for cor in correcoes:
+                        titulo = cor.titulo_melhoria or "Regra Técnica"
+                        contexto_final.append(f"INSTRUÇÃO DE CURADORIA APROVADA ({titulo}):\nPergunta do Usuário: {cor.user_query}\nResposta Ideal (Siga este padrão): {cor.suggested_improvement}")
+
+            # --- 2.2 BUSCA NA BIBLIOTECA ---
             # Primeiro, busca exata por nome de arquivo para informar status
             docs_status = DocumentoBiblioteca.objects.filter(nome_arquivo__icontains=query).only('nome_arquivo', 'status')[:3]
             for ds in docs_status:
                 status_pt = dict(DocumentoBiblioteca.STATUS_CHOICES).get(ds.status, ds.status)
                 contexto_final.append(f"INFO SISTEMA: O arquivo '{ds.nome_arquivo}' existe no sistema com o status: {status_pt}.")
 
-            # Depois, busca conteúdo apenas dos aprovados
+            # Depois, busca conteúdo dos aprovados OU dos pendentes do próprio usuário
             query_bib = Q(status='approved')
+            if user and user.is_authenticated:
+                query_bib |= Q(status='pending', enviado_por=user)
+
             if palavras:
                 sub_query = Q()
                 for p in palavras[:5]:

@@ -7,6 +7,8 @@
     <title>{% block title %}Painel Admin — Anagma IA{% endblock %}</title>
     <link rel="shortcut icon" href="{% static "Anagma.ico" %}?v=1.0" type="image/x-icon">
     <link rel="icon" href="{% static "Anagma.ico" %}?v=1.0" type="image/x-icon">
+    <link rel="stylesheet" href="{% static 'css/theme.css' %}">
+    <script src="{% static 'js/theme.js' %}"></script>
     <style>
         :root {
             --bg: #131314;
@@ -135,6 +137,7 @@
     </style>
 </head>
 <body>
+    <button id="theme-toggle" title="Modo claro">☀️</button>
     <div class="sidebar">
         <div class="sidebar-title">Painel Admin</div>
         <a href="{% url 'admin_panel:dashboard' %}" {% if request.resolver_match.url_name == 'dashboard' %}class="active"{% endif %}>📊 Dashboard</a>

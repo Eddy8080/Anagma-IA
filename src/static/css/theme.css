@@ -1,0 +1,151 @@
+/* ── Botão de alternância de tema ── */
+#theme-toggle {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 9999;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #e3e3e3;
+    border-radius: 20px;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 1rem;
+    backdrop-filter: blur(4px);
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    line-height: 1.4;
+}
+#theme-toggle:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Logo Digiana — tipografia inline (chat e loading) ── */
+.logo-digiana {
+    font-family: 'Poppins', 'Montserrat', 'Segoe UI', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: #e2e8f0;
+}
+html.light-mode .logo-digiana {
+    color: #334155;
+}
+.ia-glow {
+    color: #00f0ff;
+    text-shadow:
+        0 0  5px rgba(0, 240, 255, 0.2),
+        0 0 10px rgba(0, 240, 255, 0.4),
+        0 0 20px rgba(0, 240, 255, 0.6),
+        0 0 40px rgba(0, 240, 255, 0.8);
+}
+.ia-glow:hover {
+    text-shadow:
+        0 0 10px rgba(0, 240, 255, 0.5),
+        0 0 20px rgba(0, 240, 255, 0.8),
+        0 0 40px rgba(0, 240, 255, 1.0),
+        0 0 60px rgba(0, 240, 255, 1.0);
+    transition: text-shadow 0.3s ease-in-out;
+}
+
+/* ── Logo Digiana (tela de login) ── */
+#digiana-logo {
+    display: block;
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto 24px;
+    border-radius: 12px;
+    object-fit: contain;
+}
+
+/* ════════════════════════════════════════
+   LIGHT MODE — variáveis e overrides
+   ════════════════════════════════════════ */
+html.light-mode {
+    /* base.html */
+    --bg-color:      #f8f9fa;
+    --sidebar-bg:    #ffffff;
+    --text-color:    #1a1a1a;
+    --accent-color:  #1a73e8;
+    --input-bg:      #ffffff;
+    --ai-avatar-bg:  #f0f0f0;
+    /* base_admin.html */
+    --bg:        #f8f9fa;
+    --card-bg:   #ffffff;
+    --text:      #1a1a1a;
+    --muted:     #666;
+    --accent:    #1a73e8;
+    --border:    #e0e0e0;
+    --danger:    #d93025;
+    --success:   #137333;
+}
+
+/* Botão em modo claro */
+html.light-mode #theme-toggle {
+    background: rgba(0, 0, 0, 0.07);
+    border-color: rgba(0, 0, 0, 0.15);
+    color: #1a1a1a;
+}
+html.light-mode #theme-toggle:hover {
+    background: rgba(0, 0, 0, 0.13);
+}
+
+/* ── base.html ── */
+html.light-mode .sidebar {
+    border-right-color: #e0e0e0;
+}
+html.light-mode .new-chat-btn {
+    background-color: #f0f0f0;
+    border-color: #e0e0e0;
+    color: #1a1a1a;
+}
+html.light-mode .new-chat-btn:hover { background-color: #e4e4e4; }
+html.light-mode .history-group-label { color: #aaa; }
+html.light-mode .history-item {
+    border-color: #ebebeb;
+    color: #1a1a1a;
+}
+html.light-mode .history-item:hover  { background: #f0f0f0; border-color: #d8d8d8; }
+html.light-mode .history-item.active {
+    background: #e8f0fe;
+    border-color: #4285f4;
+}
+html.light-mode .session-action-btn { color: #aaa; }
+html.light-mode .session-action-btn:hover { background: #e4e4e4; color: #1a1a1a; }
+html.light-mode .rename-input { color: #1a1a1a; }
+html.light-mode .prompt-container {
+    border-color: #e0e0e0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+html.light-mode .prompt-input { color: #1a1a1a; }
+html.light-mode .prompt-input::placeholder { color: #bbb; }
+html.light-mode .icon-btn { color: var(--accent-color); }
+html.light-mode .icon-btn:hover { background: rgba(26, 115, 232, 0.09); }
+
+/* ── login.html — card e inputs inline ── */
+html.light-mode .greeting-container > div {
+    background-color: #ffffff !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10) !important;
+}
+html.light-mode input[type="text"],
+html.light-mode input[type="password"] {
+    background: #f8f9fa !important;
+    color: #1a1a1a !important;
+    border-color: #e0e0e0 !important;
+}
+html.light-mode label { color: #555 !important; }
+
+/* ── base_admin.html ── */
+html.light-mode .sidebar a { color: var(--text); }
+html.light-mode .sidebar a:hover,
+html.light-mode .sidebar a.active { background: #f0f0f0; }
+html.light-mode .sidebar-footer { border-top-color: #e0e0e0; }
+html.light-mode td  { border-bottom-color: #ebebeb; }
+html.light-mode th  { border-bottom-color: #e0e0e0; }
+html.light-mode .badge-green { background: #d4edda; color: #155724; }
+html.light-mode .badge-red   { background: #f8d7da; color: #721c24; }
+html.light-mode .badge-blue  { background: #cce5ff; color: #004085; }
+html.light-mode .btn-danger  { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+html.light-mode .btn-primary { background: var(--accent); color: #ffffff; }
+html.light-mode .btn-outline { border-color: #e0e0e0; color: var(--text); }
+html.light-mode .msg-success { background: #d4edda; color: #155724; border-color: #c3e6cb; }
+html.light-mode .msg-error   { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }

@@ -25,8 +25,9 @@ class ChatAiConfig(AppConfig):
         try:
             from .llm_engine import AnagmaLLMEngine
             AnagmaLLMEngine()
+            print("[SISTEMA] --- ANAGMA IA ACORDOU COM SUCESSO NO BOOT ---", flush=True)
         except Exception as e:
             import traceback
-            print(f"\n[AVISO] Falha ao pré-aquecer o motor de IA: {e}", flush=True)
+            print(f"\n[AVISO] Falha ao pré-aquecer o motor de IA no boot: {e}", flush=True)
             traceback.print_exc()
-            print("[AVISO] O servidor iniciará sem o motor de IA ativo.\n", flush=True)
+            print("[AVISO] O servidor iniciará sem o motor de IA pré-carregado.\n", flush=True)
