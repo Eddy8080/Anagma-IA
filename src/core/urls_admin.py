@@ -19,6 +19,8 @@ from .views import (
     admin_feedback_messages,
     admin_save_correction,
     admin_deletar_feedback,
+    admin_modelos,
+    admin_ia_status,
 )
 
 app_name = 'admin_panel'
@@ -49,4 +51,8 @@ urlpatterns = [
     path('feedback/user/<int:user_id>/<str:tipo>/', admin_feedback_messages, name='feedback_messages'),
     path('feedback/message/<int:message_id>/save/', admin_save_correction, name='save_correction'),
     path('feedback/message/<int:message_id>/delete/', admin_deletar_feedback, name='deletar_feedback'),
+
+    # Gestão de Modelos de IA
+    path('modelos/', admin_modelos, name='modelos'),
+    path('ia-status/', admin_ia_status, name='ia_status'),
 ]

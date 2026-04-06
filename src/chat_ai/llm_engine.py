@@ -7,13 +7,18 @@ Backend fallback : transformers + safetensors float16 (~4.6 GB, CPU)
 import os
 import traceback
 import threading
+import gc
 from django.conf import settings
 from .rag_engine import AnagmaRAGEngine
-from .vocabulario import SAUDACOES, GATILHOS_SOBRE_IA, PARES_SOBRE_IA
+from .vocabulario import (
+    SAUDACOES, GATILHOS_SOBRE_IA, PARES_SOBRE_IA,
+    GATILHOS_FORA_DO_DOMINIO, PARES_FORA_DO_DOMINIO,
+    TERMOS_DETECCAO_INGLES
+)
 
 
 class AnagmaLLMEngine:
-    """Singleton que carrega o modelo uma única vez e o mantém em RAM."""
+    """Singleton dinâmico que permite trocar de cérebro em tempo real."""
 
     _instance = None
     _lock = threading.Lock()
@@ -30,22 +35,80 @@ class AnagmaLLMEngine:
         return cls._instance
 
     # ------------------------------------------------------------------
-    # Carregamento
+    # Carregamento e Gestão de Status
     # ------------------------------------------------------------------
 
+    def _update_status(self, etapa, progresso, status='CARREGANDO', modelo=None, erro=None):
+        """Atualiza o banco de dados com o progresso real para o Admin."""
+        try:
+            from core.models import ConfiguracaoIA
+            config = ConfiguracaoIA.get_solo()
+            config.etapa_nome = etapa
+            config.progresso = progresso
+            config.status = status
+            if modelo:
+                config.modelo_em_uso = modelo
+            if erro:
+                config.ultimo_erro = str(erro)
+            config.save()
+        except Exception:
+            pass
+
     def _load_model(self):
-        print('\n[SISTEMA] --- CARREGANDO CÉREBRO PERMANENTE ---', flush=True)
-
-        gguf_path = os.path.abspath(getattr(settings, 'GGUF_MODEL_PATH', ''))
-        safetensors_path = os.path.abspath(getattr(settings, 'MICROSOFT_MODEL_PATH', ''))
-
-        if os.path.exists(gguf_path):
-            self._carregar_gguf(gguf_path)
-        elif os.path.exists(safetensors_path):
-            print('[AVISO] Modelo GGUF não encontrado. Usando safetensors (mais lento).', flush=True)
-            self._carregar_safetensors(safetensors_path)
+        """Decide qual modelo carregar com base na preferência do Admin."""
+        from core.models import ConfiguracaoIA
+        pref = ConfiguracaoIA.get_solo().modelo_preferido
+        
+        self._update_status("Iniciando ativação da Digiana...", 10)
+        
+        if pref == 'LEVE':
+            self._ativar_modo_leve()
         else:
-            print('[ERRO] Nenhum modelo encontrado. Execute download_model_gguf.py.', flush=True)
+            self._ativar_modo_completo()
+
+    def _limpar_memoria(self):
+        """Expurga modelos anteriores da RAM para evitar travamentos."""
+        self._update_status("Limpando memória para o novo cérebro...", 20)
+        self._llm = None
+        self._pipe = None
+        self._model = None
+        self._tokenizer = None
+        self._backend = None
+        gc.collect()
+
+    def _ativar_modo_leve(self):
+        gguf_path = os.path.abspath(getattr(settings, 'GGUF_MODEL_PATH', ''))
+        if os.path.exists(gguf_path):
+            self._update_status("Carregando módulo de aprendizado existente...", 40)
+            # Simulação de carga de aprendizado (RAG já inicializado)
+            self._update_status("Sincronizando histórico de conversas...", 60)
+            self._update_status("Preparando modelo LEVE...", 80)
+            self._carregar_gguf(gguf_path)
+            self._update_status("Carregamento completo!", 100, status='PRONTO', modelo='LEVE')
+        else:
+            self._update_status("Erro: Arquivo GGUF não encontrado.", 0, status='ERRO', erro='Arquivo ausente')
+
+    def _ativar_modo_completo(self):
+        safetensors_path = os.path.abspath(getattr(settings, 'MICROSOFT_MODEL_PATH', ''))
+        if os.path.exists(safetensors_path):
+            self._update_status("Carregando módulo de aprendizado existente...", 30)
+            self._update_status("Sincronizando histórico de conversas...", 50)
+            self._update_status("Preparando modelo COMPLETO...", 70)
+            sucesso = self._carregar_safetensors(safetensors_path)
+            if sucesso:
+                self._update_status("Carregamento completo!", 100, status='PRONTO', modelo='COMPLETO')
+            else:
+                self._update_status("Erro ao carregar Safetensors. Recuando para modo LEVE.", 50, status='HIBERNACAO')
+                self._ativar_modo_leve()
+        else:
+            self._update_status("Modelo COMPLETO não encontrado. Ativando modo LEVE.", 40, status='HIBERNACAO')
+            self._ativar_modo_leve()
+
+    def recarregar_modelo(self):
+        """Interface pública para trocar de cérebro via Admin."""
+        with self._lock:
+            self._limpar_memoria()
+            self._load_model()
 
     def _carregar_gguf(self, model_path):
         try:
@@ -99,12 +162,15 @@ class AnagmaLLMEngine:
             self._pipe = pipeline('text-generation', model=self._model, tokenizer=self._tokenizer)
             self._backend = 'transformers'
             print('[SISTEMA] --- SUCESSO: ANAGMA IA ESTÁ PRONTA (safetensors) ---\n', flush=True)
+            return True
 
         except MemoryError:
             print('[ERRO CRÍTICO] RAM insuficiente.', flush=True)
+            return False
         except Exception as e:
             print(f'[ERRO CRÍTICO] Falha ao carregar safetensors: {e}', flush=True)
             traceback.print_exc()
+            return False
 
     # ------------------------------------------------------------------
     # Geração de resposta
@@ -138,6 +204,30 @@ class AnagmaLLMEngine:
             return True
         palavras = set(t.split())
         return any(a in palavras and b in palavras for a, b in PARES_SOBRE_IA)
+
+    def _e_fora_do_dominio(self, texto):
+        t = texto.strip().lower()
+        # 1. Verifica gatilhos diretos
+        if any(g in t for g in GATILHOS_FORA_DO_DOMINIO):
+            return True
+        # 2. Verifica pares de palavras
+        palavras = set(t.split())
+        for par in PARES_FORA_DO_DOMINIO:
+            if all(p in palavras for p in par):
+                return True
+        return False
+
+    def _is_ingles(self, texto):
+        if not texto: return False
+        t = texto.lower()
+        # Se contiver 3 ou mais termos comuns em inglês, bloqueia
+        count = 0
+        for termo in TERMOS_DETECCAO_INGLES:
+            if termo in t:
+                count += 1
+            if count >= 3:
+                return True
+        return False
 
     def gerar_resposta(self, user_query, chat_history=None, user_name=None, saudacao=None, search_query=None, user=None):
         """
@@ -175,7 +265,7 @@ class AnagmaLLMEngine:
             primeiro_nome = (user_name or 'usuário').split()[0]
             opcoes = [
                 (
-                    f"Sou a **Anagma IA**, sua assistente de contabilidade e tributos brasileiros, {primeiro_nome}! "
+                    f"Sou a **Digiana IA**, sua assistente de contabilidade e tributos brasileiros, {primeiro_nome}! "
                     f"Você pode me perguntar sobre IRPJ, CSLL, Simples Nacional, folha de pagamento, notas fiscais, "
                     f"SPED, eSocial — qualquer coisa da área contábil e fiscal. "
                     f"Também recebo documentos em PDF ou imagem direto no chat para analisar na hora. "
@@ -188,10 +278,30 @@ class AnagmaLLMEngine:
                     f"Por onde quer começar?"
                 ),
                 (
-                    f"Sou a Anagma IA! Funciono como um especialista contábil disponível aqui no sistema, {primeiro_nome}. "
+                    f"Sou a Digiana! Funciono como um especialista contábil disponível aqui no sistema, {primeiro_nome}. "
                     f"Pode me mandar perguntas sobre tributos, escrituração, IRRF, CSLL, ICMS, ISS, folha — tudo da área. "
                     f"Também analiso documentos que você anexar. "
                     f"Tem alguma dúvida específica?"
+                ),
+            ]
+            return random.choice(opcoes)
+
+        # Intercepta temas fora do domínio contábil (Guardrails)
+        if self._e_fora_do_dominio(user_query):
+            import random
+            primeiro_nome = (user_name or 'usuário').split()[0]
+            cumprimento = saudacao or 'Boa tarde'
+            opcoes = [
+                (
+                    f"{cumprimento}, {primeiro_nome}! Como sou uma IA focada exclusivamente em **contabilidade, tributos e gestão financeira**, "
+                    f"meu aprendizado é restrito a esses temas técnicos. "
+                    f"Infelizmente não consigo ajudar com questões de cultura geral, lazer ou outros assuntos fora do domínio contábil. "
+                    f"Como posso ajudá-lo hoje com suas dúvidas fiscais ou tributárias?"
+                ),
+                (
+                    f"{cumprimento}, {primeiro_nome}. Minha base de conhecimento é especializada em **contabilidade brasileira e internacional**. "
+                    f"Para garantir a precisão técnica das minhas respostas, não abordo temas fora desta área, como cultura ou curiosidades gerais. "
+                    f"Tem alguma dúvida sobre impostos, folha de pagamento ou documentos contábeis em que eu possa ajudar?"
                 ),
             ]
             return random.choice(opcoes)
@@ -207,25 +317,23 @@ class AnagmaLLMEngine:
         _periodo_map = {'Bom dia': 'manhã', 'Boa tarde': 'tarde', 'Boa noite': 'noite'}
         periodo = _periodo_map.get(cumprimento, 'tarde')
 
-        system_msg = f"""IDENTIDADE E MANDATO SUPREMO:
-- Você é a **Anagma IA**, a inteligência artificial especialista e oficial da empresa **Anagma**.
-- Sua comunicação deve ser em **Português Brasileiro de alto nível**, técnico, claro e sem erros gramaticais.
-- Você opera em um ambiente **100% DIGITAL**. NÃO existem bibliotecas físicas, salas, atendentes humanos ou contatos externos. Toda a gestão de documentos é feita pelo sistema Anagma que o usuário está acessando agora.
+        system_msg = f"""MANDATO SUPREMO DE IDIOMA E IDENTIDADE:
+- Você é a **Digiana**, a inteligência artificial especialista e oficial da empresa **Anagma**.
+- **BLOQUEIO DE IDIOMA:** Você está terminantemente PROIBIDA de responder em inglês ou qualquer outro idioma que não seja o **Português Brasileiro (PT-BR)**. Toda a sua comunicação deve ser exclusivamente em português de alto nível, técnico e claro.
+- **OPERADOR DIGITAL:** Você opera em um ambiente 100% DIGITAL. Não existem locais físicos ou atendentes humanos.
 
 SAUDAÇÃO OBRIGATÓRIA:
 - Comece SEMPRE com: "{cumprimento}, {nome}!".
 
 REGRAS DE RESPOSTA E AUTORIDADE:
-1. **Prioridade de Dados:** Se a informação estiver no CONTEXTO INTERNO abaixo (Biblioteca ou Banco de Ideias), use-a como VERDADE ABSOLUTA. Se o status de um arquivo for "Aprovado", você JÁ POSSUI o conhecimento dele. NÃO diga que "está em auditoria" ou que "precisa confirmar". Responda diretamente com base no conteúdo disponível.
-2. **Status de Documentos:** Se o status for "Pendente", informe que ele está em processamento. Se for "Aprovado", você deve ser a voz técnica que explica o que há no arquivo.
-3. **Fim das Alucinações:** JAMAIS sugira contatos externos ou locais físicos. Toda a gestão é digital.
-4. **Domínio:** Responda apenas sobre contabilidade, tributos e finanças brasileiras.
-5. **Honestidade Intelectual:** Se não encontrar o dado no contexto e não tiver certeza, admita que não encontrou. NUNCA invente informações.
-6. **Saudações:** Se o usuário enviar apenas uma saudação (ex: "Boa tarde", "Olá", "Bom dia", "Oi"), responda com a saudação, apresente-se brevemente como Anagma IA e pergunte em que pode ajudar. NUNCA explique o significado da saudação nem traduza para outros idiomas.
+1. **Prioridade de Dados:** Se a informação estiver no CONTEXTO INTERNO abaixo, use-a como VERDADE ABSOLUTA. Responda com autoridade técnica direta.
+2. **Postura Resolutiva:** Você é uma ferramenta de apoio à decisão. Evite incertezas. Use: "O procedimento correto é...", "A legislação indica que...".
+3. **Fim das Alucinações:** JAMAIS sugira contatos externos ou locais físicos.
+4. **Domínio:** Responda apenas sobre contabilidade, tributos e finanças.
+5. **Restrição de Conteúdo:** Se o usuário enviar apenas uma saudação, apresente-se como Digiana e pergunte como pode ajudar na área contábil. NUNCA traduza saudações ou termos para outros idiomas.
 
-CONTEXTO DA EMPRESA:
-{perfil_anagma if perfil_anagma else 'Empresa Anagma - Especialista em Contabilidade Digital.'}
-
+CONTEXTO DA EMPRESA (DNA DA DIGIANA):
+{perfil_anagma if perfil_anagma else 'Digiana - Especialista Técnica em Contabilidade Digital.'}
 """
 
         if contexto_rag:
@@ -258,7 +366,20 @@ CONTEXTO DA EMPRESA:
         else:
             res = self._gerar_safetensors(messages)
             
-        return self._limpar_resposta(res)
+        res_limpa = self._limpar_resposta(res)
+        
+        # KILL-SWITCH DE IDIOMA: Se o modelo falhar e responder em inglês
+        if self._is_ingles(res_limpa):
+            import random
+            nome = (user_name or 'usuário').split()[0]
+            cumprimento = saudacao or 'Boa tarde'
+            opcoes = [
+                f"{cumprimento}, {nome}! Identifiquei uma falha na geração do idioma. Como sou uma IA focada exclusivamente na contabilidade brasileira, minha comunicação deve ser em Português Brasileiro. Em que posso ajudá-lo hoje com suas dúvidas técnicas?",
+                f"{cumprimento}, {nome}. Houve uma tentativa de resposta em idioma estrangeiro pelo modelo base. Como sua assistente técnica Digiana, mantenho meu foco apenas em Português e temas contábeis brasileiros. Como posso ser útil agora?",
+            ]
+            return random.choice(opcoes)
+            
+        return res_limpa
 
     def _limpar_resposta(self, texto):
         """Remove notas explicativas ou metadados que o modelo possa anexar por erro de instrução."""

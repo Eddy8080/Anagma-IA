@@ -1,0 +1,218 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% load static %}
+
+{% block title %}Modelos de IA - Anagma Admin{% endblock %}
+
+{% block content_admin %}
+<div class="container-fluid py-4 text-white">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="fw-bold"><i class="fas fa-brain me-2"></i>Gestão de Modelos de Inteligência</h2>
+            <p style="color: var(--muted)">Escolha o nível de processamento e autoridade técnica da Digiana IA.</p>
+        </div>
+    </div>
+
+    <!-- SELETOR DE MODELOS -->
+    <div id="selector-container" class="row g-4 {% if config.status == 'CARREGANDO' %}d-none{% endif %}">
+        <!-- DIGIANA LEVE -->
+        <div class="col-md-6">
+            <div class="card h-100 border-0 shadow-lg card-hover text-white {% if config.modelo_preferido == 'LEVE' %}border-primary border-2{% endif %}" 
+                 onclick="selectModel('LEVE')" 
+                 style="background: var(--card-bg); border: 1px solid var(--border) !important;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="icon-shape bg-light-primary text-primary rounded-circle me-3">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <h4 class="mb-0 fw-bold">Digiana - LEVE</h4>
+                    </div>
+                    <p style="color: var(--muted)" class="small">Otimizada para velocidade e baixo consumo de recursos (GGUF).</p>
+                    <ul class="list-unstyled mb-4 small">
+                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>Resposta instantânea</li>
+                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>Ideal para hardware padrão</li>
+                        <li><i class="fas fa-check-circle text-success me-2"></i>Foco em agilidade operacional</li>
+                    </ul>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="modelChoice" id="radioLEVE" value="LEVE" {% if config.modelo_preferido == 'LEVE' %}checked{% endif %}>
+                        <label class="form-check-label fw-bold" for="radioLEVE">Selecionar este modelo</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DIGIANA COMPLETO -->
+        <div class="col-md-6">
+            <div class="card h-100 border-0 shadow-lg card-hover text-white {% if config.modelo_preferido == 'COMPLETO' %}border-purple border-2{% endif %}" 
+                 onclick="selectModel('COMPLETO')" 
+                 style="background: var(--card-bg); border: 1px solid var(--border) !important;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="icon-shape bg-light-purple text-purple rounded-circle me-3">
+                            <i class="fas fa-microchip"></i>
+                        </div>
+                        <h4 class="mb-0 fw-bold">Digiana - COMPLETO</h4>
+                    </div>
+                    <p style="color: var(--muted)" class="small">Máxima precisão técnica e autoridade contábil exaustiva (Safetensors).</p>
+                    <ul class="list-unstyled mb-4 small">
+                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>Processamento profundo</li>
+                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>Análise de normas complexas</li>
+                        <li><i class="fas fa-check-circle text-success me-2"></i>Exige alta capacidade de hardware</li>
+                    </ul>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="modelChoice" id="radioCOMPLETO" value="COMPLETO" {% if config.modelo_preferido == 'COMPLETO' %}checked{% endif %}>
+                        <label class="form-check-label fw-bold" for="radioCOMPLETO">Selecionar este modelo</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 mt-4 text-center">
+            <button type="button" class="btn btn-primary btn-lg px-5 shadow" data-bs-toggle="modal" data-bs-target="#confirmModal">
+                <i class="fas fa-sync-alt me-2"></i>Aplicar e Reiniciar Cérebro
+            </button>
+        </div>
+    </div>
+
+    <!-- CONSOLE DE ATIVAÇÃO (PROGRESSO) -->
+    <div id="progress-container" class="row justify-content-center {% if config.status != 'CARREGANDO' %}d-none{% endif %}">
+        <div class="col-md-8 text-center py-5">
+            <div class="card border-0 shadow-lg p-5 rounded-4" style="background: #1e1f20; border: 1px solid var(--border) !important;">
+                <h3 class="fw-bold mb-4 text-white" id="status-title">Ativando Inteligência...</h3>
+                
+                <div class="progress mb-4" style="height: 30px; border-radius: 15px; background: #333;">
+                    <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                         role="progressbar" style="width: {{ config.progresso }}%">
+                        {{ config.progresso }}%
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-center mb-4">
+                    <div class="spinner-border text-primary me-3" role="status" id="spinner">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <h5 class="mb-0 text-info fw-bold" id="etapa-nome">{{ config.etapa_nome }}</h5>
+                </div>
+
+                <p style="color: var(--muted)" class="small">Por favor, não feche esta página enquanto o novo modelo está sendo alocado na memória RAM do servidor.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MENSAGEM DE SUCESSO -->
+    <div id="success-container" class="row justify-content-center d-none">
+        <div class="col-md-6 text-center py-5">
+            <div class="card border-0 shadow-sm p-4 rounded-4" style="background: rgba(25, 135, 84, 0.1); border: 1px solid var(--success) !important;">
+                <div class="display-1 text-success mb-3"><i class="fas fa-check-circle"></i></div>
+                <h2 class="fw-bold text-success">Carregamento Completo!</h2>
+                <p class="lead text-white" id="success-msg">A Digiana está pronta para operar no modo escolhido.</p>
+                <button class="btn btn-success px-4" onclick="location.reload()">Voltar para Gestão</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CONFIRMAÇÃO UX/UI -->
+    <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="background: var(--card-bg); border: 1px solid var(--border) !important; color: var(--text);">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold" id="confirmModalLabel">
+                        <i class="fas fa-exclamation-triangle text-warning me-2"></i>Confirmar Reinicialização
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body py-4">
+                    <p class="mb-0">Esta ação irá reiniciar o motor de IA e pode levar até <strong>1 minuto</strong> para concluir a alocação de memória.</p>
+                    <p class="mt-2 text-secondary small">Deseja continuar com a troca de cérebro da Digiana?</p>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary px-4" id="confirm-btn" onclick="executeModelSwitch()">
+                        Sim, Continuar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card-hover { cursor: pointer; transition: all 0.3s ease; }
+    .card-hover:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.5) !important; }
+    .bg-light-primary { background-color: rgba(13, 110, 253, 0.2); }
+    .bg-light-purple { background-color: rgba(111, 66, 193, 0.2); }
+    .text-purple { color: #a87dfa; }
+    .border-purple { border-color: #a87dfa !important; }
+    .icon-shape { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; }
+    .form-check-input:checked { background-color: var(--accent); border-color: var(--accent); }
+    .text-white { color: #e3e3e3 !important; }
+    .btn-outline-secondary { border-color: var(--border); color: var(--muted); }
+    .btn-outline-secondary:hover { background: #333; color: white; }
+</style>
+
+<script>
+    function selectModel(type) {
+        document.getElementById('radio' + type).checked = true;
+        document.querySelectorAll('.card-hover').forEach(c => c.classList.remove('border-primary', 'border-purple', 'border-2'));
+        const card = document.querySelector('[onclick="selectModel(\'' + type + '\')"]');
+        if (type === 'LEVE') card.classList.add('border-primary', 'border-2');
+        else card.classList.add('border-purple', 'border-2');
+    }
+
+    function executeModelSwitch() {
+        const selected = document.querySelector('input[name="modelChoice"]:checked').value;
+        const modalElement = document.getElementById('confirmModal');
+        const modal = bootstrap.Modal.getInstance(modalElement);
+        modal.hide();
+
+        document.getElementById('selector-container').classList.add('d-none');
+        document.getElementById('progress-container').classList.remove('d-none');
+
+        fetch('', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'modelo=' + selected
+        }).then(res => res.json()).then(data => {
+            if (data.status === 'ok') {
+                startPolling();
+            }
+        });
+    }
+
+    let pollInterval;
+    function startPolling() {
+        pollInterval = setInterval(() => {
+            fetch('{% url "admin_panel:ia_status" %}')
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('progress-bar').style.width = data.progresso + '%';
+                    document.getElementById('progress-bar').innerText = data.progresso + '%';
+                    document.getElementById('etapa-nome').innerText = data.etapa;
+
+                    if (data.status === 'PRONTO') {
+                        clearInterval(pollInterval);
+                        showSuccess(data.modelo_em_uso);
+                    } else if (data.status === 'ERRO' || data.status === 'HIBERNACAO') {
+                        if (data.status === 'HIBERNACAO') {
+                            alert('Aviso: O modelo Completo falhou. O sistema entrou em modo de Hibernação (Leve) para manter o serviço.');
+                            location.reload();
+                        } else {
+                            clearInterval(pollInterval);
+                            alert('Erro Crítico: ' + data.erro);
+                            location.reload();
+                        }
+                    }
+                });
+        }, 1500);
+    }
+
+    function showSuccess(modelo) {
+        document.getElementById('progress-container').classList.add('d-none');
+        document.getElementById('success-container').classList.remove('d-none');
+        document.getElementById('success-msg').innerText = 'A Digiana está pronta para operar no modo ' + modelo + '.';
+    }
+
+    {% if config.status == 'CARREGANDO' %}
+    startPolling();
+    {% endif %}
+</script>
+{% endblock %}

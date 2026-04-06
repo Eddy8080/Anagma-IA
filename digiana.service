@@ -1,0 +1,19 @@
+[Unit]
+Description=Servico Gunicorn para Digiana IA (Anagma)
+After=network.target postgresql.service redis.service
+
+[Service]
+# Substitua '{{USER}}' pelo seu usuario na VPS (ex: edilson)
+User={{USER}}
+Group=nginx
+WorkingDirectory=/home/{{USER}}/Banco_Ideias/src
+Environment="PYTHONPATH=/home/{{USER}}/Banco_Ideias/src"
+# Caminho para o Gunicorn dentro do seu VirtualEnv
+ExecStart=/home/{{USER}}/Banco_Ideias/venv/bin/gunicorn \
+          --workers 5 \
+          --timeout 120 \
+          --bind unix:/home/{{USER}}/Banco_Ideias/src/digiana.sock \
+          AnagmaCore.wsgi:application
+
+[Install]
+WantedBy=multi-user.target

@@ -1,106 +1,86 @@
 {% extends 'admin_panel/base_admin.html' %}
+{% load static %}
 
-{% block title %}Perfil Anagma — Painel Admin{% endblock %}
+{% block title %}Perfil Digiana - Anagma Admin{% endblock %}
 
 {% block content %}
-<div class="page-title">🏢 Perfil Anagma</div>
+<div class="page-title"><i class="fas fa-id-card me-2"></i>Perfil Cultural da Digiana IA</div>
 
-<!-- Quill CSS -->
-<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
-<style>
-    .ql-toolbar.ql-snow {
-        background: #1e1f20;
-        border: 1px solid #3c4043;
-        border-bottom: none;
-        border-radius: 10px 10px 0 0;
-    }
-    .ql-container.ql-snow {
-        background: #131314;
-        border: 1px solid #3c4043;
-        border-radius: 0 0 10px 10px;
-        min-height: 320px;
-        font-size: 0.95rem;
-        color: #e3e3e3;
-    }
-    .ql-editor { min-height: 320px; line-height: 1.7; color: #e3e3e3; }
-    .ql-editor.ql-blank::before { color: #555; font-style: normal; }
-    /* Ícones e texto da toolbar */
-    .ql-snow .ql-stroke { stroke: #888; }
-    .ql-snow .ql-fill  { fill: #888; }
-    .ql-snow .ql-picker-label { color: #888; }
-    .ql-snow .ql-picker-options { background: #1e1f20; border-color: #3c4043; }
-    .ql-snow .ql-picker-item { color: #e3e3e3; }
-    .ql-snow button:hover .ql-stroke,
-    .ql-snow .ql-picker-label:hover .ql-stroke { stroke: #a8c7fa; }
-    .ql-snow button:hover .ql-fill { fill: #a8c7fa; }
-    .ql-snow button.ql-active .ql-stroke { stroke: #a8c7fa; }
-    .ql-snow button.ql-active .ql-fill  { fill: #a8c7fa; }
-</style>
-
-<div class="card">
-    <p style="color:#888; font-size:0.85rem; margin-bottom:20px; line-height:1.6;">
-        Este texto define o <strong style="color:#a8c7fa;">tom e a cultura</strong> da empresa nas respostas da IA.<br>
-        Inclua a história, valores e identidade da Anagma. A IA usará esse contexto naturalmente —
-        sem citar a empresa a menos que o usuário pergunte diretamente.
-    </p>
-    {% if perfil.atualizado_em %}
-    <p style="color:#555; font-size:0.78rem; margin-bottom:16px;">
-        Última atualização: {{ perfil.atualizado_em|date:"d/m/Y \à\s H:i" }}
-    </p>
-    {% endif %}
-
-    <form method="post" id="perfil-form">
-        {% csrf_token %}
-        <!-- Campo oculto enviado ao Django — preenchido pelo JS antes do submit -->
-        <input type="hidden" name="texto" id="texto-hidden">
-
-        <!-- Editor Quill -->
-        <div id="quill-editor" spellcheck="true" lang="pt-BR">{{ perfil.texto }}</div>
-
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
-            <button type="button" onclick="limparEditor()"
-                    style="background:transparent; color:#f87171; border:1px solid #7f1d1d;
-                           border-radius:10px; padding:10px 20px; font-size:0.9rem; cursor:pointer;">
-                🗑 Limpar texto
-            </button>
-            <button type="submit"
-                    style="background:#a8c7fa; color:#131314; border:none; border-radius:10px;
-                           padding:10px 28px; font-size:0.95rem; font-weight:600; cursor:pointer;">
-                Salvar Perfil
-            </button>
+<div class="row">
+    <!-- COLUNA DE EDIÇÃO -->
+    <div class="col-md-8">
+        <div class="card">
+            <h3 class="mb-3">Configuração de Identidade</h3>
+            <p class="text-muted small mb-4">
+                Este texto define o "DNA" da Digiana. Ele é injetado no início de cada conversa para garantir que a IA mantenha sua personalidade e autoridade técnica.
+            </p>
+            
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-4">
+                    <label for="texto" class="form-label fw-bold text-accent">Mandato e Contexto da IA:</label>
+                    <textarea name="texto" id="texto" class="form-control bg-dark text-white border-secondary" 
+                              style="height: 500px; font-family: 'Consolas', monospace; font-size: 0.95rem; line-height: 1.6; padding: 20px;">{{ perfil.texto }}</textarea>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small italic">Última atualização: {{ perfil.atualizado_em|date:"d/m/Y H:i" }}</span>
+                    <button type="submit" class="btn btn-primary px-5 py-2 fw-bold">
+                        <i class="fas fa-save me-2"></i>Salvar Perfil Digiana
+                    </button>
+                </div>
+            </form>
         </div>
-    </form>
+    </div>
+
+    <!-- COLUNA DE INSTRUÇÕES (GUIA DO SUPERUSUÁRIO) -->
+    <div class="col-md-4">
+        <div class="card border-info">
+            <h4 class="text-info mb-3"><i class="fas fa-lightbulb me-2"></i>Como Estruturar?</h4>
+            <p class="small">Para uma performance máxima da Digiana, recomendamos dividir o texto em dois blocos principais:</p>
+            
+            <hr class="border-secondary">
+            
+            <h6 class="fw-bold">1. Regras de Comportamento</h6>
+            <p class="text-muted extra-small">Mantenha os itens de 1 a 5 que definem o tom técnico, o bloqueio de idioma e a autoridade contábil.</p>
+            
+            <h6 class="fw-bold mt-3">2. Contexto Institucional</h6>
+            <p class="text-muted extra-small">Adicione a história e o foco da empresa abaixo das regras técnicas usando este padrão:</p>
+            
+            <div class="bg-black p-3 rounded border border-secondary mb-3">
+                <code class="text-success extra-small">
+                    --- <br>
+                    6. CONTEXTO INSTITUCIONAL:<br>
+                    * FUNDAÇÃO: A Anagma nasceu em...<br>
+                    * VALORES: Nossos valores são...<br>
+                    * FOCO: Somos especialistas em...<br>
+                    * DIFERENCIAL: Nosso atendimento é...
+                </code>
+            </div>
+            
+            <p class="text-warning small mb-0">
+                <i class="fas fa-exclamation-circle me-1"></i> 
+                <strong>Dica:</strong> Use tópicos (*) em vez de parágrafos longos para que a IA processe a informação com mais clareza.
+            </p>
+        </div>
+
+        <div class="card mt-3 bg-dark">
+            <h5 class="mb-2 small fw-bold">Status do Perfil</h5>
+            <div class="d-flex align-items-center">
+                <div class="badge badge-green me-2">Ativo</div>
+                <span class="small text-muted">Injetado no System Prompt</span>
+            </div>
+        </div>
+    </div>
 </div>
 
-<!-- Quill JS -->
-<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
-<script>
-    const quill = new Quill('#quill-editor', {
-        theme: 'snow',
-        placeholder: 'Escreva a história, missão, valores e cultura da Anagma…',
-        modules: {
-            toolbar: [
-                [{ header: [1, 2, 3, false] }],
-                ['bold', 'italic', 'underline'],
-                [{ list: 'ordered' }, { list: 'bullet' }],
-                ['clean']
-            ]
-        }
-    });
-
-    // Habilita corretor ortográfico no editor
-    quill.root.setAttribute('spellcheck', 'true');
-    quill.root.setAttribute('lang', 'pt-BR');
-
-    // Antes de submeter, copia o texto puro (sem HTML) para o campo oculto
-    document.getElementById('perfil-form').addEventListener('submit', () => {
-        document.getElementById('texto-hidden').value = quill.getText().trim();
-    });
-
-    function limparEditor() {
-        if (confirm('Limpar todo o texto do perfil?')) {
-            quill.setText('');
-        }
+<style>
+    .text-accent { color: var(--accent); }
+    .extra-small { font-size: 0.75rem; }
+    .form-control:focus {
+        background-color: #131314 !important;
+        border-color: var(--accent) !important;
+        box-shadow: 0 0 0 0.25rem rgba(168, 199, 250, 0.1);
     }
-</script>
+</style>
 {% endblock %}

@@ -7,7 +7,51 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from .forms import CustomUserRegistrationForm
-from .models import GlobalIdeia, CustomUser, PerfilAnagma
+from .decorators import superuser_required
+from django.http import JsonResponse
+from .models import GlobalIdeia, CustomUser, PerfilAnagma, ConfiguracaoIA
+from chat_ai.llm_engine import AnagmaLLMEngine
+import threading
+
+@superuser_required
+def admin_modelos(request):
+    config = ConfiguracaoIA.get_solo()
+    
+    if request.method == 'POST':
+        novo_modelo = request.POST.get('modelo')
+        if novo_modelo in ['LEVE', 'COMPLETO']:
+            config.modelo_preferido = novo_modelo
+            config.status = 'CARREGANDO'
+            config.progresso = 0
+            config.etapa_nome = "Iniciando solicitação de troca..."
+            config.save()
+            
+            # Dispara a troca em uma thread separada para não travar o request
+            def task_recarregar():
+                engine = AnagmaLLMEngine()
+                engine.recarregar_modelo()
+            
+            thread = threading.Thread(target=task_recarregar)
+            thread.start()
+            
+            return JsonResponse({'status': 'ok'})
+
+    return render(request, 'admin_panel/modelos.html', {
+        'config': config,
+        'segment': 'modelos'
+    })
+
+@superuser_required
+def admin_ia_status(request):
+    """Endpoint para o JavaScript consultar o progresso do carregamento."""
+    config = ConfiguracaoIA.get_solo()
+    return JsonResponse({
+        'status': config.status,
+        'modelo_em_uso': config.get_modelo_em_uso_display(),
+        'etapa': config.etapa_nome,
+        'progresso': config.progresso,
+        'erro': config.ultimo_erro if config.status == 'ERRO' else None
+    })
 from .decorators import superuser_required
 from chat_ai.vocabulario import TERMOS_CONTABEIS
 

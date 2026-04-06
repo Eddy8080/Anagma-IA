@@ -36,10 +36,10 @@ class PerfilAnagma(models.Model):
     atualizado_em = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Perfil Anagma'
+        verbose_name = 'Perfil Digiana'
 
     def __str__(self):
-        return 'Perfil Anagma'
+        return 'Perfil Digiana'
 
     @classmethod
     def get(cls):
@@ -91,3 +91,42 @@ class DocumentoBiblioteca(models.Model):
 
     def __str__(self):
         return f"{self.nome_arquivo} ({self.get_status_display()})"
+
+
+class ConfiguracaoIA(models.Model):
+    """
+    Singleton para gerenciar qual cérebro a Digiana está usando e o status do carregamento.
+    """
+    MODELO_CHOICES = [
+        ('LEVE', 'Digiana - LEVE (GGUF)'),
+        ('COMPLETO', 'Digiana - COMPLETO (Safetensors)'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('PRONTO', 'Pronto para Uso'),
+        ('CARREGANDO', 'Carregando...'),
+        ('ERRO', 'Erro no Carregamento'),
+        ('HIBERNACAO', 'Em Hibernação (Fallback)'),
+    ]
+
+    modelo_preferido = models.CharField(max_length=10, choices=MODELO_CHOICES, default='LEVE')
+    modelo_em_uso = models.CharField(max_length=10, choices=MODELO_CHOICES, default='LEVE')
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='PRONTO')
+    
+    etapa_nome = models.CharField(max_length=100, default='Sistema Estável', help_text="Mensagem amigável para o Admin")
+    progresso = models.IntegerField(default=100, help_text="0 a 100 para a barra de progresso")
+    
+    ultimo_erro = models.TextField(blank=True, null=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Configuração da IA'
+        verbose_name_plural = 'Configurações da IA'
+
+    def __str__(self):
+        return f"IA: {self.modelo_em_uso} ({self.status})"
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

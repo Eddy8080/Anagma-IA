@@ -63,6 +63,35 @@ PARES_SOBRE_IA = (
 )
 
 # ---------------------------------------------------------------------------
+# Temas fora do domínio contábil/fiscal — interceptados para manter o foco
+# ---------------------------------------------------------------------------
+GATILHOS_FORA_DO_DOMINIO = (
+    # Cultura e Lazer
+    'cultura', 'tradição', 'tradicao', 'dança', 'danca', 'música', 'musica',
+    'festival', 'festivais', 'festa junina', 'carnaval', 'arte', 'literatura',
+    'culinária', 'culinaria', 'gastronomia', 'comida típica', 'receita de',
+    # Esportes e Entretenimento
+    'esporte', 'futebol', 'copa do mundo', 'olimpíadas', 'olimpiadas',
+    'filme', 'série', 'serie', 'cinema', 'famoso', 'celebridade',
+    # Turismo e Geral
+    'turismo', 'viagem', 'viajar', 'país', 'pais', 'história do brasil', 'geografia',
+    'curiosidade', 'me conte sobre', 'dicas de lazer', 'o que fazer em',
+    'política', 'politica', 'religião', 'religiao', 'igreja',
+)
+
+# Pares que indicam temas fora do domínio
+PARES_FORA_DO_DOMINIO = (
+    ('brasil', 'cultura'),
+    ('brasil', 'tradição'),
+    ('brasil', 'tradicao'),
+    ('brasil', 'história'),
+    ('brasil', 'historia'),
+    ('brasil', 'geografia'),
+    ('como', 'fazer', 'comida'),
+    ('como', 'fazer', 'bolo'),
+)
+
+# ---------------------------------------------------------------------------
 # Stopwords do RAG — ignoradas na busca semântica para evitar ruído
 # ---------------------------------------------------------------------------
 STOPWORDS_RAG = frozenset({
@@ -74,9 +103,19 @@ STOPWORDS_RAG = frozenset({
 })
 
 # ---------------------------------------------------------------------------
+# Termos de Detecção de Idioma Estrangeiro (Kill-Switch)
+# Usados para interceptar respostas que o modelo gera em inglês por erro.
+# ---------------------------------------------------------------------------
+TERMOS_DETECCAO_INGLES = frozenset({
+    ' the ', ' and ', ' with ', ' from ', ' because ', ' certainly ',
+    ' however ', ' although ', ' which ', ' where ', ' when ', ' who ',
+    ' this ', ' that ', ' these ', ' those ', ' been ', ' have ', ' has ',
+    ' will ', ' would ', ' should ', ' could ', ' about ', ' after ',
+    ' before ', ' during ', ' through ', ' between ', ' among '
+})
+
+# ---------------------------------------------------------------------------
 # Termos do domínio contábil/fiscal/financeiro
-# Usados para validar se uma ideia ou conteúdo pertence ao domínio da Anagma.
-# Verificação por substring sobre texto normalizado (lowercase com espaços).
 # ---------------------------------------------------------------------------
 TERMOS_CONTABEIS = (
     'contab', 'tribut', 'fiscal', ' imposto', 'irpj', 'irpf', 'irrf', 'csll',
