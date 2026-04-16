@@ -13,11 +13,11 @@
         <form method="post">
             {% csrf_token %}
             <div style="margin-bottom: 20px;">
-                <label style="display: block; margin-bottom: 8px; font-size: 0.9rem; color: #888;">Usuário</label>
-                <input type="text" name="username" style="width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #333; background: #131314; color: white; outline: none; box-sizing: border-box;">
+                <label for="id_username" style="display: block; margin-bottom: 8px; font-size: 0.9rem; color: #888;">Usuário</label>
+                <input type="text" name="username" id="id_username" style="width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #333; background: #131314; color: white; outline: none; box-sizing: border-box;">
             </div>
             <div style="margin-bottom: 30px;">
-                <label style="display: block; margin-bottom: 8px; font-size: 0.9rem; color: #888;">Senha</label>
+                <label for="id_password" style="display: block; margin-bottom: 8px; font-size: 0.9rem; color: #888;">Senha</label>
                 <div style="position: relative; width: 100%;">
                     <input type="password" name="password" id="id_password" required
                            style="width: 100%; padding: 12px 45px 12px 12px; border-radius: 12px; border: 1px solid #333; background: #131314; color: white; outline: none; box-sizing: border-box; font-family: inherit;">
