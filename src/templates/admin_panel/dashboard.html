@@ -7,32 +7,80 @@
 
 <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:16px;">
     <div class="card" style="text-align:center;">
-        <div style="font-size:2rem; font-weight:700; color:#a8c7fa;">{{ total_usuarios }}</div>
+        <div id="stat-usuarios" style="font-size:2rem; font-weight:700; color:#a8c7fa;">{{ total_usuarios }}</div>
         <div style="color:#888; font-size:0.85rem; margin-top:4px;">Usuários cadastrados</div>
     </div>
     <div class="card" style="text-align:center;">
-        <div style="font-size:2rem; font-weight:700; color:#4ade80;">{{ total_ideias_ativas }}</div>
+        <div id="stat-ideias" style="font-size:2rem; font-weight:700; color:#4ade80;">{{ total_ideias_ativas }}</div>
         <div style="color:#888; font-size:0.85rem; margin-top:4px;">Ideias ativas</div>
     </div>
     <div class="card" style="text-align:center;">
-        <div style="font-size:2rem; font-weight:700; color:#facc15;">{{ sessoes_hoje }}</div>
+        <div id="stat-sessoes" style="font-size:2rem; font-weight:700; color:#facc15;">{{ sessoes_hoje }}</div>
         <div style="color:#888; font-size:0.85rem; margin-top:4px;">Sessões de chat hoje</div>
     </div>
 </div>
 <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:32px;">
     <a href="{% url 'admin_panel:feedback_list' tipo='like' %}" style="text-decoration:none;">
         <div class="card" style="text-align:center; cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='#4ade80'" onmouseout="this.style.borderColor='#333'">
-            <div style="font-size:2rem; font-weight:700; color:#4ade80;">👍 {{ total_likes }}</div>
+            <div style="font-size:2rem; font-weight:700; color:#4ade80;">👍 <span id="stat-likes">{{ total_likes }}</span></div>
             <div style="color:#888; font-size:0.85rem; margin-top:4px;">Respostas curtidas</div>
         </div>
     </a>
     <a href="{% url 'admin_panel:feedback_list' tipo='dislike' %}" style="text-decoration:none;">
         <div class="card" style="text-align:center; cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='#f87171'" onmouseout="this.style.borderColor='#333'">
-            <div style="font-size:2rem; font-weight:700; color:#f87171;">👎 {{ total_dislikes }}</div>
+            <div style="font-size:2rem; font-weight:700; color:#f87171;">👎 <span id="stat-dislikes">{{ total_dislikes }}</span></div>
             <div style="color:#888; font-size:0.85rem; margin-top:4px;">Respostas não curtidas</div>
         </div>
     </a>
 </div>
+
+<script>
+(function () {
+    var STREAM_URL = "{% url 'admin_panel:dashboard_stream' %}";
+    var es = null;
+
+    function updateStat(id, value) {
+        var el = document.getElementById(id);
+        if (el && el.textContent != String(value)) {
+            el.style.transition = 'opacity 0.25s';
+            el.style.opacity = '0.3';
+            setTimeout(function () {
+                el.textContent = value;
+                el.style.opacity = '1';
+            }, 250);
+        }
+    }
+
+    function connect() {
+        if (es) es.close();
+        es = new EventSource(STREAM_URL);
+        es.onmessage = function (e) {
+            var d = JSON.parse(e.data);
+            updateStat('stat-usuarios', d.total_usuarios);
+            updateStat('stat-ideias',   d.total_ideias_ativas);
+            updateStat('stat-sessoes',  d.sessoes_hoje);
+            updateStat('stat-likes',    d.total_likes);
+            updateStat('stat-dislikes', d.total_dislikes);
+        };
+        es.onerror = function () {
+            es.close();
+            setTimeout(connect, 5000); // reconecta após 5s se cair
+        };
+    }
+
+    connect();
+
+    // Reconecta ao voltar para a aba
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') connect();
+    });
+
+    // Fecha o canal ao sair da página para liberar o worker do servidor
+    window.addEventListener('beforeunload', function () {
+        if (es) es.close();
+    });
+})();
+</script>
 
 <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
     <a href="{% url 'admin_panel:usuarios' %}" style="text-decoration:none;">

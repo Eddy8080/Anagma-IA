@@ -1,9 +1,12 @@
 from django.urls import path
 from .views import (
     admin_panel,
+    admin_dashboard_stats,
+    admin_dashboard_stream,
     admin_usuarios,
     admin_criar_usuario,
     admin_deletar_usuario,
+    admin_reset_password,
     admin_update_user_status,
     admin_ideias,
     admin_criar_ideia,
@@ -27,9 +30,12 @@ app_name = 'admin_panel'
 
 urlpatterns = [
     path('', admin_panel, name='dashboard'),
+    path('stats/', admin_dashboard_stats, name='dashboard_stats'),
+    path('stats/stream/', admin_dashboard_stream, name='dashboard_stream'),
     path('usuarios/', admin_usuarios, name='usuarios'),
     path('usuarios/criar/', admin_criar_usuario, name='criar_usuario'),
     path('usuarios/<int:user_id>/deletar/', admin_deletar_usuario, name='deletar_usuario'),
+    path('usuarios/<int:user_id>/reset-password/', admin_reset_password, name='reset_password'),
     path('usuarios/<int:user_id>/status/', admin_update_user_status, name='update_user_status'),
     
     path('ideias/', admin_ideias, name='ideias'),

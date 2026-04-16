@@ -14,6 +14,7 @@ class CustomUser(AbstractUser):
     ]
     nome_completo = models.CharField(max_length=255, blank=True)
     account_status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
+    password_change_required = models.BooleanField(default=False, help_text="Obriga o usuário a trocar a senha no próximo login.")
     
     class Meta:
         ordering = ['nome_completo', 'username']

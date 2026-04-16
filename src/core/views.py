@@ -65,7 +65,8 @@ class AnagmaLoginView(LoginView):
 
     def form_valid(self, form):
         remember_me = self.request.POST.get('remember_me')
-        auth_login(self.request, form.get_user())
+        user = form.get_user()
+        auth_login(self.request, user)
         
         if remember_me:
             # Mantém logado por 30 dias
@@ -73,6 +74,10 @@ class AnagmaLoginView(LoginView):
         else:
             # Expira ao fechar o navegador
             self.request.session.set_expiry(0)
+            
+        # Verificação de Troca de Senha Obrigatória
+        if user.password_change_required:
+            return redirect('force_password_change')
             
         return redirect(self.get_success_url())
 
@@ -129,19 +134,43 @@ def criar_ideia(request):
 # Painel de superusuários
 # ---------------------------------------------------------------------------
 
-@superuser_required
-def admin_panel(request):
+def _get_dashboard_stats():
     from chat_ai.models import ChatSession, ChatMessage
-    from django.utils import timezone
     hoje = timezone.now().date()
-    context = {
+    return {
         'total_usuarios': CustomUser.objects.count(),
         'total_ideias_ativas': GlobalIdeia.objects.filter(ativa=True).count(),
         'sessoes_hoje': ChatSession.objects.filter(criado_em__date=hoje).count(),
-        'total_likes': ChatMessage.objects.filter(feedback='like').count(),
-        'total_dislikes': ChatMessage.objects.filter(feedback='dislike').count(),
+        'total_likes': ChatMessage.objects.filter(feedback='like', session__isnull=False, session__deleted_at__isnull=True).count(),
+        'total_dislikes': ChatMessage.objects.filter(feedback='dislike', session__isnull=False, session__deleted_at__isnull=True).count(),
     }
-    return render(request, 'admin_panel/dashboard.html', context)
+
+@superuser_required
+def admin_panel(request):
+    return render(request, 'admin_panel/dashboard.html', _get_dashboard_stats())
+
+@superuser_required
+def admin_dashboard_stats(request):
+    return JsonResponse(_get_dashboard_stats())
+
+@superuser_required
+def admin_dashboard_stream(request):
+    import json, time
+    from django.http import StreamingHttpResponse
+
+    def event_stream():
+        last = {}
+        while True:
+            stats = _get_dashboard_stats()
+            if stats != last:
+                last = stats
+                yield f"data: {json.dumps(stats)}\n\n"
+            time.sleep(3)
+
+    response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'
+    return response
 
 
 @superuser_required
@@ -178,6 +207,8 @@ def admin_criar_usuario(request):
         is_active=(status == 'active' and dominio_oficial),
         account_status=status
     )
+    u.password_change_required = True # Novo usuário deve trocar a senha inicial
+    u.save()
     if dominio_oficial:
         messages.success(request, f'Usuário "{u.username}" criado com status {u.get_account_status_display()}.')
     else:
@@ -237,6 +268,27 @@ def admin_update_user_status(request, user_id):
             
         usuario.save()
         messages.success(request, f'Perfil de {usuario.username} atualizado.')
+        
+    return redirect('admin_panel:usuarios')
+
+
+@superuser_required
+def admin_reset_password(request, user_id):
+    """
+    Permite ao Superusuário redefinir a senha de um usuário específico.
+    """
+    if request.method == 'POST':
+        usuario = get_object_or_404(CustomUser, pk=user_id)
+        nova_senha = request.POST.get('nova_senha', '').strip()
+
+        if not nova_senha:
+            messages.error(request, 'A nova senha não pode ser vazia.')
+            return redirect('admin_panel:usuarios')
+
+        usuario.set_password(nova_senha)
+        usuario.password_change_required = True # Obriga a troca no próximo login
+        usuario.save()
+        messages.success(request, f'Senha de "{usuario.username}" redefinida. O usuário deverá trocá-la no próximo acesso.')
         
     return redirect('admin_panel:usuarios')
 
@@ -556,4 +608,34 @@ def admin_deletar_feedback(request, message_id):
             return redirect('admin_panel:feedback_messages', user_id=user_id, tipo=tipo)
         return redirect('admin_panel:dashboard')
     return redirect('admin_panel:dashboard')
+
+
+@login_required
+def force_password_change(request):
+    """
+    Página de troca de senha obrigatória. Não permite navegação externa 
+    enquanto a senha não for alterada.
+    """
+    if not request.user.password_change_required:
+        return redirect('chat:home')
+
+    if request.method == 'POST':
+        nova_senha = request.POST.get('nova_senha', '').strip()
+        confirmacao = request.POST.get('confirmacao', '').strip()
+
+        if not nova_senha or nova_senha != confirmacao:
+            messages.error(request, 'As senhas não coincidem ou estão vazias.')
+        elif len(nova_senha) < 8:
+            messages.error(request, 'A senha deve ter pelo menos 8 caracteres.')
+        else:
+            request.user.set_password(nova_senha)
+            request.user.password_change_required = False
+            request.user.save()
+            # Re-autentica o usuário para não deslogar após trocar a senha
+            from django.contrib.auth import update_session_auth_hash
+            update_session_auth_hash(request, request.user)
+            messages.success(request, 'Sua senha foi atualizada com sucesso. Bem-vindo(a) à Digiana!')
+            return redirect('chat:home')
+
+    return render(request, 'registration/force_password_change.html')
 

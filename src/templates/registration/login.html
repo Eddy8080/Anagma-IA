@@ -18,8 +18,47 @@
             </div>
             <div style="margin-bottom: 30px;">
                 <label style="display: block; margin-bottom: 8px; font-size: 0.9rem; color: #888;">Senha</label>
-                <input type="password" name="password" style="width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #333; background: #131314; color: white; outline: none; box-sizing: border-box;">
+                <div style="position: relative; width: 100%;">
+                    <input type="password" name="password" id="id_password" required
+                           style="width: 100%; padding: 12px 45px 12px 12px; border-radius: 12px; border: 1px solid #333; background: #131314; color: white; outline: none; box-sizing: border-box; font-family: inherit;">
+                    <button type="button" id="togglePassword"
+                            style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #666; cursor: pointer; font-size: 1.2rem; user-select: none; -webkit-tap-highlight-color: transparent;"
+                            title="Mantenha pressionado para ver a senha">
+                        👁️
+                    </button>
+                </div>
             </div>
+
+            <script>
+                const togglePassword = document.querySelector('#togglePassword');
+                const password = document.querySelector('#id_password');
+
+                const showPassword = () => {
+                    password.type = 'text';
+                    togglePassword.style.color = '#a8c7fa';
+                };
+
+                const hidePassword = () => {
+                    password.type = 'password';
+                    togglePassword.style.color = '#666';
+                };
+
+                // Eventos para mouse (Desktop)
+                togglePassword.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    showPassword();
+                });
+                togglePassword.addEventListener('mouseup', hidePassword);
+                togglePassword.addEventListener('mouseleave', hidePassword);
+
+                // Eventos para toque (Mobile)
+                togglePassword.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    showPassword();
+                }, { passive: false });
+                togglePassword.addEventListener('touchend', hidePassword);
+                togglePassword.addEventListener('touchcancel', hidePassword);
+            </script>
             
             <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
                 <input type="checkbox" name="remember_me" id="remember_me" style="accent-color: #a8c7fa; width: 16px; height: 16px;">
@@ -55,5 +94,16 @@
     .sidebar { display: none !important; }
     .main-content { padding-bottom: 0 !important; }
     .prompt-container { display: none !important; }
+
+    /* Integração da arte Digiana ao layout */
+    #digiana-logo {
+        width: 100%;
+        display: block;
+        border-radius: 16px;
+        margin-bottom: 24px;
+        opacity: 0.88;
+        transition: opacity 0.3s ease;
+    }
+    html.light-mode #digiana-logo { opacity: 0.70; }
 </style>
 {% endblock %}

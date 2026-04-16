@@ -22,20 +22,20 @@
 
     <div style="display:flex; flex-direction:column; gap:12px;">
         {% for usuario in usuarios %}
-        <div class="card" style="display:flex; justify-content:space-between; align-items:center; transition:background 0.2s;" onmouseover="this.style.background='#2a2b2e'" onmouseout="this.style.background='var(--sidebar-bg)'">
-            <a href="{% url 'admin_panel:feedback_messages' user_id=usuario.id tipo=tipo %}" style="text-decoration:none; flex:1; display:flex; justify-content:space-between; align-items:center; margin-right:20px;">
-                <div>
-                    <div style="font-weight:600; color:#e3e3e3;">{{ usuario.nome_completo|default:usuario.username }}</div>
-                    <div style="font-size:0.8rem; color:#666;">{{ usuario.email }}</div>
+        <div class="card" style="display:flex !important; flex-direction:row !important; flex-wrap:nowrap !important; justify-content:space-between !important; align-items:center !important; transition:background 0.2s; margin-bottom:0;" onmouseover="this.style.background='#2a2b2e'" onmouseout="this.style.background='var(--sidebar-bg)'">
+            <a href="{% url 'admin_panel:feedback_messages' user_id=usuario.id tipo=tipo %}" style="text-decoration:none; flex:1; min-width:0; display:flex !important; flex-direction:row !important; justify-content:space-between !important; align-items:center !important; margin-right:16px;">
+                <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">
+                    <div style="font-weight:600; color:#e3e3e3; overflow:hidden; text-overflow:ellipsis;">{{ usuario.nome_completo|default:usuario.username }}</div>
+                    <div style="font-size:0.8rem; color:#666; overflow:hidden; text-overflow:ellipsis;">{{ usuario.email }}</div>
                 </div>
                 <div style="background:{% if tipo == 'like' %}#1a2e1a{% else %}#2e1a1a{% endif %}; 
                             color:{% if tipo == 'like' %}#4ade80{% else %}#f87171{% endif %}; 
-                            padding:4px 12px; border-radius:12px; font-weight:600; font-size:0.9rem;">
+                            padding:4px 12px; border-radius:12px; font-weight:600; font-size:0.9rem; flex-shrink:0; margin-left:12px;">
                     {{ usuario.total_feedback }}
                 </div>
             </a>
             
-            <button type="button" class="btn btn-danger" onclick="openDeleteModal('{{ usuario.id }}', '{{ usuario.username|escapejs }}')" style="padding:6px 14px; font-size:0.8rem;">
+            <button type="button" class="btn btn-danger" onclick="openDeleteModal('{{ usuario.id }}', '{{ usuario.username|escapejs }}')" style="flex-shrink:0 !important; padding:6px 14px; font-size:0.8rem; white-space:nowrap !important;">
                 Excluir Usuário
             </button>
         </div>
