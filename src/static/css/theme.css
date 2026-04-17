@@ -167,8 +167,9 @@ html.light-mode .icon-btn:hover { background: rgba(26, 115, 232, 0.09); }
 
 /* ── login.html — card e inputs inline ── */
 html.light-mode .greeting-container > div {
-    background-color: #ffffff !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10) !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
 }
 html.light-mode input[type="text"],
 html.light-mode input[type="password"] {
@@ -215,3 +216,10 @@ html.light-mode .feedback-btn:hover { background: #e4e4e4; color: #1a1a1a; borde
 html.light-mode .history-item.pinned-item               { background: #f3eeff; border-color: #c9b0f0; }
 html.light-mode .history-item.pinned-item:hover         { background: #ede0ff; border-color: #b89ee0; }
 html.light-mode .history-item.pinned-item.active        { background: #e8d5ff; border-color: #9b72cb; border-left: 3px solid #9b72cb; }
+
+/* ── Utilitários de Texto Dinâmico (Admin) ── */
+.text-dynamic { color: #ffffff !important; }
+.text-dynamic-muted { color: #cccccc !important; }
+html.light-mode .text-dynamic { color: #000000 !important; }
+html.light-mode .text-dynamic-muted { color: #333333 !important; }
+

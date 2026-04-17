@@ -3,8 +3,8 @@
 {% block title %}Gestão de Usuários — Anagma IA{% endblock %}
 
 {% block content %}
-<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px;">
-    <div class="page-title" style="margin:0;">👥 Gestão de Usuários</div>
+<div style="display:flex; align-items:center; justify-content:flex-start; gap:32px; margin-bottom:24px;">
+    <div class="page-title text-dynamic" style="margin:0;">👥 Gestão de Usuários</div>
     <button id="toggle-form-btn" onclick="toggleForm()"
             style="background:#a8c7fa; color:#131314; border:none; border-radius:10px;
                    padding:9px 20px; font-size:0.9rem; font-weight:600; cursor:pointer;">
@@ -25,30 +25,30 @@
 {# ── Formulário de criação ── #}
 <div id="create-form" style="display:none; margin-bottom:24px;">
     <div class="card" style="padding:24px;">
-        <div style="color:#a8c7fa; font-weight:600; margin-bottom:16px;">Cadastrar Novo Usuário</div>
+        <div class="text-dynamic" style="font-weight:600; margin-bottom:16px;">Cadastrar Novo Usuário</div>
         <form method="post" action="{% url 'admin_panel:criar_usuario' %}">
             {% csrf_token %}
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
                 <div>
-                    <label style="display:block; color:#888; font-size:0.8rem; margin-bottom:4px;">Username *</label>
+                    <label class="text-dynamic-muted" style="display:block; font-size:0.8rem; margin-bottom:4px;">Username *</label>
                     <input type="text" name="username" required autocomplete="off"
                            style="width:100%; box-sizing:border-box; background:#131314; border:1px solid #3c4043;
                                   border-radius:8px; color:#e3e3e3; padding:9px 12px; font-size:0.9rem; outline:none; font-family:inherit;">
                 </div>
                 <div>
-                    <label style="display:block; color:#888; font-size:0.8rem; margin-bottom:4px;">Nome Completo *</label>
+                    <label class="text-dynamic-muted" style="display:block; font-size:0.8rem; margin-bottom:4px;">Nome Completo *</label>
                     <input type="text" name="nome_completo" required
                            style="width:100%; box-sizing:border-box; background:#131314; border:1px solid #3c4043;
                                   border-radius:8px; color:#e3e3e3; padding:9px 12px; font-size:0.9rem; outline:none; font-family:inherit;">
                 </div>
                 <div>
-                    <label style="display:block; color:#888; font-size:0.8rem; margin-bottom:4px;">E-mail *</label>
+                    <label class="text-dynamic-muted" style="display:block; font-size:0.8rem; margin-bottom:4px;">E-mail *</label>
                     <input type="email" name="email" required placeholder="nome@anagma.com.br"
                            style="width:100%; box-sizing:border-box; background:#131314; border:1px solid #3c4043;
                                   border-radius:8px; color:#e3e3e3; padding:9px 12px; font-size:0.9rem; outline:none; font-family:inherit;">
                 </div>
                 <div>
-                    <label style="display:block; color:#888; font-size:0.8rem; margin-bottom:4px;">Status Inicial</label>
+                    <label class="text-dynamic-muted" style="display:block; font-size:0.8rem; margin-bottom:4px;">Status Inicial</label>
                     <select name="account_status" style="width:100%; background:#131314; border:1px solid #3c4043; border-radius:8px; color:#e3e3e3; padding:9px 12px; font-size:0.9rem; outline:none;">
                         <option value="active">Ativo</option>
                         <option value="inactive">Inativo</option>
@@ -56,7 +56,7 @@
                     </select>
                 </div>
                 <div>
-                    <label style="display:block; color:#888; font-size:0.8rem; margin-bottom:4px;">Senha *</label>
+                    <label class="text-dynamic-muted" style="display:block; font-size:0.8rem; margin-bottom:4px;">Senha *</label>
                     <input type="password" name="password" required autocomplete="new-password"
                            style="width:100%; box-sizing:border-box; background:#131314; border:1px solid #3c4043;
                                   border-radius:8px; color:#e3e3e3; padding:9px 12px; font-size:0.9rem; outline:none; font-family:inherit;">
@@ -79,21 +79,21 @@
     <table style="width:100%;">
         <thead>
             <tr>
-                <th>Nome (A-Z)</th>
-                <th>Usuário</th>
-                <th>Perfil</th>
-                <th>Status</th>
-                <th>Ações de Governança</th>
+                <th class="text-dynamic-muted">Nome (A-Z)</th>
+                <th class="text-dynamic-muted">Usuário</th>
+                <th class="text-dynamic-muted">Perfil</th>
+                <th class="text-dynamic-muted">Status</th>
+                <th class="text-dynamic-muted">Ações de Governança</th>
             </tr>
         </thead>
         <tbody>
             {% for u in usuarios %}
             <tr>
                 <td>
-                    <div style="font-weight:600; color:#e3e3e3;">{{ u.nome_completo|default:"Sem nome" }}</div>
-                    <div style="font-size:0.75rem; color:#666;">{{ u.email|default:"Sem e-mail" }}</div>
+                    <div class="text-dynamic" style="font-weight:600;">{{ u.nome_completo|default:"Sem nome" }}</div>
+                    <div class="text-dynamic-muted" style="font-size:0.75rem;">{{ u.email|default:"Sem e-mail" }}</div>
                 </td>
-                <td style="color:#a8c7fa; font-size:0.9rem;">{{ u.username }}</td>
+                <td class="text-dynamic" style="font-size:0.9rem;">{{ u.username }}</td>
                 <td>
                     <form method="post" action="{% url 'admin_panel:update_user_status' u.id %}" style="margin:0; position:relative;">
                         {% csrf_token %}

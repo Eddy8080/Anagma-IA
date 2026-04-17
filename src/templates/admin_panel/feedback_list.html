@@ -3,7 +3,7 @@
 {% block title %}Feedback {{ label }} — Painel Admin{% endblock %}
 
 {% block content %}
-<div class="page-title" style="display:flex; justify-content:space-between; align-items:center;">
+<div class="page-title text-dynamic" style="display:flex; justify-content:space-between; align-items:center;">
     <div>
         <a href="{% url 'admin_panel:dashboard' %}" style="text-decoration:none; color:inherit;">📊 Dashboard</a> 
         / {{ label }}
@@ -17,16 +17,16 @@
 </div>
 
 <div class="card">
-    <h3 style="margin-top:0; font-weight:500;">Usuários que enviaram feedbacks</h3>
-    <p style="color:#888; font-size:0.9rem; margin-bottom:24px;">Clique em um usuário para ver as mensagens específicas.</p>
+    <h3 class="text-dynamic" style="margin-top:0; font-weight:500;">Usuários que enviaram feedbacks</h3>
+    <p class="text-dynamic-muted" style="font-size:0.9rem; margin-bottom:24px;">Clique em um usuário para ver as mensagens específicas.</p>
 
     <div style="display:flex; flex-direction:column; gap:12px;">
         {% for usuario in usuarios %}
-        <div class="card" style="display:flex !important; flex-direction:row !important; flex-wrap:nowrap !important; justify-content:space-between !important; align-items:center !important; transition:background 0.2s; margin-bottom:0;" onmouseover="this.style.background='#2a2b2e'" onmouseout="this.style.background='var(--sidebar-bg)'">
+        <div class="card" style="display:flex !important; flex-direction:row !important; flex-wrap:nowrap !important; justify-content:space-between !important; align-items:center !important; transition:background 0.2s; margin-bottom:0;" onmouseover="this.style.background='rgba(66, 133, 244, 0.1)'" onmouseout="this.style.background='var(--card-bg)'">
             <a href="{% url 'admin_panel:feedback_messages' user_id=usuario.id tipo=tipo %}" style="text-decoration:none; flex:1; min-width:0; display:flex !important; flex-direction:row !important; justify-content:space-between !important; align-items:center !important; margin-right:16px;">
                 <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">
-                    <div style="font-weight:600; color:#e3e3e3; overflow:hidden; text-overflow:ellipsis;">{{ usuario.nome_completo|default:usuario.username }}</div>
-                    <div style="font-size:0.8rem; color:#666; overflow:hidden; text-overflow:ellipsis;">{{ usuario.email }}</div>
+                    <div class="text-dynamic" style="font-weight:600; overflow:hidden; text-overflow:ellipsis;">{{ usuario.nome_completo|default:usuario.username }}</div>
+                    <div class="text-dynamic-muted" style="font-size:0.8rem; overflow:hidden; text-overflow:ellipsis;">{{ usuario.email }}</div>
                 </div>
                 <div style="background:{% if tipo == 'like' %}#1a2e1a{% else %}#2e1a1a{% endif %}; 
                             color:{% if tipo == 'like' %}#4ade80{% else %}#f87171{% endif %}; 

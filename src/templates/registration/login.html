@@ -2,8 +2,8 @@
 {% load static %}
 
 {% block content %}
-<div class="greeting-container" style="flex-direction: column;">
-    <div style="background-color: #1e1f20; padding: 40px; border-radius: 28px; width: 100%; max-width: 400px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+<div class="login-wrapper">
+    <div class="login-card">
         <img id="digiana-logo"
              src="{% static 'dark.png' %}"
              data-dark="{% static 'dark.png' %}"
@@ -12,75 +12,42 @@
         
         <form method="post">
             {% csrf_token %}
-            <div style="margin-bottom: 20px;">
-                <label for="id_username" style="display: block; margin-bottom: 8px; font-size: 0.9rem; color: #888;">Usuário</label>
-                <input type="text" name="username" id="id_username" style="width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #333; background: #131314; color: white; outline: none; box-sizing: border-box;">
+            <div class="form-group">
+                <label for="id_username">Usuário</label>
+                <input type="text" name="username" id="id_username" autocomplete="username" required>
             </div>
-            <div style="margin-bottom: 30px;">
-                <label for="id_password" style="display: block; margin-bottom: 8px; font-size: 0.9rem; color: #888;">Senha</label>
-                <div style="position: relative; width: 100%;">
-                    <input type="password" name="password" id="id_password" required
-                           style="width: 100%; padding: 12px 45px 12px 12px; border-radius: 12px; border: 1px solid #333; background: #131314; color: white; outline: none; box-sizing: border-box; font-family: inherit;">
-                    <button type="button" id="togglePassword"
-                            style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #666; cursor: pointer; font-size: 1.2rem; user-select: none; -webkit-tap-highlight-color: transparent;"
-                            title="Mantenha pressionado para ver a senha">
+
+            <div class="form-group">
+                <label for="id_password">Senha</label>
+                <div class="password-wrapper">
+                    <input type="password" name="password" id="id_password" autocomplete="current-password" required>
+                    <button type="button" id="togglePassword" title="Mantenha pressionado para ver a senha">
                         👁️
                     </button>
                 </div>
             </div>
 
-            <script>
-                const togglePassword = document.querySelector('#togglePassword');
-                const password = document.querySelector('#id_password');
-
-                const showPassword = () => {
-                    password.type = 'text';
-                    togglePassword.style.color = '#a8c7fa';
-                };
-
-                const hidePassword = () => {
-                    password.type = 'password';
-                    togglePassword.style.color = '#666';
-                };
-
-                // Eventos para mouse (Desktop)
-                togglePassword.addEventListener('mousedown', (e) => {
-                    e.preventDefault();
-                    showPassword();
-                });
-                togglePassword.addEventListener('mouseup', hidePassword);
-                togglePassword.addEventListener('mouseleave', hidePassword);
-
-                // Eventos para toque (Mobile)
-                togglePassword.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    showPassword();
-                }, { passive: false });
-                togglePassword.addEventListener('touchend', hidePassword);
-                togglePassword.addEventListener('touchcancel', hidePassword);
-            </script>
-            
-            <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
-                <input type="checkbox" name="remember_me" id="remember_me" style="accent-color: #a8c7fa; width: 16px; height: 16px;">
-                <label for="remember_me" style="font-size: 0.85rem; color: #888; cursor: pointer;">Lembrar-me</label>
+            <div class="options-group">
+                <input type="checkbox" name="remember_me" id="remember_me">
+                <label for="remember_me">Lembrar-me</label>
             </div>
             
-            <button type="submit" style="width: 100%; padding: 14px; border-radius: 28px; border: none; background: linear-gradient(to right, #4285f4, #9b72cb); color: white; font-weight: 600; cursor: pointer; transition: opacity 0.2s;">
+            <button type="submit" class="btn-login">
                 Acessar Banco de Ideias
             </button>
             
-            <div style="text-align: center; margin-top: 20px; font-size: 0.9rem; display: flex; flex-direction: column; gap: 10px;">
-                <a href="{% url 'register' %}" style="color: #a8c7fa; text-decoration: none;">Criar conta com E-mail Anagma</a>
-                <a href="{% url 'password_reset' %}" style="color: #888; text-decoration: none;">Esqueceu a senha?</a>
+            <div class="login-footer">
+                <a href="{% url 'register' %}" class="link-secondary">Criar conta com E-mail Anagma</a>
+                <a href="{% url 'password_reset' %}" class="link-muted">Esqueceu a senha?</a>
             </div>
             
             {% if form.errors %}
-                <p style="color: #d96570; font-size: 0.8rem; text-align: center; margin-top: 15px;">Usuário ou senha inválidos.</p>
+                <p class="error-msg">Usuário ou senha inválidos.</p>
             {% endif %}
 
             {% if messages %}
                 {% for message in messages %}
-                    <p style="color: {% if message.tags == 'success' %}#81c995{% else %}#d96570{% endif %}; font-size: 0.8rem; text-align: center; margin-top: 15px;">
+                    <p class="msg-{{ message.tags }}">
                         {{ message }}
                     </p>
                 {% endfor %}
@@ -89,13 +56,56 @@
     </div>
 </div>
 
+<script>
+    const togglePassword = document.querySelector('#togglePassword');
+    const passwordField = document.querySelector('#id_password');
+
+    const showPassword = () => {
+        passwordField.type = 'text';
+        togglePassword.classList.add('active');
+    };
+
+    const hidePassword = () => {
+        passwordField.type = 'password';
+        togglePassword.classList.remove('active');
+    };
+
+    // Eventos Mouse
+    togglePassword.addEventListener('mousedown', (e) => { e.preventDefault(); showPassword(); });
+    togglePassword.addEventListener('mouseup', hidePassword);
+    togglePassword.addEventListener('mouseleave', hidePassword);
+
+    // Eventos Touch
+    togglePassword.addEventListener('touchstart', (e) => { e.preventDefault(); showPassword(); }, { passive: false });
+    togglePassword.addEventListener('touchend', hidePassword);
+    togglePassword.addEventListener('touchcancel', hidePassword);
+</script>
+
 <style>
-    /* Ocultar sidebar na tela de login */
+    /* Ocultar elementos da interface principal */
     .sidebar { display: none !important; }
     .main-content { padding-bottom: 0 !important; }
     .prompt-container { display: none !important; }
 
-    /* Integração da arte Digiana ao layout */
+    /* Layout Base */
+    .login-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 80vh;
+    }
+
+    .login-card {
+        background-color: #1e1f20;
+        padding: 40px;
+        border-radius: 28px;
+        width: 100%;
+        max-width: 400px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+
+    /* Logo Digiana */
     #digiana-logo {
         width: 100%;
         display: block;
@@ -104,6 +114,105 @@
         opacity: 0.88;
         transition: opacity 0.3s ease;
     }
+
+    /* Formulário */
+    .form-group { margin-bottom: 20px; }
+    .form-group:last-of-type { margin-bottom: 30px; }
+
+    label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 0.9rem;
+        color: #888;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+        width: 100%;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid #333;
+        background: #131314;
+        color: white;
+        outline: none;
+        box-sizing: border-box;
+        font-family: inherit;
+    }
+
+    /* Password Toggle */
+    .password-wrapper { position: relative; width: 100%; }
+    .password-wrapper input { padding-right: 45px; }
+
+    #togglePassword {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #666;
+        cursor: pointer;
+        font-size: 1.2rem;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+    #togglePassword.active { color: #a8c7fa; }
+
+    /* Opções e Botão */
+    .options-group {
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .options-group input { accent-color: #a8c7fa; width: 16px; height: 16px; }
+    .options-group label { margin-bottom: 0; cursor: pointer; font-size: 0.85rem; }
+
+    .btn-login {
+        width: 100%;
+        padding: 14px;
+        border-radius: 28px;
+        border: none;
+        background: linear-gradient(to right, #4285f4, #9b72cb);
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s;
+    }
+    .btn-login:hover { opacity: 0.9; }
+
+    /* Footer do Login */
+    .login-footer {
+        text-align: center;
+        margin-top: 20px;
+        font-size: 0.9rem;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .link-secondary { color: #a8c7fa; text-decoration: none; }
+    .link-muted { color: #888; text-decoration: none; }
+
+    /* Mensagens */
+    .error-msg, .msg-error { color: #d96570; font-size: 0.8rem; text-align: center; margin-top: 15px; }
+    .msg-success { color: #81c995; font-size: 0.8rem; text-align: center; margin-top: 15px; }
+
+    /* ════════════════════════════════════════
+       LIGHT MODE OVERRIDES
+       ════════════════════════════════════════ */
+    html.light-mode .login-card {
+        background-color: #ffffff;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10);
+    }
     html.light-mode #digiana-logo { opacity: 0.70; }
+    html.light-mode label { color: #555; }
+    html.light-mode input[type="text"],
+    html.light-mode input[type="password"] {
+        background: #f8f9fa;
+        color: #1a1a1a;
+        border-color: #e0e0e0;
+    }
+    html.light-mode .link-muted { color: #666; }
 </style>
 {% endblock %}

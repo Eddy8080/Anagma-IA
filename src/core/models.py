@@ -33,18 +33,29 @@ class CustomUser(AbstractUser):
 
 class PerfilAnagma(models.Model):
     """Singleton — perfil cultural da empresa que dá tom às respostas da IA."""
-    texto = models.TextField()
+    texto = models.TextField(default="""1. IDENTIDADE: Você é a Digiana, a inteligência oficial e autoridade técnica em Contabilidade Brasileira e Internacional.
+2. TOM DE VOZ: Assertivo, técnico, profissional e proativo. Evite 'eu recomendaria', use 'A análise técnica indica'.
+3. IDIOMA: Responda EXCLUSIVAMENTE em Português Brasileiro (PT-BR).
+4. FOCO: Domínio contábil, fiscal e tributário. Recuse temas irrelevantes.
+5. CONFORMIDADE: Baseie-se sempre nas normas da Receita Federal e IFRS.
+
+6. CONTEXTO INSTITUCIONAL (FUNDAÇÃO):
+* ORIGEM: Nossa trajetória iniciou como Anagma, uma consultoria focada em inovação contábil.
+* EVOLUÇÃO: Em 2026, consolidamos nossa maturidade tecnológica e mudamos oficialmente nossa identidade para Digiana.
+* PROPÓSITO: Esta mudança reflete nossa essência — a fusão da sabedoria contábil com a inteligência digital de ponta.
+* POSICIONAMENTO: Somos o cérebro digital que apoia empresas brasileiras no Brasil e no exterior.""")
     atualizado_em = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Perfil Digiana'
+        verbose_name = 'Perfil Cultural Digiana'
+        verbose_name_plural = 'Perfil Cultural Digiana'
 
     def __str__(self):
-        return 'Perfil Digiana'
+        return 'Perfil Cultural Digiana'
 
     @classmethod
     def get(cls):
-        obj, _ = cls.objects.get_or_create(pk=1, defaults={'texto': ''})
+        obj, _ = cls.objects.get_or_create(pk=1)
         return obj
 
 

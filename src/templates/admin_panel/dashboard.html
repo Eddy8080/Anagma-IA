@@ -3,33 +3,33 @@
 {% block title %}Dashboard — Painel Admin{% endblock %}
 
 {% block content %}
-<div class="page-title">📊 Dashboard</div>
+<div class="page-title text-dynamic">📊 Dashboard</div>
 
 <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:16px;">
     <div class="card" style="text-align:center;">
         <div id="stat-usuarios" style="font-size:2rem; font-weight:700; color:#a8c7fa;">{{ total_usuarios }}</div>
-        <div style="color:#888; font-size:0.85rem; margin-top:4px;">Usuários cadastrados</div>
+        <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px;">Usuários cadastrados</div>
     </div>
     <div class="card" style="text-align:center;">
         <div id="stat-ideias" style="font-size:2rem; font-weight:700; color:#4ade80;">{{ total_ideias_ativas }}</div>
-        <div style="color:#888; font-size:0.85rem; margin-top:4px;">Ideias ativas</div>
+        <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px;">Ideias ativas</div>
     </div>
     <div class="card" style="text-align:center;">
         <div id="stat-sessoes" style="font-size:2rem; font-weight:700; color:#facc15;">{{ sessoes_hoje }}</div>
-        <div style="color:#888; font-size:0.85rem; margin-top:4px;">Sessões de chat hoje</div>
+        <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px;">Sessões de chat hoje</div>
     </div>
 </div>
 <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:32px;">
     <a href="{% url 'admin_panel:feedback_list' tipo='like' %}" style="text-decoration:none;">
         <div class="card" style="text-align:center; cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='#4ade80'" onmouseout="this.style.borderColor='#333'">
             <div style="font-size:2rem; font-weight:700; color:#4ade80;">👍 <span id="stat-likes">{{ total_likes }}</span></div>
-            <div style="color:#888; font-size:0.85rem; margin-top:4px;">Respostas curtidas</div>
+            <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px;">Respostas curtidas</div>
         </div>
     </a>
     <a href="{% url 'admin_panel:feedback_list' tipo='dislike' %}" style="text-decoration:none;">
         <div class="card" style="text-align:center; cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='#f87171'" onmouseout="this.style.borderColor='#333'">
             <div style="font-size:2rem; font-weight:700; color:#f87171;">👎 <span id="stat-dislikes">{{ total_dislikes }}</span></div>
-            <div style="color:#888; font-size:0.85rem; margin-top:4px;">Respostas não curtidas</div>
+            <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px;">Respostas não curtidas</div>
         </div>
     </a>
 </div>
@@ -85,14 +85,14 @@
 <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
     <a href="{% url 'admin_panel:usuarios' %}" style="text-decoration:none;">
         <div class="card" style="cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='#a8c7fa'" onmouseout="this.style.borderColor='#333'">
-            <div style="font-size:1.1rem; font-weight:600; margin-bottom:8px;">👥 Gerenciar Usuários</div>
-            <div style="color:#888; font-size:0.88rem;">Promova ou rebaixe usuários ao nível de superusuário.</div>
+            <div class="text-dynamic" style="font-size:1.1rem; font-weight:600; margin-bottom:8px;">👥 Gerenciar Usuários</div>
+            <div class="text-dynamic-muted" style="font-size:0.88rem;">Promova ou rebaixe usuários ao nível de superusuário.</div>
         </div>
     </a>
     <a href="{% url 'admin_panel:ideias' %}" style="text-decoration:none;">
         <div class="card" style="cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='#a8c7fa'" onmouseout="this.style.borderColor='#333'">
-            <div style="font-size:1.1rem; font-weight:600; margin-bottom:8px;">💡 Auditar Ideias</div>
-            <div style="color:#888; font-size:0.88rem;">Ative, desative ou exclua ideias da base de conhecimento.</div>
+            <div class="text-dynamic" style="font-size:1.1rem; font-weight:600; margin-bottom:8px;">💡 Auditar Ideias</div>
+            <div class="text-dynamic-muted" style="font-size:0.88rem;">Ative, desative ou exclua ideias da base de conhecimento.</div>
         </div>
     </a>
 </div>
