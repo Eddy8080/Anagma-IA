@@ -3,6 +3,7 @@ from .views import (
     admin_panel,
     admin_dashboard_stats,
     admin_dashboard_stream,
+    admin_ideias_stream,
     admin_usuarios,
     admin_criar_usuario,
     admin_deletar_usuario,
@@ -14,6 +15,7 @@ from .views import (
     admin_toggle_ideia,
     admin_editar_ideia,
     admin_perfil_anagma,
+    admin_insights,
     admin_biblioteca,
     admin_upload_biblioteca,
     admin_auditar_documento,
@@ -39,12 +41,14 @@ urlpatterns = [
     path('usuarios/<int:user_id>/status/', admin_update_user_status, name='update_user_status'),
     
     path('ideias/', admin_ideias, name='ideias'),
+    path('ideias/stream/', admin_ideias_stream, name='ideias_stream'),
     path('ideias/criar/', admin_criar_ideia, name='criar_ideia'),
     path('ideias/<int:ideia_id>/editar/', admin_editar_ideia, name='editar_ideia'),
     path('ideias/<int:ideia_id>/deletar/', admin_deletar_ideia, name='deletar_ideia'),
     path('ideias/<int:ideia_id>/toggle/', admin_toggle_ideia, name='toggle_ideia'),
     
     path('perfil/', admin_perfil_anagma, name='perfil_anagma'),
+    path('insights/', admin_insights, name='insights'),
 
     # Biblioteca de Curadoria
     path('biblioteca/', admin_biblioteca, name='biblioteca'),

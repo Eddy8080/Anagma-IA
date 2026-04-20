@@ -12,6 +12,8 @@ from django.http import JsonResponse
 from .models import GlobalIdeia, CustomUser, PerfilAnagma, ConfiguracaoIA
 from chat_ai.llm_engine import AnagmaLLMEngine
 import threading
+import json
+import time
 
 @superuser_required
 def admin_modelos(request):
@@ -165,6 +167,38 @@ def admin_dashboard_stream(request):
             if stats != last:
                 last = stats
                 yield f"data: {json.dumps(stats)}\n\n"
+            time.sleep(3)
+
+    response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'
+    return response
+
+
+@superuser_required
+def admin_ideias_stream(request):
+    import json, time
+    from django.http import StreamingHttpResponse
+
+    def event_stream():
+        last_count = GlobalIdeia.objects.count()
+        while True:
+            # Verifica se houve nova ideia
+            current_count = GlobalIdeia.objects.count()
+            if current_count > last_count:
+                # Busca as novas ideias criadas desde o último check
+                novas = GlobalIdeia.objects.select_related('autor').order_by('-criado_em')[:current_count - last_count]
+                for ideia in reversed(novas): # Envia da mais antiga para a mais nova
+                    data = {
+                        'pk': ideia.pk,
+                        'titulo': ideia.titulo,
+                        'conteudo': ideia.conteudo,
+                        'autor': ideia.autor.username if ideia.autor else "—",
+                        'criado_em': ideia.criado_em.strftime('%d/%m/%Y %H:%M'),
+                        'ativa': ideia.ativa
+                    }
+                    yield f"data: {json.dumps(data)}\n\n"
+                last_count = current_count
             time.sleep(3)
 
     response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
@@ -366,6 +400,58 @@ def admin_perfil_anagma(request):
         messages.success(request, 'Perfil Anagma atualizado.')
         return redirect('admin_panel:perfil_anagma')
     return render(request, 'admin_panel/perfil_anagma.html', {'perfil': perfil})
+
+
+@superuser_required
+def admin_insights(request):
+    """
+    Dashboard de estatísticas de engajamento da Digiana IA.
+    Agrega dados de interações por hora (hoje) e por dia (últimos 7 dias).
+    """
+    from chat_ai.models import ChatMessage
+    from django.db.models import Count
+    from django.db.models.functions import TruncHour, TruncDay
+    from datetime import timedelta
+
+    now = timezone.localtime()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    last_week_start = (now - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # 1. Dados Tempo Real (Hoje por hora) - Mensagens dos Usuários
+    today_stats = ChatMessage.objects.filter(
+        timestamp__gte=today_start,
+        role='user'
+    ).annotate(
+        hour=TruncHour('timestamp')
+    ).values('hour').annotate(
+        count=Count('id')
+    ).order_by('hour')
+
+    # 2. Dados Semanais (Últimos 7 dias)
+    weekly_stats = ChatMessage.objects.filter(
+        timestamp__gte=last_week_start,
+        role='user'
+    ).annotate(
+        day=TruncDay('timestamp')
+    ).values('day').annotate(
+        count=Count('id')
+    ).order_by('day')
+
+    # Preparação para o Chart.js no template
+    realtime_labels = [h['hour'].strftime('%H:%M') for h in today_stats]
+    realtime_data = [h['count'] for h in today_stats]
+
+    weekly_labels = [d['day'].strftime('%d/%m/%Y') for d in weekly_stats]
+    weekly_data = [d['count'] for d in weekly_stats]
+
+    context = {
+        'realtime_labels': json.dumps(realtime_labels),
+        'realtime_data': json.dumps(realtime_data),
+        'weekly_labels': json.dumps(weekly_labels),
+        'weekly_data': json.dumps(weekly_data),
+        'hoje': now.strftime('%d/%m/%Y'),
+    }
+    return render(request, 'admin_panel/insights.html', context)
 
 
 # ---------------------------------------------------------------------------

@@ -6,18 +6,24 @@
 <div class="page-title text-dynamic">📊 Dashboard</div>
 
 <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:16px;">
-    <div class="card" style="text-align:center;">
-        <div id="stat-usuarios" style="font-size:2rem; font-weight:700; color:#a8c7fa;">{{ total_usuarios }}</div>
-        <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px;">Usuários cadastrados</div>
-    </div>
-    <div class="card" style="text-align:center;">
-        <div id="stat-ideias" style="font-size:2rem; font-weight:700; color:#4ade80;">{{ total_ideias_ativas }}</div>
-        <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px;">Ideias ativas</div>
-    </div>
-    <div class="card" style="text-align:center;">
-        <div id="stat-sessoes" style="font-size:2rem; font-weight:700; color:#facc15;">{{ sessoes_hoje }}</div>
-        <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px;">Sessões de chat hoje</div>
-    </div>
+    <a href="{% url 'admin_panel:usuarios' %}" style="text-decoration:none;">
+        <div class="card" style="text-align:center; cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='#a8c7fa'" onmouseout="this.style.borderColor='#333'">
+            <div id="stat-usuarios" style="font-size:2rem; font-weight:700; color:#a8c7fa;">{{ total_usuarios }}</div>
+            <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px;">Usuários cadastrados</div>
+        </div>
+    </a>
+    <a href="{% url 'admin_panel:ideias' %}" style="text-decoration:none;">
+        <div class="card" style="text-align:center; cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='#4ade80'" onmouseout="this.style.borderColor='#333'">
+            <div id="stat-ideias" style="font-size:2rem; font-weight:700; color:#4ade80;">{{ total_ideias_ativas }}</div>
+            <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px;">Ideias ativas</div>
+        </div>
+    </a>
+    <a href="{% url 'admin_panel:insights' %}" style="text-decoration:none;">
+        <div class="card" style="text-align:center; cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='#facc15'" onmouseout="this.style.borderColor='#333'">
+            <div id="stat-sessoes" style="font-size:2rem; font-weight:700; color:#facc15;">{{ sessoes_hoje }}</div>
+            <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px;">Sessões de chat hoje</div>
+        </div>
+    </a>
 </div>
 <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:32px;">
     <a href="{% url 'admin_panel:feedback_list' tipo='like' %}" style="text-decoration:none;">

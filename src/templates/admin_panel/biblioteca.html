@@ -12,12 +12,12 @@
     </div>
     
     <!-- Upload Direto Superusuário -->
-    <div style="background:#1e1f20; border:1px solid #333; border-radius:12px; padding:12px 20px; display:flex; align-items:center; gap:16px;">
-        <span style="font-size:0.85rem; color:#a8c7fa; font-weight:500;">➕ Adicionar Manual/Documento:</span>
+    <div class="card" style="padding:12px 20px; display:flex; align-items:center; gap:16px; margin-bottom:0;">
+        <span class="text-dynamic" style="font-size:0.85rem; font-weight:500;">➕ Adicionar Manual/Documento:</span>
         <form action="{% url 'admin_panel:upload_biblioteca' %}" method="post" enctype="multipart/form-data" style="display:flex; align-items:center; gap:10px; margin:0;">
             {% csrf_token %}
-            <input type="file" name="arquivo" required style="font-size:0.8rem; color:#888; max-width:200px;">
-            <button type="submit" class="btn" style="background:var(--accent); color:white; border:none; padding:6px 16px; font-size:0.85rem;">Subir Direto</button>
+            <input type="file" name="arquivo" required class="text-dynamic-muted" style="font-size:0.8rem; max-width:200px;">
+            <button type="submit" class="btn btn-primary" style="padding:6px 16px; font-size:0.85rem;">Subir Direto</button>
         </form>
     </div>
 </div>
@@ -26,39 +26,39 @@
     <table style="width:100%;">
         <thead>
             <tr>
-                <th>Documento</th>
-                <th>Status</th>
-                <th>Data</th>
-                <th>Auditoria</th>
-                <th>Ações</th>
+                <th class="text-dynamic-muted">Documento</th>
+                <th class="text-dynamic-muted">Status</th>
+                <th class="text-dynamic-muted">Data</th>
+                <th class="text-dynamic-muted">Auditoria</th>
+                <th class="text-dynamic-muted">Ações</th>
             </tr>
         </thead>
         <tbody>
             {% for doc in documentos %}
             <tr>
                 <td>
-                    <div style="font-weight:600; color:#e3e3e3;">{{ doc.nome_arquivo }}</div>
-                    <div style="font-size:0.75rem; color:#666;">Extensão: .{{ doc.extensao }}</div>
+                    <div style="font-weight:600;" class="text-dynamic">{{ doc.nome_arquivo }}</div>
+                    <div style="font-size:0.75rem;" class="text-dynamic-muted">Extensão: .{{ doc.extensao }}</div>
                 </td>
                 <td>
                     {% if doc.status == 'pending' %}
-                        <span class="badge" style="background:#3b2a1a; color:#fbbf24;">Pendente</span>
+                        <span class="badge" style="background:rgba(251, 191, 36, 0.1); color:#fbbf24; border: 1px solid rgba(251, 191, 36, 0.2);">Pendente</span>
                     {% elif doc.status == 'approved' %}
                         <span class="badge badge-green">Aprovado</span>
                     {% else %}
                         <span class="badge badge-red">Rejeitado</span>
                     {% endif %}
                 </td>
-                <td style="font-size:0.85rem; color:#888;">{{ doc.criado_em|date:"d/m/Y H:i" }}</td>
+                <td style="font-size:0.85rem;" class="text-dynamic-muted">{{ doc.criado_em|date:"d/m/Y H:i" }}</td>
                 <td style="font-size:0.85rem;">
                     {% if doc.auditado_por %}
-                        <div style="color:#4ade80;">Por: {{ doc.auditado_por.username }}</div>
+                        <div style="color:#4ade80; font-weight:500;">Por: {{ doc.auditado_por.username }}</div>
                     {% else %}
-                        <div style="color:#555; font-style:italic;">Aguardando...</div>
+                        <div class="text-dynamic-muted" style="font-style:italic; opacity:0.6;">Aguardando...</div>
                     {% endif %}
                 </td>
                 <td>
-                    <button class="btn btn-outline" onclick="openPreviewModal('{{ doc.id }}', '{{ doc.nome_arquivo|escapejs }}', `{{ doc.conteudo_extraido|escapejs }}`)">
+                    <button class="btn btn-outline text-dynamic" onclick="openPreviewModal('{{ doc.id }}', '{{ doc.nome_arquivo|escapejs }}', `{{ doc.conteudo_extraido|escapejs }}`)">
                         Revisar Conteúdo
                     </button>
                     <button type="button" onclick="openDeleteModal('{{ doc.id }}')" 
@@ -68,7 +68,7 @@
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="5" style="text-align:center; color:#555; padding:40px;">Nenhum documento na fila de auditoria.</td></tr>
+            <tr><td colspan="5" style="text-align:center; padding:40px;" class="text-dynamic-muted">Nenhum documento na fila de auditoria.</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -77,15 +77,15 @@
 {# ── Modal de Confirmação de Exclusão (Estilo Chat) ── #}
 <div id="delete-doc-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
                                background:rgba(0,0,0,0.8); z-index:10000; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
-    <div style="background:#1e1f20; border:1px solid #3c4043; border-radius:16px; padding:32px; width:90%; max-width:380px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.6);">
+    <div class="card" style="padding:32px; width:90%; max-width:380px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.6);">
         <div style="font-size:2.5rem; margin-bottom:16px;">🗑️</div>
-        <h3 style="margin:0 0 12px; color:#e3e3e3; font-weight:500;">Excluir este documento?</h3>
-        <p style="color:#999; font-size:0.95rem; line-height:1.5; margin-bottom:24px;">Esta ação é permanente e removerá o arquivo físico da biblioteca da IA.</p>
+        <h3 style="margin:0 0 12px; font-weight:500;" class="text-dynamic">Excluir este documento?</h3>
+        <p class="text-dynamic-muted" style="font-size:0.95rem; line-height:1.5; margin-bottom:24px;">Esta ação é permanente e removerá o arquivo físico da biblioteca da IA.</p>
         <div style="display:flex; gap:12px; justify-content:center;">
-            <button onclick="closeDeleteModal()" style="background:#333537; color:#e3e3e3; border:1px solid #444; border-radius:10px; padding:10px 24px; cursor:pointer; font-weight:500;">Não</button>
+            <button onclick="closeDeleteModal()" class="btn btn-outline text-dynamic" style="padding:10px 24px;">Não</button>
             <form id="delete-form-real" method="post" action="" style="margin:0;">
                 {% csrf_token %}
-                <button type="submit" style="background:#d93025; color:white; border:none; border-radius:10px; padding:10px 24px; cursor:pointer; font-weight:600;">Sim, excluir</button>
+                <button type="submit" class="btn btn-danger" style="padding:10px 24px; font-weight:600;">Sim, excluir</button>
             </form>
         </div>
     </div>
@@ -94,13 +94,13 @@
 {# ── Modal de Revisão e Auditoria ── #}
 <div id="preview-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
                                background:rgba(0,0,0,0.85); z-index:10000; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
-    <div style="background:#1e1f20; border:1px solid #3c4043; border-radius:16px; padding:32px; width:90%; max-width:800px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,0.6);">
+    <div class="card" style="padding:32px; width:90%; max-width:800px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,0.6);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h3 id="modal-title" style="margin:0; color:#a8c7fa; font-weight:500;">Revisar Documento</h3>
-            <button onclick="closePreviewModal()" style="background:none; border:none; color:#888; font-size:1.5rem; cursor:pointer;">&times;</button>
+            <h3 id="modal-title" style="margin:0; font-weight:600;" class="text-dynamic">Revisar Documento</h3>
+            <button onclick="closePreviewModal()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;" class="text-dynamic">&times;</button>
         </div>
 
-        <div style="flex:1; overflow-y:auto; background:#131314; border:1px solid #333; border-radius:10px; padding:20px; margin-bottom:24px; color:#ccc; font-family:monospace; font-size:0.9rem; white-space:pre-wrap;" id="modal-content">
+        <div style="flex:1; overflow-y:auto; background:rgba(0,0,0,0.05); border:1px solid var(--border); border-radius:10px; padding:20px; margin-bottom:24px; font-family:monospace; font-size:0.9rem; white-space:pre-wrap;" id="modal-content" class="text-dynamic">
             <!-- Conteúdo extraído será inserido aqui -->
         </div>
 
@@ -109,14 +109,14 @@
             <input type="hidden" name="acao" id="audit-action" value="approve">
             
             <div id="rejection-box" style="display:none; margin-bottom:20px;">
-                <label style="display:block; color:#888; font-size:0.85rem; margin-bottom:8px;">Motivo da Rejeição:</label>
-                <textarea name="motivo_rejeicao" style="width:100%; background:#131314; border:1px solid #d93025; border-radius:8px; color:#e3e3e3; padding:12px; font-family:inherit; outline:none;" rows="2" placeholder="Ex: O documento não é do domínio contábil."></textarea>
+                <label class="text-dynamic-muted" style="display:block; font-size:0.85rem; margin-bottom:8px;">Motivo da Rejeição:</label>
+                <textarea name="motivo_rejeicao" style="width:100%; background:transparent; border:1px solid #d93025; border-radius:8px; padding:12px; font-family:inherit; outline:none;" rows="2" class="text-dynamic" placeholder="Ex: O documento não é do domínio contábil."></textarea>
             </div>
 
             <div style="display:flex; justify-content:flex-end; gap:12px;">
-                <button type="button" onclick="closePreviewModal()" style="background:#333537; color:#e3e3e3; border:1px solid #444; border-radius:10px; padding:10px 24px; cursor:pointer;">Fechar</button>
-                <button type="button" onclick="submitAudit('reject')" style="background:none; color:#f87171; border:1px solid #3b1a1a; border-radius:10px; padding:10px 24px; cursor:pointer;">Rejeitar</button>
-                <button type="button" onclick="submitAudit('approve')" style="background:#4ade80; color:#131314; border:none; border-radius:10px; padding:10px 24px; cursor:pointer; font-weight:600;">Aprovar para IA</button>
+                <button type="button" onclick="closePreviewModal()" class="btn btn-outline text-dynamic" style="padding:10px 24px;">Fechar</button>
+                <button type="button" onclick="submitAudit('reject')" class="btn btn-danger" style="background:transparent; padding:10px 24px;">Rejeitar</button>
+                <button type="button" onclick="submitAudit('approve')" class="btn btn-primary" style="padding:10px 24px; font-weight:600; color:#131314;">Aprovar para IA</button>
             </div>
         </form>
     </div>

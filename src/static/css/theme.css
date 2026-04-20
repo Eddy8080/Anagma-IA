@@ -1,3 +1,136 @@
+/* ── Variáveis de Tema (Global) ── */
+:root {
+    --bg-card: #1e1f20;
+    --bg-input: #131314;
+    --border-card: #333;
+    --border-input: #3c4043;
+    --text-main: #e3e3e3;
+    --text-muted: #888;
+    --accent-main: #a8c7fa;
+    --accent-dark: #131314;
+}
+
+html.light-mode {
+    --bg-card: #ffffff;
+    --bg-input: #f8f9fa;
+    --border-card: #e0e0e0;
+    --border-input: #dcdcdc;
+    --text-main: #1a1a1a;
+    --text-muted: #666;
+    --accent-main: #1a73e8;
+    --accent-dark: #ffffff;
+    
+    /* base.html */
+    --bg-color:      #f8f9fa;
+    --sidebar-bg:    #ffffff;
+    --text-color:    #1a1a1a;
+    --accent-color:  #1a73e8;
+    --input-bg:      #ffffff;
+    --ai-avatar-bg:  #f0f0f0;
+    /* base_admin.html */
+    --bg:        #f8f9fa;
+    --card-bg:   #ffffff;
+    --text:      #1a1a1a;
+    --muted:     #666;
+    --accent:    #1a73e8;
+    --border:    #e0e0e0;
+    --danger:    #d93025;
+    --success:   #137333;
+}
+
+/* ── Classes de Formulário e Cards Adaptativos ── */
+.form-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: 16px;
+    padding: 36px;
+    width: 100%;
+    max-width: 640px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.form-title {
+    margin: 0 0 6px;
+    color: var(--text-main);
+    font-size: 1.4rem;
+}
+
+.form-subtitle {
+    margin: 0 0 6px;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+}
+
+.form-label {
+    display: block;
+    color: var(--accent-main);
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+.form-input,
+.form-card input[type="text"],
+.form-card input[type="email"],
+.form-card input[type="password"],
+.form-card textarea {
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    border-radius: 10px;
+    color: var(--text-main);
+    padding: 12px 14px;
+    font-size: 0.97rem;
+    margin-bottom: 18px;
+    outline: none;
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+
+.form-input:focus,
+.form-card input:focus,
+.form-card textarea:focus {
+    border-color: var(--accent-main);
+}
+
+.form-btn-primary {
+    flex: 1;
+    background: var(--accent-main);
+    color: var(--accent-dark);
+    border: none;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.form-btn-primary:hover {
+    opacity: 0.9;
+}
+
+.form-btn-secondary {
+    flex: 1;
+    background: var(--bg-input);
+    color: var(--text-main);
+    border: 1px solid var(--border-input);
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 1rem;
+    text-align: center;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.form-btn-secondary:hover {
+    background: var(--border-card);
+}
+
 /* ── Botões da sidebar inferior ── */
 .btn-nova-ideia {
     display: block;
