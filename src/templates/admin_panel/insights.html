@@ -14,11 +14,11 @@
     <div class="col-12 mb-4">
         <div class="card">
             <div class="d-flex align-items-center mb-3">
-                <div style="width: 10px; height: 10px; background: #4ade80; border-radius: 50%; margin-right: 10px; animation: pulse 2s infinite;"></div>
-                <h5 class="mb-0 text-dynamic" style="font-size: 1.1rem; font-weight: 500;">Engajamento em Tempo Real</h5>
+                <div class="insights-pulse-dot"></div>
+                <h5 class="mb-0 text-dynamic insights-chart-title">Engajamento em Tempo Real</h5>
             </div>
             <p class="text-dynamic-muted small mb-4">Interações registradas hoje, agrupadas por hora.</p>
-            <div style="height: 350px;">
+            <div class="insights-chart-wrapper">
                 <canvas id="realtimeChart"></canvas>
             </div>
         </div>
@@ -29,43 +29,67 @@
         <div class="card">
             <div class="d-flex align-items-center mb-3">
                 <i class="fas fa-calendar-alt text-primary me-2"></i>
-                <h5 class="mb-0 text-dynamic" style="font-size: 1.1rem; font-weight: 500;">Histórico Semanal</h5>
+                <h5 class="mb-0 text-dynamic insights-chart-title">Histórico Semanal</h5>
             </div>
             <p class="text-dynamic-muted small mb-4">Volume de interações nos últimos 7 dias (Dia/Mês/Ano).</p>
-            <div style="height: 350px;">
+            <div class="insights-chart-wrapper">
                 <canvas id="weeklyChart"></canvas>
             </div>
         </div>
     </div>
 </div>
 
+{# dados do servidor isolados — evita erro do linter JS com tags Django #}
+<script id="chart-data" type="application/json">
+{
+    "realtimeLabels": {{ realtime_labels|safe }},
+    "realtimeData":   {{ realtime_data|safe }},
+    "weeklyLabels":   {{ weekly_labels|safe }},
+    "weeklyData":     {{ weekly_data|safe }}
+}
+</script>
+
 <style>
     @keyframes pulse {
-        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
-        70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(74, 222, 128, 0); }
+        0%   { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
+        70%  { transform: scale(1);    box-shadow: 0 0 0 10px rgba(74, 222, 128, 0); }
         100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
     }
+    .insights-pulse-dot {
+        width: 10px;
+        height: 10px;
+        background: #4ade80;
+        border-radius: 50%;
+        margin-right: 10px;
+        animation: pulse 2s infinite;
+        flex-shrink: 0;
+    }
+    .insights-chart-title { font-size: 1.1rem; font-weight: 500; }
+    .insights-chart-wrapper { height: 350px; }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     let realtimeChart, weeklyChart;
 
+    const raw = JSON.parse(document.getElementById('chart-data').textContent);
+
     function getChartColors() {
         const isLight = document.documentElement.classList.contains('light-mode');
         return {
-            text: isLight ? '#1a1a1a' : '#e3e3e3',
-            grid: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)',
-            accent: isLight ? '#4285f4' : '#4ade80', // Azul no light, Verde neon no dark para tempo real
-            secondary: isLight ? '#9b72cb' : '#a8c7fa', // Lilás no light, Azul suave no dark para semanal
+            text:       isLight ? '#1a1a1a' : '#e3e3e3',
+            grid:       isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)',
+            accent:     isLight ? '#4285f4' : '#4ade80',
+            secondary:  isLight ? '#9b72cb' : '#a8c7fa',
             bgRealtime: isLight ? 'rgba(66, 133, 244, 0.1)' : 'rgba(74, 222, 128, 0.1)',
-            bgWeekly: isLight ? 'rgba(155, 114, 203, 0.6)' : 'rgba(168, 199, 250, 0.6)'
+            bgWeekly:   isLight ? 'rgba(155, 114, 203, 0.6)' : 'rgba(168, 199, 250, 0.6)'
         };
     }
 
     function createCharts() {
         const colors = getChartColors();
-        
+        const isLight = document.documentElement.classList.contains('light-mode');
+
         const commonOptions = {
             responsive: true,
             maintainAspectRatio: false,
@@ -73,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: document.documentElement.classList.contains('light-mode') ? '#fff' : '#1e1f20',
+                    backgroundColor: isLight ? '#fff' : '#1e1f20',
                     titleColor: colors.text,
                     bodyColor: colors.text,
                     borderColor: colors.grid,
@@ -102,10 +126,10 @@ document.addEventListener('DOMContentLoaded', function() {
         realtimeChart = new Chart(rtCtx, {
             type: 'line',
             data: {
-                labels: {{ realtime_labels|safe }},
+                labels: raw.realtimeLabels,
                 datasets: [{
                     label: 'Interações',
-                    data: {{ realtime_data|safe }},
+                    data: raw.realtimeData,
                     borderColor: colors.accent,
                     backgroundColor: rtGradient,
                     fill: true,
@@ -123,10 +147,10 @@ document.addEventListener('DOMContentLoaded', function() {
         weeklyChart = new Chart(wkCtx, {
             type: 'bar',
             data: {
-                labels: {{ weekly_labels|safe }},
+                labels: raw.weeklyLabels,
                 datasets: [{
                     label: 'Interações',
-                    data: {{ weekly_data|safe }},
+                    data: raw.weeklyData,
                     backgroundColor: colors.bgWeekly,
                     borderColor: colors.secondary,
                     borderWidth: 1,
@@ -139,11 +163,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     createCharts();
 
-    // Ouvinte para o botão de troca de tema (ajustado para ser reativo)
     const themeBtn = document.getElementById('theme-toggle');
     if (themeBtn) {
         themeBtn.addEventListener('click', () => {
-            // Pequeno delay para esperar a classe 'light-mode' ser aplicada no <html>
             setTimeout(() => {
                 if (realtimeChart) realtimeChart.destroy();
                 if (weeklyChart) weeklyChart.destroy();
