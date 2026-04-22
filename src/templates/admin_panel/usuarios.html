@@ -2,81 +2,71 @@
 
 {% block title %}Gestão de Usuários — Anagma IA{% endblock %}
 
+{% block messages %}{% endblock %}
+
 {% block content %}
-<div style="display:flex; align-items:center; justify-content:flex-start; gap:32px; margin-bottom:24px;">
-    <div class="page-title text-dynamic" style="margin:0;">👥 Gestão de Usuários</div>
-    <button id="toggle-form-btn" onclick="toggleForm()"
-            style="background:#a8c7fa; color:#131314; border:none; border-radius:10px;
-                   padding:9px 20px; font-size:0.9rem; font-weight:600; cursor:pointer;">
-        + Novo Usuário
-    </button>
+<div class="usuarios-header">
+    <div class="page-title text-dynamic usuarios-title">👥 Gestão de Usuários</div>
+    <button id="toggle-form-btn" class="btn-novo-usuario" onclick="toggleForm()">+ Novo Usuário</button>
 </div>
 
 {% if messages %}
     {% for msg in messages %}
-        <div style="padding:10px 16px; border-radius:8px; margin-bottom:16px;
-            {% if msg.tags == 'error' %}background:#3b1a1a; color:#f87171; border:1px solid #7f1d1d;
-            {% else %}background:#1a3b2a; color:#4ade80; border:1px solid #166534;{% endif %}">
+        <div class="msg-flash {% if msg.tags == 'error' %}msg-flash-error{% else %}msg-flash-success{% endif %}">
+            {% if msg.tags == 'error' %}<input type="hidden" id="has-form-error" value="1">{% endif %}
             {{ msg }}
         </div>
     {% endfor %}
 {% endif %}
 
 {# ── Formulário de criação ── #}
-<div id="create-form" style="display:none; margin-bottom:24px;">
-    <div class="card" style="padding:24px;">
-        <div class="text-dynamic" style="font-weight:600; margin-bottom:16px;">Cadastrar Novo Usuário</div>
+<div id="create-form" class="create-form-wrapper">
+    <div class="card card-padded">
+        <div class="text-dynamic form-section-title">Cadastrar Novo Usuário</div>
         <form method="post" action="{% url 'admin_panel:criar_usuario' %}">
             {% csrf_token %}
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+            <div class="form-grid-2col">
                 <div>
-                    <label class="text-dynamic-muted" style="display:block; font-size:0.8rem; margin-bottom:4px;">Username *</label>
-                    <input type="text" name="username" required autocomplete="off"
-                           style="width:100%; box-sizing:border-box; background:#131314; border:1px solid #3c4043;
-                                  border-radius:8px; color:#e3e3e3; padding:9px 12px; font-size:0.9rem; outline:none; font-family:inherit;">
+                    <label for="f-username" class="text-dynamic-muted form-field-label">Username *</label>
+                    <input type="text" id="f-username" name="username" required autocomplete="off"
+                           title="Username" placeholder="ex: joao.silva" class="usuarios-input">
                 </div>
                 <div>
-                    <label class="text-dynamic-muted" style="display:block; font-size:0.8rem; margin-bottom:4px;">Nome Completo *</label>
-                    <input type="text" name="nome_completo" required
-                           style="width:100%; box-sizing:border-box; background:#131314; border:1px solid #3c4043;
-                                  border-radius:8px; color:#e3e3e3; padding:9px 12px; font-size:0.9rem; outline:none; font-family:inherit;">
+                    <label for="f-nome" class="text-dynamic-muted form-field-label">Nome Completo *</label>
+                    <input type="text" id="f-nome" name="nome_completo" required
+                           title="Nome completo" placeholder="Nome e Sobrenome" class="usuarios-input">
                 </div>
                 <div>
-                    <label class="text-dynamic-muted" style="display:block; font-size:0.8rem; margin-bottom:4px;">E-mail *</label>
-                    <input type="email" name="email" required placeholder="nome@anagma.com.br"
-                           style="width:100%; box-sizing:border-box; background:#131314; border:1px solid #3c4043;
-                                  border-radius:8px; color:#e3e3e3; padding:9px 12px; font-size:0.9rem; outline:none; font-family:inherit;">
+                    <label for="f-email" class="text-dynamic-muted form-field-label">E-mail *</label>
+                    <input type="email" id="f-email" name="email" required
+                           title="E-mail corporativo" placeholder="nome@anagma.com.br" class="usuarios-input">
                 </div>
                 <div>
-                    <label class="text-dynamic-muted" style="display:block; font-size:0.8rem; margin-bottom:4px;">Status Inicial</label>
-                    <select name="account_status" style="width:100%; background:#131314; border:1px solid #3c4043; border-radius:8px; color:#e3e3e3; padding:9px 12px; font-size:0.9rem; outline:none;">
+                    <label for="f-status" class="text-dynamic-muted form-field-label">Status Inicial</label>
+                    <select id="f-status" name="account_status" class="select-gov select-gov-full"
+                            title="Status inicial" aria-label="Status inicial">
                         <option value="active">Ativo</option>
                         <option value="inactive">Inativo</option>
                         <option value="paused">Pausado</option>
                     </select>
                 </div>
                 <div>
-                    <label class="text-dynamic-muted" style="display:block; font-size:0.8rem; margin-bottom:4px;">Senha *</label>
-                    <input type="password" name="password" required autocomplete="new-password"
-                           style="width:100%; box-sizing:border-box; background:#131314; border:1px solid #3c4043;
-                                  border-radius:8px; color:#e3e3e3; padding:9px 12px; font-size:0.9rem; outline:none; font-family:inherit;">
+                    <label for="f-senha" class="text-dynamic-muted form-field-label">Senha *</label>
+                    <input type="password" id="f-senha" name="password" required autocomplete="new-password"
+                           title="Senha de acesso" placeholder="Senha forte" class="usuarios-input">
                 </div>
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:10px;">
-                <button type="button" onclick="toggleForm()"
-                        style="background:#333537; color:#e3e3e3; border:1px solid #444; border-radius:8px;
-                               padding:9px 20px; font-size:0.9rem; cursor:pointer;">Cancelar</button>
-                <button type="submit"
-                        style="background:#a8c7fa; color:#131314; border:none; border-radius:8px;
-                               padding:9px 20px; font-size:0.9rem; font-weight:600; cursor:pointer;">Criar Usuário</button>
+            <div class="form-actions-right">
+                <button type="button" onclick="toggleForm()" class="btn-modal-secondary btn-modal-secondary--sm">Cancelar</button>
+                <button type="submit" class="btn-primary-action">Criar Usuário</button>
             </div>
         </form>
     </div>
 </div>
 
 {# ── Tabela de usuários ── #}
-<div class="card" style="padding:0;">
-    <table style="width:100%;">
+<div class="card card-table">
+    <table>
         <thead>
             <tr>
                 <th class="text-dynamic-muted">Nome (A-Z)</th>
@@ -90,17 +80,16 @@
             {% for u in usuarios %}
             <tr>
                 <td>
-                    <div class="text-dynamic" style="font-weight:600;">{{ u.nome_completo|default:"Sem nome" }}</div>
-                    <div class="text-dynamic-muted" style="font-size:0.75rem;">{{ u.email|default:"Sem e-mail" }}</div>
+                    <div class="text-dynamic user-name-cell">{{ u.nome_completo|default:"Sem nome" }}</div>
+                    <div class="text-dynamic-muted user-email-cell">{{ u.email|default:"Sem e-mail" }}</div>
                 </td>
-                <td class="text-dynamic" style="font-size:0.9rem;">{{ u.username }}</td>
+                <td class="text-dynamic td-username">{{ u.username }}</td>
                 <td>
-                    <form method="post" action="{% url 'admin_panel:update_user_status' u.id %}" style="margin:0; position:relative;">
+                    <form class="form-inline" method="post" action="{% url 'admin_panel:update_user_status' u.id %}">
                         {% csrf_token %}
-                        <select name="nivel" onchange="this.form.submit()" 
-                                style="background:#1e1f20; border:1px solid #444; color:{% if u.is_superuser %}#a8c7fa{% else %}#4ade80{% endif %}; 
-                                       border-radius:6px; padding:6px 10px; font-size:0.85rem; outline:none; cursor:pointer; width:135px;
-                                       display:inline-block; -webkit-appearance:auto; -moz-appearance:auto; appearance:auto;"
+                        <select name="nivel" class="select-gov select-gov-perfil"
+                                title="Perfil do usuário" aria-label="Perfil do usuário"
+                                onchange="this.form.submit()"
                                 {% if u == request.user %}disabled{% endif %}>
                             <option value="user" {% if not u.is_superuser %}selected{% endif %}>Usuário</option>
                             <option value="admin" {% if u.is_superuser %}selected{% endif %}>Superusuário</option>
@@ -108,12 +97,11 @@
                     </form>
                 </td>
                 <td>
-                    <form method="post" action="{% url 'admin_panel:update_user_status' u.id %}" style="margin:0; position:relative;">
+                    <form class="form-inline" method="post" action="{% url 'admin_panel:update_user_status' u.id %}">
                         {% csrf_token %}
-                        <select name="status" onchange="this.form.submit()" 
-                                style="background:#1e1f20; border:1px solid #444; border-radius:6px; padding:6px 10px; font-size:0.85rem; outline:none; cursor:pointer; width:115px;
-                                       display:inline-block; -webkit-appearance:auto; -moz-appearance:auto; appearance:auto;
-                                       color:{% if u.account_status == 'active' %}#4ade80{% elif u.account_status == 'paused' %}#fbbf24{% else %}#f87171{% endif %};"
+                        <select name="status" class="select-gov select-gov-status"
+                                title="Status da conta" aria-label="Status da conta"
+                                onchange="this.form.submit()"
                                 {% if u == request.user %}disabled{% endif %}>
                             <option value="active" {% if u.account_status == 'active' %}selected{% endif %}>Ativo</option>
                             <option value="inactive" {% if u.account_status == 'inactive' %}selected{% endif %}>Inativo</option>
@@ -123,90 +111,75 @@
                 </td>
                 <td>
                     {% if u != request.user %}
-                    <div style="display:flex; gap:8px;">
-                        <button type="button" onclick="openResetPasswordModal('{{ u.id }}', '{{ u.username }}')"
-                                style="background:none; border:1px solid #3c4043; color:#a8c7fa; border-radius:6px; padding:4px 12px; font-size:0.8rem; cursor:pointer; transition:background 0.2s;"
-                                onmouseover="this.style.background='#131314'" onmouseout="this.style.background='none'"
-                                title="Alterar Senha">
-                            🔑
-                        </button>
-                        <button type="button" onclick="openDeleteModal('{{ u.id }}', '{{ u.username }}')"
-                                style="background:none; border:1px solid #3b1a1a; color:#f87171; border-radius:6px; padding:4px 12px; font-size:0.8rem; cursor:pointer; transition:background 0.2s;"
-                                onmouseover="this.style.background='#3b1a1a'" onmouseout="this.style.background='none'">
-                            Excluir
-                        </button>
+                    <div class="actions-cell">
+                        <button type="button" class="btn-gov-key"
+                                onclick="openResetPasswordModal('{{ u.id }}', '{{ u.username }}')"
+                                title="Alterar Senha">🔑</button>
+                        <button type="button" class="btn-gov-excluir"
+                                onclick="openDeleteModal('{{ u.id }}', '{{ u.username }}')">Excluir</button>
                     </div>
                     {% else %}
-                    <span style="color:#555; font-size:0.8rem; font-style:italic;">Você</span>
+                    <span class="text-dynamic self-label">Você</span>
                     {% endif %}
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="5" style="text-align:center; color:#888; padding:32px;">Nenhum usuário encontrado.</td></tr>
+            <tr><td colspan="5" class="td-empty">Nenhum usuário encontrado.</td></tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
 
 {# ── Modal de Alteração de Senha ── #}
-<div id="reset-password-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
-                                   background:rgba(0,0,0,0.8); z-index:10000; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
-    <div style="background:#1e1f20; border:1px solid #3c4043; border-radius:16px; padding:32px; width:90%; max-width:400px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.6);">
-        <div style="font-size:2.5rem; margin-bottom:16px;">🔑</div>
-        <h3 style="margin:0 0 12px; color:#e3e3e3; font-weight:500;">Alterar Senha de: <span id="pwd-modal-username" style="color:#a8c7fa;"></span></h3>
-        <p style="color:#999; font-size:0.9rem; margin-bottom:24px;">Defina uma nova senha para este usuário.</p>
-        
+<div id="reset-password-modal" class="modal-overlay">
+    <div class="card-modal card-modal-sm">
+        <div class="modal-icon">🔑</div>
+        <h3 class="text-dynamic modal-title">Alterar Senha de: <span id="pwd-modal-username" class="modal-username-hl"></span></h3>
+        <p class="text-dynamic-muted modal-desc">Defina uma nova senha para este usuário.</p>
         <form id="reset-password-form" method="post" action="">
             {% csrf_token %}
-            <div style="position:relative; margin-bottom:24px;">
-                <input type="password" name="nova_senha" id="new-password-input" required placeholder="Nova senha técnica"
-                       style="width:100%; box-sizing:border-box; background:#131314; border:1px solid #3c4043;
-                              border-radius:10px; color:#e3e3e3; padding:12px 45px 12px 12px; font-size:1rem; outline:none; font-family:inherit;">
-                <button type="button" onclick="togglePasswordVisibility('new-password-input')"
-                        style="position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; color:#666; cursor:pointer; font-size:1.2rem;"
-                        title="Ver Senha">
-                    👁️
-                </button>
+            <div class="password-input-wrapper">
+                <input type="password" name="nova_senha" id="new-password-input" required
+                       placeholder="Nova senha técnica" class="modal-input-lg">
+                <button type="button" class="btn-show-password"
+                        onclick="togglePasswordVisibility('new-password-input')"
+                        title="Ver Senha">👁️</button>
             </div>
-
-            <div style="display:flex; gap:12px; justify-content:center;">
-                <button type="button" onclick="closeResetPasswordModal()" style="background:#333537; color:#e3e3e3; border:1px solid #444; border-radius:10px; padding:10px 24px; cursor:pointer; font-weight:500;">Cancelar</button>
-                <button type="submit" style="background:#a8c7fa; color:#131314; border:none; border-radius:10px; padding:10px 24px; cursor:pointer; font-weight:500;">Salvar Senha</button>
+            <div class="modal-actions">
+                <button type="button" onclick="closeResetPasswordModal()" class="btn-modal-secondary btn-modal-secondary--md">Cancelar</button>
+                <button type="submit" class="btn-primary-action btn-primary-action--md">Salvar Senha</button>
             </div>
         </form>
     </div>
 </div>
 
 {# ── Modal de Exclusão Estratégica ── #}
-<div id="delete-user-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
-                                   background:rgba(0,0,0,0.8); z-index:10000; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
-    <div style="background:#1e1f20; border:1px solid #3c4043; border-radius:16px; padding:32px; width:90%; max-width:450px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.6);">
-        <div style="font-size:2.5rem; margin-bottom:16px;">🛡️</div>
-        <h3 style="margin:0 0 12px; color:#e3e3e3; font-weight:500;">Excluir Usuário: <span id="modal-username" style="color:#a8c7fa;"></span></h3>
-        <p style="color:#999; font-size:0.95rem; line-height:1.5; margin-bottom:24px;">Como deseja tratar os dados deste usuário?</p>
-        
+<div id="delete-user-modal" class="modal-overlay">
+    <div class="card-modal card-modal-md">
+        <div class="modal-icon">🛡️</div>
+        <h3 class="text-dynamic modal-title">Excluir Usuário: <span id="modal-username" class="modal-username-hl"></span></h3>
+        <p class="text-dynamic-muted modal-desc-lg">Como deseja tratar os dados deste usuário?</p>
         <form id="delete-user-form" method="post" action="">
             {% csrf_token %}
-            <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:24px;">
-                <label style="display:flex; align-items:center; gap:12px; background:#131314; padding:12px; border-radius:10px; border:1px solid #333; cursor:pointer; text-align:left;">
-                    <input type="radio" name="modo" value="keep" checked style="accent-color:#4285f4;">
+            <div class="modal-radio-list">
+                <label class="modal-radio-group">
+                    <input type="radio" name="modo" value="keep" checked class="radio-keep">
                     <div>
-                        <div style="color:#e3e3e3; font-weight:600; font-size:0.9rem;">Preservar para IA (Recomendado)</div>
-                        <div style="color:#666; font-size:0.75rem;">Mantém ideias e histórico de chat de forma anônima para treinamento.</div>
+                        <div class="text-dynamic modal-radio-title">Preservar para IA (Recomendado)</div>
+                        <div class="text-dynamic-muted modal-radio-desc">Mantém ideias e histórico de chat de forma anônima para treinamento.</div>
                     </div>
                 </label>
-                <label style="display:flex; align-items:center; gap:12px; background:#131314; padding:12px; border-radius:10px; border:1px solid #333; cursor:pointer; text-align:left;">
-                    <input type="radio" name="modo" value="purge" style="accent-color:#d93025;">
+                <label class="modal-radio-group">
+                    <input type="radio" name="modo" value="purge" class="radio-purge">
                     <div>
-                        <div style="color:#f87171; font-weight:600; font-size:0.9rem;">Eliminação Total</div>
-                        <div style="color:#666; font-size:0.75rem;">Apaga o usuário e ABSOLUTAMENTE TODOS os dados (ideias e chats).</div>
+                        <div class="text-danger-label">Eliminação Total</div>
+                        <div class="text-dynamic-muted modal-radio-desc">Apaga o usuário e ABSOLUTAMENTE TODOS os dados (ideias e chats).</div>
                     </div>
                 </label>
             </div>
-
-            <div style="display:flex; gap:12px; justify-content:center;">
-                <button type="button" onclick="closeDeleteModal()" style="background:#333537; color:#e3e3e3; border:1px solid #444; border-radius:10px; padding:10px 24px; cursor:pointer; font-weight:500;">Cancelar</button>
-                <button type="submit" style="background:#d93025; color:white; border:none; border-radius:10px; padding:10px 24px; cursor:pointer; font-weight:500;">Confirmar Exclusão</button>
+            <div class="modal-actions">
+                <button type="button" onclick="closeDeleteModal()" class="btn-modal-secondary btn-modal-secondary--md">Cancelar</button>
+                <button type="submit" class="btn-danger-action">Confirmar Exclusão</button>
             </div>
         </form>
     </div>
@@ -215,24 +188,24 @@
 <script>
 function toggleForm() {
     const f = document.getElementById('create-form');
-    f.style.display = f.style.display === 'none' ? 'block' : 'none';
+    const hidden = getComputedStyle(f).display === 'none';
+    f.style.display = hidden ? 'block' : 'none';
 }
 
 function openResetPasswordModal(userId, username) {
     const modal = document.getElementById('reset-password-modal');
-    const form = document.getElementById('reset-password-form');
-    const nameSpan = document.getElementById('pwd-modal-username');
+    const form  = document.getElementById('reset-password-form');
+    const span  = document.getElementById('pwd-modal-username');
     const input = document.getElementById('new-password-input');
-    
     input.value = '';
-    input.type = 'password';
+    input.type  = 'password';
     form.action = `/admin-panel/usuarios/${userId}/reset-password/`;
-    nameSpan.textContent = username;
-    modal.style.display = 'flex';
+    span.textContent = username;
+    modal.classList.add('is-open');
 }
 
 function closeResetPasswordModal() {
-    document.getElementById('reset-password-modal').style.display = 'none';
+    document.getElementById('reset-password-modal').classList.remove('is-open');
 }
 
 function togglePasswordVisibility(inputId) {
@@ -242,21 +215,19 @@ function togglePasswordVisibility(inputId) {
 
 function openDeleteModal(userId, username) {
     const modal = document.getElementById('delete-user-modal');
-    const form = document.getElementById('delete-user-form');
-    const nameSpan = document.getElementById('modal-username');
-    
-    // Constrói a URL dinamicamente
+    const form  = document.getElementById('delete-user-form');
+    const span  = document.getElementById('modal-username');
     form.action = `/admin-panel/usuarios/${userId}/deletar/`;
-    nameSpan.textContent = username;
-    modal.style.display = 'flex';
+    span.textContent = username;
+    modal.classList.add('is-open');
 }
 
 function closeDeleteModal() {
-    document.getElementById('delete-user-modal').style.display = 'none';
+    document.getElementById('delete-user-modal').classList.remove('is-open');
 }
 
-{% if messages %}
-{% for msg in messages %}{% if msg.tags == 'error' %}document.getElementById('create-form').style.display = 'block';{% endif %}{% endfor %}
-{% endif %}
+if (document.getElementById('has-form-error')) {
+    document.getElementById('create-form').style.display = 'block';
+}
 </script>
 {% endblock %}

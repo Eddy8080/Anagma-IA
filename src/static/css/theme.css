@@ -2,23 +2,39 @@
 :root {
     --bg-card: #1e1f20;
     --bg-input: #131314;
+    --bg-select: #2d2f32;
     --border-card: #333;
-    --border-input: #3c4043;
-    --text-main: #e3e3e3;
-    --text-muted: #888;
+    --border-input: #5a5f66;
+    --text-main: #ffffff;
+    --text-input: #ffffff; /* Texto branco puro no Dark */
+    --text-muted: #aaaaaa;
     --accent-main: #a8c7fa;
     --accent-dark: #131314;
+
+    /* Cores de Status (Dark - Neon) */
+    --stat-success: #4ade80;
+    --stat-info: #a8c7fa;
+    --stat-warning: #fbbf24;
+    --stat-danger: #f87171;
 }
 
 html.light-mode {
     --bg-card: #ffffff;
-    --bg-input: #f8f9fa;
-    --border-card: #e0e0e0;
-    --border-input: #dcdcdc;
-    --text-main: #1a1a1a;
-    --text-muted: #666;
+    --bg-input: #f0f2f5;
+    --bg-select: #e8ecf1;
+    --border-card: #c8d0da;
+    --border-input: #9baab8;
+    --text-main: #000000;
+    --text-input: #111111;
+    --text-muted: #444;
     --accent-main: #1a73e8;
     --accent-dark: #ffffff;
+
+    /* Cores de Status (Light - Saturadas/Vivas) */
+    --stat-success: #137333;
+    --stat-info: #1a73e8;
+    --stat-warning: #b06000;
+    --stat-danger: #d93025;
     
     /* base.html */
     --bg-color:      #f8f9fa;
@@ -69,6 +85,12 @@ html.light-mode {
     font-weight: 500;
 }
 
+/* Aplicação das Variáveis de Texto e Fundo */
+select, input, textarea, option {
+    color: var(--text-input) !important;
+    background: var(--bg-input);
+}
+
 .form-input,
 .form-card input[type="text"],
 .form-card input[type="email"],
@@ -79,7 +101,7 @@ html.light-mode {
     background: var(--bg-input);
     border: 1px solid var(--border-input);
     border-radius: 10px;
-    color: var(--text-main);
+    color: var(--text-input) !important;
     padding: 12px 14px;
     font-size: 0.97rem;
     margin-bottom: 18px;
@@ -114,7 +136,7 @@ html.light-mode {
 .form-btn-secondary {
     flex: 1;
     background: var(--bg-input);
-    color: var(--text-main);
+    color: var(--text-input) !important;
     border: 1px solid var(--border-input);
     border-radius: 10px;
     padding: 12px;
@@ -237,24 +259,6 @@ html.light-mode .logo-digiana {
 /* ════════════════════════════════════════
    LIGHT MODE — variáveis e overrides
    ════════════════════════════════════════ */
-html.light-mode {
-    /* base.html */
-    --bg-color:      #f8f9fa;
-    --sidebar-bg:    #ffffff;
-    --text-color:    #1a1a1a;
-    --accent-color:  #1a73e8;
-    --input-bg:      #ffffff;
-    --ai-avatar-bg:  #f0f0f0;
-    /* base_admin.html */
-    --bg:        #f8f9fa;
-    --card-bg:   #ffffff;
-    --text:      #1a1a1a;
-    --muted:     #666;
-    --accent:    #1a73e8;
-    --border:    #e0e0e0;
-    --danger:    #d93025;
-    --success:   #137333;
-}
 
 /* Botão em modo claro */
 html.light-mode #theme-toggle {
@@ -305,10 +309,11 @@ html.light-mode .greeting-container > div {
     border: none !important;
 }
 html.light-mode input[type="text"],
+html.light-mode input[type="email"],
 html.light-mode input[type="password"] {
-    background: #f8f9fa !important;
-    color: #1a1a1a !important;
-    border-color: #e0e0e0 !important;
+    background: var(--bg-input) !important;
+    color: #111111 !important;
+    border-color: var(--border-input) !important;
 }
 html.light-mode label { color: #555 !important; }
 
@@ -327,6 +332,272 @@ html.light-mode .btn-primary { background: var(--accent); color: #ffffff; }
 html.light-mode .btn-outline { border-color: #e0e0e0; color: var(--text); }
 html.light-mode .msg-success { background: #d4edda; color: #155724; border-color: #c3e6cb; }
 html.light-mode .msg-error   { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+
+/* Overrides para Selects e Modais no Modo Light */
+html.light-mode select {
+    background: var(--bg-select) !important;
+    color: var(--text-input) !important;
+    border-color: var(--border-input) !important;
+}
+
+/* ══════════════════════════════════════
+   usuarios.html — classes de componentes
+   ══════════════════════════════════════ */
+
+/* Cabeçalho da página */
+.usuarios-header { display: flex; align-items: center; justify-content: flex-start; gap: 32px; margin-bottom: 24px; }
+.usuarios-title  { margin: 0; }
+
+/* Botão Novo Usuário */
+.btn-novo-usuario {
+    background: #a8c7fa; color: #131314; border: none;
+    border-radius: 10px; padding: 9px 20px;
+    font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s;
+}
+.btn-novo-usuario:hover { opacity: 0.9; }
+
+/* Formulário de criação */
+.create-form-wrapper { display: none; margin-bottom: 24px; }
+.card-padded         { padding: 24px; }
+.form-section-title  { font-weight: 600; margin-bottom: 16px; }
+.form-grid-2col      { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.form-field-label    { display: block; font-size: 0.8rem; margin-bottom: 4px; font-weight: 600; }
+.form-actions-right  { display: flex; justify-content: flex-end; gap: 10px; }
+
+/* Input padrão dos formulários de usuário */
+.usuarios-input {
+    width: 100%; box-sizing: border-box;
+    background: var(--bg-input); border: 1px solid var(--border-input);
+    border-radius: 8px; color: var(--text-input);
+    padding: 9px 12px; font-size: 0.9rem; outline: none;
+    font-family: inherit; font-weight: 600;
+}
+.usuarios-input:focus { border-color: var(--accent-main); }
+
+/* Larguras dos selects de governança na tabela */
+.select-gov-full   { width: 100%; }
+.select-gov-perfil { width: 135px; }
+.select-gov-status { width: 115px; }
+
+/* Botão primário (azul) */
+.btn-primary-action {
+    background: #a8c7fa; color: #131314; border: none;
+    border-radius: 10px; padding: 9px 20px;
+    font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s;
+}
+.btn-primary-action:hover { opacity: 0.9; }
+.btn-primary-action--md  { padding: 10px 24px; }
+
+/* Botão de cancelar nos modais */
+.btn-modal-secondary {
+    background: var(--bg-input); color: var(--text-input);
+    border: 1px solid var(--border-input);
+    border-radius: 8px; padding: 9px 20px;
+    font-size: 0.9rem; cursor: pointer; font-weight: 600; transition: background 0.2s;
+}
+.btn-modal-secondary--md { border-radius: 10px; padding: 10px 24px; }
+.btn-modal-secondary--sm { border-radius: 8px; }
+
+/* Botão de exclusão (vermelho) */
+.btn-danger-action {
+    background: var(--stat-danger); color: white; border: none;
+    border-radius: 10px; padding: 10px 24px;
+    cursor: pointer; font-weight: 600; transition: opacity 0.2s;
+}
+.btn-danger-action:hover { opacity: 0.85; }
+
+/* Tabela */
+.card-table      { padding: 0; }
+.user-name-cell  { font-weight: 600; }
+.user-email-cell { font-size: 0.75rem; font-weight: 500; }
+.td-username     { font-size: 0.9rem; font-weight: 500; }
+.form-inline     { margin: 0; position: relative; }
+.actions-cell    { display: flex; gap: 8px; }
+.self-label      { font-size: 0.9rem; font-weight: 700; font-style: italic; }
+.td-empty        { text-align: center; color: #888; padding: 32px; }
+
+/* Formulário — largura garantida cross-browser */
+.create-form-wrapper { width: 100%; }
+.card-padded { width: 100%; box-sizing: border-box; }
+.form-grid-2col { width: 100%; }
+.usuarios-input { display: block; }
+
+/* Modais */
+.modal-overlay {
+    display: none; position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.8); z-index: 10000;
+    align-items: center; justify-content: center;
+    backdrop-filter: blur(4px);
+}
+.modal-overlay.is-open { display: flex; }
+.card-modal {
+    background: var(--bg-card); border: 1px solid var(--border-input);
+    border-radius: 16px; padding: 32px; width: 90%;
+    text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+}
+.card-modal-sm { max-width: 400px; }
+.card-modal-md { max-width: 450px; }
+
+.modal-icon        { font-size: 2.5rem; margin-bottom: 16px; }
+.modal-title       { margin: 0 0 12px; font-weight: 700; }
+.modal-username-hl { color: var(--stat-info); }
+.modal-desc        { font-size: 0.9rem; margin-bottom: 24px; font-weight: 600; }
+.modal-desc-lg     { font-size: 0.95rem; line-height: 1.5; margin-bottom: 24px; font-weight: 600; }
+.modal-actions     { display: flex; gap: 12px; justify-content: center; }
+.modal-radio-list  { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+.modal-radio-title { font-weight: 700; font-size: 0.9rem; }
+.modal-radio-desc  { font-size: 0.75rem; font-weight: 600; }
+.radio-keep        { accent-color: #4285f4; }
+.radio-purge       { accent-color: #d93025; }
+.text-danger-label { color: var(--stat-danger); font-weight: 700; font-size: 0.9rem; }
+
+/* Input de senha no modal */
+.modal-input-lg {
+    width: 100%; box-sizing: border-box;
+    background: var(--bg-input); border: 1px solid var(--border-input);
+    border-radius: 10px; color: var(--text-input);
+    padding: 12px 45px 12px 12px; font-size: 1rem; outline: none;
+    font-family: inherit; font-weight: 600;
+}
+.password-input-wrapper { position: relative; margin-bottom: 24px; }
+.btn-show-password {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: #666; cursor: pointer; font-size: 1.2rem;
+}
+
+/* Light mode — overrides dos novos componentes */
+html.light-mode .btn-modal-secondary { background: #f0f0f0 !important; color: #1a1a1a !important; border-color: #dcdcdc !important; }
+html.light-mode .usuarios-input      { background: var(--bg-input); border-color: var(--border-input); color: var(--text-input); }
+html.light-mode .modal-input-lg      { background: var(--bg-input); border-color: var(--border-input); color: var(--text-input); }
+html.light-mode .card-modal          { background: var(--bg-card) !important; border-color: var(--border-card) !important; }
+html.light-mode .modal-overlay       { background: rgba(255,255,255,0.8) !important; }
+/* Modal radio group — base dark + light override */
+.modal-radio-group {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--bg-input); padding: 12px;
+    border-radius: 10px; border: 1px solid var(--border-input);
+    cursor: pointer; text-align: left;
+}
+html.light-mode .modal-radio-group { background: #f8f9fa !important; border-color: #e0e0e0 !important; }
+
+/* ── Flash messages (usuarios.html) ── */
+@keyframes flash-slide-out {
+    0%   { opacity: 1; transform: translateY(0);    max-height: 60px; margin-bottom: 16px; }
+    70%  { opacity: 1; transform: translateY(0);    max-height: 60px; margin-bottom: 16px; }
+    90%  { opacity: 0; transform: translateY(-8px); max-height: 60px; margin-bottom: 16px; }
+    100% { opacity: 0; transform: translateY(-8px); max-height: 0;    margin-bottom: 0;    padding: 0; }
+}
+.msg-flash {
+    padding: 10px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-weight: 600;
+    animation: flash-slide-out 3.5s ease forwards;
+    overflow: hidden;
+}
+.msg-flash-error   { background: #3b1a1a; color: #f87171; border: 1px solid #7f1d1d; }
+.msg-flash-success { background: #1a3b2a; color: #4ade80; border: 1px solid #166534; }
+html.light-mode .msg-flash-error   { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+html.light-mode .msg-flash-success { background: #d4edda; color: #155724; border-color: #c3e6cb; }
+
+/* ── Gestão de Usuários — contraste de tabela ── */
+html.light-mode .card table td {
+    border-bottom-color: #d0d8e4 !important;
+    color: #111111;
+}
+html.light-mode .card table th {
+    border-bottom-color: #b0bcc9 !important;
+    background: #f4f6fa;
+}
+html.light-mode .card table tbody tr:hover {
+    background: #eef2f8;
+}
+/* ── Dark mode — tabela de usuários: texto e selects forçados ── */
+.card table td {
+    border-bottom-color: #383a3d;
+    color: #e3e3e3;
+}
+/* ── Select de governança (Perfil / Status) — dark mode base ── */
+.select-gov {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    color: #e8eaed;
+    background-color: #2d2f32;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23e8eaed'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 8px 5px;
+    border: 1px solid #6a7078;
+    border-radius: 6px;
+    padding: 6px 28px 6px 10px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    outline: none;
+    cursor: pointer;
+    display: inline-block;
+}
+.select-gov option {
+    background: #2d2f32;
+    color: #e8eaed;
+}
+.select-gov:disabled { opacity: 0.5; cursor: not-allowed; }
+
+html.light-mode .select-gov {
+    color: #111111;
+    background-color: #e8ecf1;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23333333'/%3E%3C/svg%3E");
+    border-color: #9baab8;
+}
+html.light-mode .select-gov option {
+    background: #e8ecf1;
+    color: #111111;
+}
+
+/* ── Botões de Governança (Perfil/Excluir) — via CSS puro ── */
+.btn-gov-key {
+    background: none;
+    border: 1px solid var(--border-input);
+    color: var(--stat-info);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-weight: 700;
+    transition: background 0.2s;
+}
+.btn-gov-key:hover { background: var(--bg-input); }
+
+.btn-gov-excluir {
+    background: none;
+    border: 1px solid var(--border-input);
+    color: var(--stat-danger);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-weight: 700;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.btn-gov-excluir:hover {
+    background: var(--stat-danger);
+    color: #ffffff;
+    border-color: var(--stat-danger);
+}
+html.light-mode .card input,
+html.light-mode .card select,
+html.light-mode .card textarea {
+    background: var(--bg-input) !important;
+    color: var(--text-input) !important;
+    border-color: var(--border-input) !important;
+}
+html.light-mode .btn-gov-key:hover   { background: var(--bg-input); }
+html.light-mode .btn-gov-excluir:hover {
+    background: var(--stat-danger);
+    color: #ffffff;
+    border-color: var(--stat-danger);
+}
 
 /* ── chat/home.html — light mode ── */
 html.light-mode .ai-bubble  { color: #1a1a1a; }
@@ -355,4 +626,3 @@ html.light-mode .history-item.pinned-item.active        { background: #e8d5ff; b
 .text-dynamic-muted { color: #cccccc !important; }
 html.light-mode .text-dynamic { color: #000000 !important; }
 html.light-mode .text-dynamic-muted { color: #333333 !important; }
-
