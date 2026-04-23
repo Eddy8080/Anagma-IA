@@ -7,10 +7,13 @@ class ChatAiConfig(AppConfig):
     name = 'chat_ai'
 
     def ready(self):
+        import chat_ai.signals  # noqa: F401
+
         # Não carrega o modelo durante comandos de gerenciamento (migrate, shell, etc.)
         comandos_sem_modelo = {
             'migrate', 'makemigrations', 'collectstatic',
-            'shell', 'createsuperuser', 'check', 'test', 'dbshell'
+            'shell', 'createsuperuser', 'check', 'test', 'dbshell',
+            'revectorizar_biblioteca',
         }
         if len(sys.argv) > 1 and sys.argv[1] in comandos_sem_modelo:
             return

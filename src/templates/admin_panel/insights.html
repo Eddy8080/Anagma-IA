@@ -165,7 +165,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const themeBtn = document.getElementById('theme-toggle');
     if (themeBtn) {
-        themeBtn.addEventListener('click', () => {
+        themeBtn.addEventListener('change', () => {
             setTimeout(() => {
                 if (realtimeChart) realtimeChart.destroy();
                 if (weeklyChart) weeklyChart.destroy();

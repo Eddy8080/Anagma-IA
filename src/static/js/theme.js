@@ -15,8 +15,7 @@
 
         var btn = document.getElementById('theme-toggle');
         if (btn) {
-            btn.textContent = theme === 'light' ? '🌙' : '☀️';
-            btn.title = theme === 'light' ? 'Modo escuro' : 'Modo claro';
+            btn.checked = (theme === 'light');
         }
 
         var logo = document.getElementById('digiana-logo');
@@ -38,7 +37,7 @@
     document.addEventListener('DOMContentLoaded', function () {
         var btn = document.getElementById('theme-toggle');
         if (btn) {
-            btn.addEventListener('click', toggle);
+            btn.addEventListener('change', toggle);
         }
         /* Re-aplica após o DOM estar pronto para atualizar ícone e logo */
         applyTheme(getTheme());

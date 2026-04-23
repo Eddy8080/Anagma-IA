@@ -3,110 +3,120 @@
 {% block title %}Mensagens de {{ usuario.username }} — Painel Admin{% endblock %}
 
 {% block content %}
-<div class="page-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:nowrap; gap:16px;">
+<div class="page-title text-dynamic" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:nowrap; gap:16px; margin-bottom:32px;">
     <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;">
-        <a href="{% url 'admin_panel:dashboard' %}" style="text-decoration:none; color:inherit;">📊 Dashboard</a> 
+        <a href="{% url 'admin_panel:dashboard' %}" style="text-decoration:none; color:inherit;">📊 Dashboard</a>
         / <a href="{% url 'admin_panel:feedback_list' tipo=tipo %}" style="text-decoration:none; color:inherit;">{{ label }}</a>
         / {{ usuario.nome_completo|default:usuario.username }}
     </div>
-    <div style="display:flex; gap:12px; flex-shrink:0;">
-        <button type="button" class="btn btn-danger" 
-                onclick="openDeleteUserModal('{{ usuario.id }}', '{{ usuario.username|escapejs }}')" 
-                style="padding:6px 16px; font-size:0.85rem; flex-shrink:0;">
-            🗑️ Excluir Este Usuário
+    <div style="display:flex; gap:12px; flex-shrink:0; margin-right:120px;">
+        <button type="button" class="btn-gov-excluir"
+                onclick="openDeleteUserModal('{{ usuario.id }}', '{{ usuario.username|escapejs }}')"
+                style="padding:10px 24px; font-size:0.85rem; flex-shrink:0;">
+            🗑️ Excluir Usuário
         </button>
-        <a href="{% url 'admin_panel:feedback_list' tipo=tipo %}" 
-           style="background:#333537; border:1px solid #444; color:#e3e3e3; border-radius:8px; 
-                  padding:6px 16px; text-decoration:none; font-size:0.85rem; transition:background 0.2s; flex-shrink:0; white-space:nowrap;"
-           onmouseover="this.style.background='#444'" onmouseout="this.style.background='#333537'">
-            ← Voltar à Lista
+        <a href="{% url 'admin_panel:feedback_list' tipo=tipo %}" class="btn-nova-ideia"
+           style="padding:10px 24px; font-size:0.85rem; flex-shrink:0; white-space:nowrap; text-decoration:none;">
+            ← Voltar
         </a>
     </div>
 </div>
 
-<div style="display:flex; flex-direction:column; gap:20px;">
+
+<div style="display:flex; flex-direction:column; gap:32px;">
     {% for msg in mensagens %}
-    <div class="card" style="border-left: 4px solid {% if tipo == 'like' %}#4ade80{% else %}#f87171{% endif %};">
-        <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:0.85rem; color:#888;">
+    <div class="card" style="border-left: 6px solid {% if tipo == 'like' %}var(--stat-success){% else %}var(--stat-danger){% endif %}; padding:36px !important;">
+        
+        {# ── Contexto da Mensagem ── #}
+        <div style="display:flex; justify-content:space-between; margin-bottom:24px; font-size:0.85rem; color:var(--text-muted); font-weight:700; border-bottom:1px solid var(--border-input); padding-bottom:14px;">
             <span>📅 {{ msg.timestamp|date:"d/m/Y H:i" }}</span>
-            <span>Conversa: {{ msg.session.titulo }}</span>
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60%;">Conversa: {{ msg.session.titulo }}</span>
         </div>
 
-        <div style="margin-bottom:16px;">
-            <div style="color:var(--accent-color); font-weight:600; font-size:0.9rem; margin-bottom:4px;">Anagma IA respondeu:</div>
-            <div style="background:#131314; padding:12px; border-radius:10px; border:1px solid #333; color:#e3e3e3; white-space:pre-wrap;">{{ msg.content }}</div>
+        {# ── Resposta Original da IA ── #}
+        <div style="margin-bottom:32px;">
+            <div style="color:var(--accent-main); font-weight:800; font-size:1rem; margin-bottom:12px;">
+                🤖 Anagma IA respondeu:
+            </div>
+            <div class="input-moldura" style="padding:24px; border-radius:12px; background:var(--bg-input); color:var(--text-main); white-space:pre-wrap; line-height:1.75;">{{ msg.content }}</div>
         </div>
 
 {% with corr=msg.corrections.first %}
-        <div style="margin-top:20px; border-top:1px dashed #333;">
-            {# ── Cabeçalho do Acordeão ── #}
+        {# ── Seção de Curadoria (Layout Original de Edição) ── #}
+        <div style="margin-top:40px; border-top:2px dashed var(--border-input); padding-top:32px; position:relative;">
+            <div style="position:absolute; top:-12px; left:24px; background:var(--bg-card); padding:0 12px; font-size:0.75rem; font-weight:800; color:var(--text-muted); text-transform:uppercase;">
+                ✍️ Curadoria Técnica
+            </div>
+
             <div onclick="toggleAccordion('{{ msg.id }}')" 
-                 style="background:#1a1c1e; padding:12px 16px; border-radius:10px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; margin-top:16px; border:1px solid #333; transition:background 0.2s;"
-                 onmouseover="this.style.background='#25282b'" onmouseout="this.style.background='#1a1c1e'">
-                <div style="display:flex; align-items:center; gap:12px;">
-                    <span id="icon-{{ msg.id }}" style="font-size:0.8rem; color:#888;">{% if corr %}▶{% else %}▼{% endif %}</span>
-                    <span style="font-weight:600; color:#a8c7fa;">
-                        ✍️ {% if corr %}{{ corr.titulo_melhoria|default:"Curadoria Técnica (Sem Título)" }}{% else %}Nova Curadoria Técnica{% endif %}
+                 style="background:var(--bg-select); padding:16px 24px; border-radius:12px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; border:1px solid var(--border-input); margin-bottom:20px;">
+                <div style="display:flex; align-items:center; gap:16px;">
+                    <span id="icon-{{ msg.id }}" style="font-size:0.9rem; color:var(--text-muted);">{% if corr %}▶{% else %}▼{% endif %}</span>
+                    <span style="font-weight:700; color:var(--accent-main);">
+                        {% if corr %}{{ corr.titulo_melhoria|default:"Curadoria Técnica (Sem Título)" }}{% else %}Nova Curadoria Técnica{% endif %}
                     </span>
                 </div>
                 {% if corr %}
-                    <span style="font-size:0.75rem; color:#4ade80; background:#1a2e1a; padding:2px 8px; border-radius:10px;">✓ Gravado</span>
+                    <span class="badge-curadoria-gravado">✓ Gravado</span>
                 {% else %}
-                    <span style="font-size:0.75rem; color:#666;">Pendente</span>
+                    <span class="badge-curadoria-pendente" style="color:#888;">Pendente</span>
                 {% endif %}
             </div>
 
-            {# ── Conteúdo do Acordeão ── #}
-            <div id="accordion-content-{{ msg.id }}" style="display: {% if corr %}none{% else %}block{% endif %}; padding-top:16px;">
+            <div id="accordion-content-{{ msg.id }}" style="display: {% if corr %}none{% else %}block{% endif %};">
                 <form action="{% url 'admin_panel:save_correction' message_id=msg.id %}" method="post" onsubmit="prepararEnvio('{{ msg.id }}')">
                     {% csrf_token %}
-                    
-                    <div style="margin-bottom:12px;">
-                        <label style="display:block; font-size:0.8rem; color:#888; margin-bottom:6px; text-transform:uppercase;">Título da Melhoria Técnica</label>
-                        <input type="text" name="titulo_melhoria" maxlength="255" 
+
+                    {# Título #}
+                    <div style="margin-bottom:20px;">
+                        <label class="form-label" style="font-size:0.8rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Título da Melhoria</label>
+                        <input type="text" name="titulo_melhoria" maxlength="255"
                                value="{% if corr %}{{ corr.titulo_melhoria }}{% endif %}"
                                placeholder="Ex: Regra de tributação para Lucro Real"
-                               style="width:100%; background:#131314; border:1px solid #444; border-radius:8px; color:white; padding:10px 14px; outline:none;"
-                               onfocus="this.style.borderColor='#4285f4'" onblur="this.style.borderColor='#444'">
+                               class="form-input" style="font-weight:600;">
                     </div>
 
-                    <label style="display:block; font-size:0.8rem; color:#888; margin-bottom:6px; text-transform:uppercase;">Resposta Ideal (Aprendizado da IA)</label>
-                    <!-- Toolbar Editor Rico -->
-                    <div style="background:#131314; border:1px solid #444; border-bottom:none; border-radius:10px 10px 0 0; padding:8px 12px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-                        <button type="button" class="tb-btn" onclick="fmt('bold', '{{ msg.id }}')" title="Negrito"><strong>N</strong></button>
-                        <button type="button" class="tb-btn" onclick="fmt('italic', '{{ msg.id }}')" title="Itálico"><em>I</em></button>
-                        <button type="button" class="tb-btn" onclick="fmt('insertUnorderedList', '{{ msg.id }}')" title="Lista">• Lista</button>
-                        <button type="button" class="tb-btn" onclick="fmt('insertOrderedList', '{{ msg.id }}')" title="Lista Numerada">1. Lista</button>
-                        <div style="width:1px; background:#444; height:20px; margin:0 4px;"></div>
-                        <button type="button" class="tb-btn" onclick="fmt('removeFormat', '{{ msg.id }}')" style="font-size:0.7rem;">✕ Fmt</button>
+                    {# Resposta Ideal (Toolbar + Editor Original) #}
+                    <div style="margin-bottom:24px;">
+                        <label class="form-label" style="font-size:0.8rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Resposta Ideal (Aprendizado da IA)</label>
+                        
+                        {# Barra de Ferramentas - Layout Original de Ideias.html #}
+                        <div style="padding:12px 20px 0; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                            <button type="button" class="tb-btn" onclick="fmt('bold', '{{ msg.id }}')" title="Negrito"><strong>N</strong></button>
+                            <button type="button" class="tb-btn" onclick="fmt('italic', '{{ msg.id }}')" title="Itálico"><em>I</em></button>
+                            <button type="button" class="tb-btn" onclick="fmt('underline', '{{ msg.id }}')" title="Sublinhado"><u>S</u></button>
+                            <div class="tb-sep"></div>
+                            <button type="button" class="tb-btn" onclick="fmt('insertUnorderedList', '{{ msg.id }}')" title="Lista">• Lista</button>
+                            <button type="button" class="tb-btn" onclick="fmt('insertOrderedList', '{{ msg.id }}')" title="Lista Numerada">1. Lista</button>
+                            <div class="tb-sep"></div>
+                            <button type="button" class="tb-btn" onclick="fmt('removeFormat', '{{ msg.id }}')" title="Limpar Formatação">✕ Fmt</button>
+                        </div>
+
+                        {# Área do Editor com Moldura Original #}
+                        <div id="editor-{{ msg.id }}" contenteditable="true" spellcheck="true" class="input-moldura"
+                            style="margin:12px 0; padding:16px; border-radius:10px; border:1px solid var(--border-input); background: var(--bg-input); color: var(--text-main); font-size:0.95rem; line-height:1.75; min-height:180px; outline:none;">{% if corr %}{{ corr.suggested_improvement|safe }}{% endif %}</div>
                     </div>
 
-                    <div id="editor-{{ msg.id }}" contenteditable="true" spellcheck="true"
-                         style="width:100%; background:#131314; border:1px solid #444; border-radius:0 0 10px 10px; color:white; 
-                                padding:14px; font-family:inherit; font-size:1rem; outline:none; min-height:120px; line-height:1.6;"
-                         onfocus="this.style.borderColor='#4285f4'" onblur="this.style.borderColor='#444'">{% if corr %}{{ corr.suggested_improvement|safe }}{% endif %}</div>
-                    
                     <input type="hidden" name="sugestao" id="hidden-{{ msg.id }}">
-                    
-                    <div style="display:flex; align-items:center; justify-content:space-between; margin-top:20px;">
-                        <div style="font-size:0.85rem; color:#666;">
+
+                    {# Ações #}
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-top:32px; padding-top:24px; border-top:1px solid var(--border-input);">
+                        <div class="text-dynamic-muted" style="font-size:0.85rem; font-weight:700;">
                             {% if corr %}
-                                ✓ Gravada em {{ corr.curated_at|date:"d/m/Y" }}
+                                ✓ Sincronizado em {{ corr.curated_at|date:"d/m/Y" }}
                             {% else %}
-                                Aguardando curadoria...
+                                ⏳ Aguardando curadoria especializada...
                             {% endif %}
                         </div>
                         <div style="display:flex; gap:12px;">
-                            <button type="button" class="btn btn-outline" 
+                            <button type="button" class="btn-gov-excluir"
                                     onclick="openDeleteFeedbackModal('{{ msg.id }}')"
-                                    style="color:#f87171; border-color:#3b1a1a; padding:8px 20px;">
+                                    style="padding:10px 24px;">
                                 🗑️ Excluir Feedback
                             </button>
-                            
-                            <button type="submit" 
-                                    style="background:linear-gradient(to right,#4285f4,#9b72cb); color:white; border:none; border-radius:8px; 
-                                           padding:10px 24px; cursor:pointer; font-weight:600; transition:transform 0.1s;"
-                                    onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+
+                            <button type="submit" class="btn-primary-action"
+                                    style="padding:12px 32px; font-weight:700;">
                                 Gravar Melhoria Técnica
                             </button>
                         </div>
@@ -117,62 +127,99 @@
         {% endwith %}
     </div>
     {% empty %}
-    <p style="text-align:center; color:#555; padding:40px;">Nenhuma mensagem encontrada para este usuário.</p>
+    <div class="card" style="text-align:center; padding:80px;">
+        <p class="text-dynamic-muted" style="font-weight:800; font-size:1.2rem;">Nenhuma mensagem encontrada para este usuário.</p>
+    </div>
     {% endfor %}
 </div>
 
-{# ── Modal de Exclusão de Usuário ── #}
-<div id="delete-user-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
-                               background:rgba(0,0,0,0.8); z-index:10000; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
-    <div style="background:#1e1f20; border:1px solid #3c4043; border-radius:16px; padding:32px; width:90%; max-width:420px; text-align:center;">
-        <div style="font-size:2.5rem; margin-bottom:16px;">⚠️</div>
-        <h3 style="margin:0 0 12px; color:#e3e3e3; font-weight:500;">Excluir usuário <span id="del-username" style="color:var(--accent-color);"></span>?</h3>
-        <p style="color:#999; font-size:0.9rem; line-height:1.5; margin-bottom:24px;">Esta ação removerá o acesso do usuário ao sistema.</p>
-        
+{# ── Modais ── #}
+<div id="delete-user-modal" class="modal-overlay">
+    <div class="card-modal card-modal-md">
+        <div class="modal-icon">⚠️</div>
+        <h3 class="modal-title text-dynamic">Excluir usuário <span id="del-username" class="modal-username-hl"></span>?</h3>
+        <p class="modal-desc text-dynamic-muted">Esta ação removerá o acesso do usuário ao sistema.</p>
+
         <form id="delete-form-real" method="post" action="" style="margin:0;">
             {% csrf_token %}
             <div style="display:flex; flex-direction:column; gap:12px;">
-                <button type="submit" name="modo" value="keep" class="btn btn-outline" style="text-align:left; padding:12px; display:flex; align-items:center; gap:12px;">
-                    <span>🧠</span> <div><strong>Preservar Histórico</strong><br><small>Mantém os dados para a IA.</small></div>
+                <button type="submit" name="modo" value="keep" class="modal-radio-group">
+                    <span style="font-size:1.8rem;">🧠</span> 
+                    <div>
+                        <div class="text-dynamic" style="font-weight:700;">Preservar Histórico</div>
+                        <div class="text-dynamic-muted" style="font-size:0.8rem;">Mantém os dados para o aprendizado da IA.</div>
+                    </div>
                 </button>
-                <button type="submit" name="modo" value="purge" class="btn btn-danger" style="text-align:left; padding:12px; display:flex; align-items:center; gap:12px; border:none;">
-                    <span>🔥</span> <div><strong>Purga Total</strong><br><small>Elimina tudo permanentemente.</small></div>
+                <button type="submit" name="modo" value="purge" class="btn-danger-action" style="text-align:left; padding:16px; display:flex; align-items:center; gap:16px; border-radius:10px;">
+                    <span style="font-size:1.8rem;">🔥</span> 
+                    <div>
+                        <div style="font-weight:700;">Purga Total</div>
+                        <div style="font-size:0.8rem; opacity:0.9;">Elimina tudo permanentemente.</div>
+                    </div>
                 </button>
             </div>
-            <button type="button" onclick="closeDeleteUserModal()" style="margin-top:20px; background:none; border:none; color:#666; cursor:pointer;">Cancelar</button>
+            <button type="button" onclick="closeDeleteUserModal()" class="btn-modal-secondary" style="margin-top:24px; border:none; background:none !important; font-weight:700;">Cancelar</button>
         </form>
     </div>
 </div>
 
-{# ── Modal de Exclusão de Feedback ── #}
-<div id="delete-feedback-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
-                                   background:rgba(0,0,0,0.8); z-index:10000; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
-    <div style="background:#1e1f20; border:1px solid #3c4043; border-radius:16px; padding:32px; width:90%; max-width:380px; text-align:center;">
-        <div style="font-size:2.5rem; margin-bottom:16px;">🗑️</div>
-        <h3 style="margin:0 0 12px; color:#e3e3e3; font-weight:500;">Remover este feedback?</h3>
-        <p style="color:#999; font-size:0.9rem; line-height:1.5; margin-bottom:24px;">A mensagem permanecerá no histórico do usuário, mas sairá da fila de curadoria.</p>
-        <div style="display:flex; gap:12px; justify-content:center;">
-            <button onclick="closeDeleteFeedbackModal()" style="background:#333537; color:#e3e3e3; border:1px solid #444; border-radius:10px; padding:10px 24px; cursor:pointer;">Não</button>
+<div id="delete-feedback-modal" class="modal-overlay">
+    <div class="card-modal card-modal-sm">
+        <div class="modal-icon">🗑️</div>
+        <h3 class="modal-title text-dynamic">Remover este feedback?</h3>
+        <p class="modal-desc text-dynamic-muted">A mensagem sairá da fila de curadoria.</p>
+        <div class="modal-actions">
+            <button onclick="closeDeleteFeedbackModal()" class="btn-modal-secondary">Não</button>
             <form id="delete-feedback-form-real" method="post" action="" style="margin:0;">
                 {% csrf_token %}
-                <button type="submit" style="background:#d93025; color:white; border:none; border-radius:10px; padding:10px 24px; cursor:pointer; font-weight:600;">Sim, excluir</button>
+                <button type="submit" class="btn-danger-action">Sim, excluir</button>
             </form>
         </div>
     </div>
 </div>
 
 <style>
+/* --- Estilo dos Botões da Toolbar Original --- */
 .tb-btn {
-    background: #2a2b2e;
-    border: 1px solid #444;
-    color: #e3e3e3;
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    color: var(--text-main);
     border-radius: 6px;
-    padding: 4px 10px;
-    font-size: 0.85rem;
+    padding: 6px 12px;
+    font-size: 0.82rem;
     cursor: pointer;
     transition: all 0.2s;
+    min-width: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
-.tb-btn:hover { background: #3c4043; border-color: #555; }
+.tb-btn:hover { background: var(--border-card); border-color: var(--accent-main); color: var(--accent-main); }
+.tb-sep { width: 1px; background: var(--border-input); margin: 0 6px; align-self: stretch; height: 24px; }
+
+/* --- Molduras Originais (Fidelidade Máxima) --- */
+.input-moldura {
+    border: 1px solid rgba(168, 199, 250, 0.2) !important;
+    box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.5);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.input-moldura:focus {
+    border-color: var(--accent-main) !important;
+    box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--accent-main);
+}
+
+/* Ajustes Modo Light Original */
+html.light-mode .input-moldura {
+    background: #ffffff !important;
+    border: 1px solid rgba(26, 115, 232, 0.2) !important;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.05);
+    color: #1a1a1a !important;
+}
+html.light-mode .input-moldura:focus {
+    border-color: var(--accent-main) !important;
+}
+html.light-mode .tb-btn { background: #f8fafc; border-color: #cbd5e1; color: #334155; }
+html.light-mode .tb-btn:hover { background: #e2e8f0; border-color: var(--accent-main); }
 </style>
 
 <script>
@@ -180,42 +227,35 @@ function toggleAccordion(msgId) {
     const content = document.getElementById('accordion-content-' + msgId);
     const icon = document.getElementById('icon-' + msgId);
     const isHidden = content.style.display === 'none';
-    
     content.style.display = isHidden ? 'block' : 'none';
     icon.textContent = isHidden ? '▼' : '▶';
 }
-
 function fmt(cmd, msgId) {
     document.getElementById('editor-' + msgId).focus();
     document.execCommand(cmd, false, null);
 }
-
 function prepararEnvio(msgId) {
     const editor = document.getElementById('editor-' + msgId);
     document.getElementById('hidden-' + msgId).value = editor.innerHTML.trim();
 }
-
 function openDeleteUserModal(userId, username) {
     const modal = document.getElementById('delete-user-modal');
     const form = document.getElementById('delete-form-real');
     document.getElementById('del-username').textContent = username;
     form.action = `/admin-panel/usuarios/${userId}/deletar/`;
-    modal.style.display = 'flex';
+    modal.classList.add('is-open');
 }
-
 function closeDeleteUserModal() {
-    document.getElementById('delete-user-modal').style.display = 'none';
+    document.getElementById('delete-user-modal').classList.remove('is-open');
 }
-
 function openDeleteFeedbackModal(msgId) {
     const modal = document.getElementById('delete-feedback-modal');
     const form = document.getElementById('delete-feedback-form-real');
     form.action = `/admin-panel/feedback/message/${msgId}/delete/`;
-    modal.style.display = 'flex';
+    modal.classList.add('is-open');
 }
-
 function closeDeleteFeedbackModal() {
-    document.getElementById('delete-feedback-modal').style.display = 'none';
+    document.getElementById('delete-feedback-modal').classList.remove('is-open');
 }
 </script>
 {% endblock %}

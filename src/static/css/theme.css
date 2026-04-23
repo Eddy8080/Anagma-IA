@@ -1,4 +1,4 @@
-/* ── Variáveis de Tema (Global) ── */
+﻿/* â”€â”€ VariÃ¡veis de Tema (Global) â”€â”€ */
 :root {
     --bg-card: #1e1f20;
     --bg-input: #131314;
@@ -54,7 +54,7 @@ html.light-mode {
     --success:   #137333;
 }
 
-/* ── Classes de Formulário e Cards Adaptativos ── */
+/* â”€â”€ Classes de FormulÃ¡rio e Cards Adaptativos â”€â”€ */
 .form-card {
     background-color: var(--bg-card);
     border: 1px solid var(--border-card);
@@ -85,7 +85,7 @@ html.light-mode {
     font-weight: 500;
 }
 
-/* Aplicação das Variáveis de Texto e Fundo */
+/* AplicaÃ§Ã£o das VariÃ¡veis de Texto e Fundo */
 select, input, textarea, option {
     color: var(--text-input) !important;
     background: var(--bg-input);
@@ -153,7 +153,7 @@ select, input, textarea, option {
     background: var(--border-card);
 }
 
-/* ── Botões da sidebar inferior ── */
+/* â”€â”€ BotÃµes da sidebar inferior â”€â”€ */
 .btn-nova-ideia {
     display: block;
     background: #333537;
@@ -196,29 +196,79 @@ html.light-mode .btn-painel-admin {
 }
 html.light-mode .btn-painel-admin:hover { background: #d4e4fd; border-color: #a0c0f0; }
 
-/* ── Botão de alternância de tema ── */
-#theme-toggle {
+/* ── Toggle de tema — Lâmpada SVG ── */
+.theme-switch-label {
     position: fixed;
-    top: 1rem;
-    right: 1rem;
+    top: 0.4rem;
+    right: 2.2rem;
     z-index: 9999;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #e3e3e3;
-    border-radius: 20px;
-    padding: 6px 14px;
     cursor: pointer;
-    font-size: 1rem;
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
-    transition: background 0.2s, color 0.2s, border-color 0.2s;
-    line-height: 1.4;
+    width: 64px;
+    height: 73px;
+    display: block;
+    -webkit-tap-highlight-color: transparent;
 }
-#theme-toggle:hover {
-    background: rgba(255, 255, 255, 0.2);
+.theme-toggle-input { display: none; }
+
+/* Cordinha: translateY não depende de transform-origin, mas fill-box garante escalonamento correto */
+.cord {
+    transform-box: fill-box;
+    transform-origin: 50% 0%;
+    transition: transform 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+.theme-switch-label:hover .cord  { transform: translateY(8px); }
+.theme-switch-label:active .cord { transform: translateY(18px); }
+
+/* Vidro — apagado (dark) */
+.bulb-glass {
+    fill: #fcf4a3;
+    stroke: #f39c12;
+    transition: fill 0.4s ease, stroke 0.4s ease;
+}
+/* Vidro — aceso (light) */
+.theme-toggle-input:checked ~ svg .bulb-glass {
+    fill: #ffeb3b;
+    stroke: #f1c40f;
 }
 
-/* ── Logo Digiana — tipografia inline (chat e loading) ── */
+/* Aura — apagada */
+.bulb-aura {
+    transform-box: fill-box;
+    transform-origin: 50% 50%;
+    opacity: 0;
+    transform: scale(0.9);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+}
+/* Aura — acesa */
+.theme-toggle-input:checked ~ svg .bulb-aura {
+    opacity: 0.6;
+    transform: scale(1.1);
+}
+
+/* Braço — nasce do corpo da lâmpada, pivota no ombro (140,138) do viewBox 220x250 */
+.bulb-arm {
+    transform-box: view-box;
+    transform-origin: 63.6% 55.2%;
+    transform: rotate(85deg);
+    opacity: 0;
+    transition: transform 0.4s cubic-bezier(0.4, 0.0, 0.2, 1), opacity 0.35s ease;
+}
+/* Checked: braço some suavemente (missão cumprida) */
+.theme-toggle-input:checked ~ svg .bulb-arm {
+    opacity: 0;
+    transform: rotate(85deg);
+}
+/* Hover: levanta em direção ao puxador — svg iguala especificidade com :checked e cascade vence */
+.theme-switch-label:hover svg .bulb-arm {
+    transform: rotate(-15deg);
+    opacity: 1;
+}
+/* Active: puxa a cordinha para baixo */
+.theme-switch-label:active svg .bulb-arm {
+    transform: rotate(10deg);
+}
+
+/* â”€â”€ Logo Digiana â€” tipografia inline (chat e loading) â”€â”€ */
 .logo-digiana {
     font-family: 'Poppins', 'Montserrat', 'Segoe UI', sans-serif;
     font-size: 1rem;
@@ -246,7 +296,7 @@ html.light-mode .logo-digiana {
     transition: text-shadow 0.3s ease-in-out;
 }
 
-/* ── Logo Digiana (tela de login) ── */
+/* â”€â”€ Logo Digiana (tela de login) â”€â”€ */
 #digiana-logo {
     display: block;
     width: 100%;
@@ -256,11 +306,11 @@ html.light-mode .logo-digiana {
     object-fit: contain;
 }
 
-/* ════════════════════════════════════════
-   LIGHT MODE — variáveis e overrides
-   ════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   LIGHT MODE â€” variÃ¡veis e overrides
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-/* Botão em modo claro */
+/* BotÃ£o em modo claro */
 html.light-mode #theme-toggle {
     background: rgba(0, 0, 0, 0.07);
     border-color: rgba(0, 0, 0, 0.15);
@@ -270,7 +320,7 @@ html.light-mode #theme-toggle:hover {
     background: rgba(0, 0, 0, 0.13);
 }
 
-/* ── base.html ── */
+/* â”€â”€ base.html â”€â”€ */
 html.light-mode .sidebar {
     border-right-color: #e0e0e0;
 }
@@ -302,7 +352,7 @@ html.light-mode .prompt-input::placeholder { color: #bbb; }
 html.light-mode .icon-btn { color: var(--accent-color); }
 html.light-mode .icon-btn:hover { background: rgba(26, 115, 232, 0.09); }
 
-/* ── login.html — card e inputs inline ── */
+/* â”€â”€ login.html â€” card e inputs inline â”€â”€ */
 html.light-mode .greeting-container > div {
     background-color: transparent !important;
     box-shadow: none !important;
@@ -317,7 +367,7 @@ html.light-mode input[type="password"] {
 }
 html.light-mode label { color: #555 !important; }
 
-/* ── base_admin.html ── */
+/* â”€â”€ base_admin.html â”€â”€ */
 html.light-mode .sidebar a { color: var(--text); }
 html.light-mode .sidebar a:hover,
 html.light-mode .sidebar a.active { background: #f0f0f0; }
@@ -340,15 +390,15 @@ html.light-mode select {
     border-color: var(--border-input) !important;
 }
 
-/* ══════════════════════════════════════
-   usuarios.html — classes de componentes
-   ══════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   usuarios.html â€” classes de componentes
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-/* Cabeçalho da página */
+/* CabeÃ§alho da pÃ¡gina */
 .usuarios-header { display: flex; align-items: center; justify-content: flex-start; gap: 32px; margin-bottom: 24px; }
 .usuarios-title  { margin: 0; }
 
-/* Botão Novo Usuário */
+/* BotÃ£o Novo UsuÃ¡rio */
 .btn-novo-usuario {
     background: #a8c7fa; color: #131314; border: none;
     border-radius: 10px; padding: 9px 20px;
@@ -356,7 +406,7 @@ html.light-mode select {
 }
 .btn-novo-usuario:hover { opacity: 0.9; }
 
-/* Formulário de criação */
+/* FormulÃ¡rio de criaÃ§Ã£o */
 .create-form-wrapper { display: none; margin-bottom: 24px; }
 .card-padded         { padding: 24px; }
 .form-section-title  { font-weight: 600; margin-bottom: 16px; }
@@ -364,7 +414,7 @@ html.light-mode select {
 .form-field-label    { display: block; font-size: 0.8rem; margin-bottom: 4px; font-weight: 600; }
 .form-actions-right  { display: flex; justify-content: flex-end; gap: 10px; }
 
-/* Input padrão dos formulários de usuário */
+/* Input padrÃ£o dos formulÃ¡rios de usuÃ¡rio */
 .usuarios-input {
     width: 100%; box-sizing: border-box;
     background: var(--bg-input); border: 1px solid var(--border-input);
@@ -374,12 +424,12 @@ html.light-mode select {
 }
 .usuarios-input:focus { border-color: var(--accent-main); }
 
-/* Larguras dos selects de governança na tabela */
+/* Larguras dos selects de governanÃ§a na tabela */
 .select-gov-full   { width: 100%; }
 .select-gov-perfil { width: 135px; }
 .select-gov-status { width: 115px; }
 
-/* Botão primário (azul) */
+/* BotÃ£o primÃ¡rio (azul) */
 .btn-primary-action {
     background: #a8c7fa; color: #131314; border: none;
     border-radius: 10px; padding: 9px 20px;
@@ -388,7 +438,7 @@ html.light-mode select {
 .btn-primary-action:hover { opacity: 0.9; }
 .btn-primary-action--md  { padding: 10px 24px; }
 
-/* Botão de cancelar nos modais */
+/* BotÃ£o de cancelar nos modais */
 .btn-modal-secondary {
     background: var(--bg-input); color: var(--text-input);
     border: 1px solid var(--border-input);
@@ -398,7 +448,7 @@ html.light-mode select {
 .btn-modal-secondary--md { border-radius: 10px; padding: 10px 24px; }
 .btn-modal-secondary--sm { border-radius: 8px; }
 
-/* Botão de exclusão (vermelho) */
+/* BotÃ£o de exclusÃ£o (vermelho) */
 .btn-danger-action {
     background: var(--stat-danger); color: white; border: none;
     border-radius: 10px; padding: 10px 24px;
@@ -416,7 +466,7 @@ html.light-mode select {
 .self-label      { font-size: 0.9rem; font-weight: 700; font-style: italic; }
 .td-empty        { text-align: center; color: #888; padding: 32px; }
 
-/* Formulário — largura garantida cross-browser */
+/* FormulÃ¡rio â€” largura garantida cross-browser */
 .create-form-wrapper { width: 100%; }
 .card-padded { width: 100%; box-sizing: border-box; }
 .form-grid-2col { width: 100%; }
@@ -466,13 +516,13 @@ html.light-mode select {
     background: none; border: none; color: #666; cursor: pointer; font-size: 1.2rem;
 }
 
-/* Light mode — overrides dos novos componentes */
+/* Light mode â€” overrides dos novos componentes */
 html.light-mode .btn-modal-secondary { background: #f0f0f0 !important; color: #1a1a1a !important; border-color: #dcdcdc !important; }
 html.light-mode .usuarios-input      { background: var(--bg-input); border-color: var(--border-input); color: var(--text-input); }
 html.light-mode .modal-input-lg      { background: var(--bg-input); border-color: var(--border-input); color: var(--text-input); }
 html.light-mode .card-modal          { background: var(--bg-card) !important; border-color: var(--border-card) !important; }
 html.light-mode .modal-overlay       { background: rgba(255,255,255,0.8) !important; }
-/* Modal radio group — base dark + light override */
+/* Modal radio group â€” base dark + light override */
 .modal-radio-group {
     display: flex; align-items: center; gap: 12px;
     background: var(--bg-input); padding: 12px;
@@ -481,7 +531,7 @@ html.light-mode .modal-overlay       { background: rgba(255,255,255,0.8) !import
 }
 html.light-mode .modal-radio-group { background: #f8f9fa !important; border-color: #e0e0e0 !important; }
 
-/* ── Flash messages (usuarios.html) ── */
+/* â”€â”€ Flash messages (usuarios.html) â”€â”€ */
 @keyframes flash-slide-out {
     0%   { opacity: 1; transform: translateY(0);    max-height: 60px; margin-bottom: 16px; }
     70%  { opacity: 1; transform: translateY(0);    max-height: 60px; margin-bottom: 16px; }
@@ -501,7 +551,7 @@ html.light-mode .modal-radio-group { background: #f8f9fa !important; border-colo
 html.light-mode .msg-flash-error   { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
 html.light-mode .msg-flash-success { background: #d4edda; color: #155724; border-color: #c3e6cb; }
 
-/* ── Gestão de Usuários — contraste de tabela ── */
+/* â”€â”€ GestÃ£o de UsuÃ¡rios â€” contraste de tabela â”€â”€ */
 html.light-mode .card table td {
     border-bottom-color: #d0d8e4 !important;
     color: #111111;
@@ -513,12 +563,12 @@ html.light-mode .card table th {
 html.light-mode .card table tbody tr:hover {
     background: #eef2f8;
 }
-/* ── Dark mode — tabela de usuários: texto e selects forçados ── */
+/* â”€â”€ Dark mode â€” tabela de usuÃ¡rios: texto e selects forÃ§ados â”€â”€ */
 .card table td {
     border-bottom-color: #383a3d;
     color: #e3e3e3;
 }
-/* ── Select de governança (Perfil / Status) — dark mode base ── */
+/* â”€â”€ Select de governanÃ§a (Perfil / Status) â€” dark mode base â”€â”€ */
 .select-gov {
     -webkit-appearance: none;
     -moz-appearance: none;
@@ -555,7 +605,7 @@ html.light-mode .select-gov option {
     color: #111111;
 }
 
-/* ── Botões de Governança (Perfil/Excluir) — via CSS puro ── */
+/* â”€â”€ BotÃµes de GovernanÃ§a (Perfil/Excluir) â€” via CSS puro â”€â”€ */
 .btn-gov-key {
     background: none;
     border: 1px solid var(--border-input);
@@ -599,7 +649,7 @@ html.light-mode .btn-gov-excluir:hover {
     border-color: var(--stat-danger);
 }
 
-/* ── chat/home.html — light mode ── */
+/* â”€â”€ chat/home.html â€” light mode â”€â”€ */
 html.light-mode .ai-bubble  { color: #1a1a1a; }
 html.light-mode .user-bubble { background: #e8f0fe; color: #1a1a1a; }
 
@@ -621,8 +671,216 @@ html.light-mode .history-item.pinned-item               { background: #f3eeff; b
 html.light-mode .history-item.pinned-item:hover         { background: #ede0ff; border-color: #b89ee0; }
 html.light-mode .history-item.pinned-item.active        { background: #e8d5ff; border-color: #9b72cb; border-left: 3px solid #9b72cb; }
 
-/* ── Utilitários de Texto Dinâmico (Admin) ── */
+/* â”€â”€ UtilitÃ¡rios de Texto DinÃ¢mico (Admin) â”€â”€ */
 .text-dynamic { color: #ffffff !important; }
 .text-dynamic-muted { color: #cccccc !important; }
 html.light-mode .text-dynamic { color: #000000 !important; }
 html.light-mode .text-dynamic-muted { color: #333333 !important; }
+
+/* â”€â”€ Interface de Curadoria TÃ©cnica (RestauraÃ§Ã£o Alta Fidelidade SeÃ§Ã£o 15.1) â”€â”€ */
+.curadoria-msg-box {
+    background: var(--bg-input);
+    padding: 24px;
+    border-radius: 16px;
+    border: 1px solid var(--border-input);
+    color: var(--text-input) !important;
+    white-space: pre-wrap;
+    line-height: 1.7;
+    font-size: 1rem;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);
+}
+
+.curadoria-accordion-header {
+    background: var(--bg-select);
+    padding: 18px 24px;
+    border-radius: 16px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 24px;
+    border: 1px solid var(--border-input);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+.curadoria-accordion-header:hover {
+    background: var(--border-card);
+    border-color: var(--accent-main);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+}
+
+.curadoria-label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+
+.curadoria-input-title {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    border-radius: 12px;
+    color: var(--text-input) !important;
+    padding: 16px 20px;
+    outline: none;
+    font-weight: 600;
+    font-size: 1.1rem;
+    transition: all 0.2s;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+.curadoria-input-title:focus {
+    border-color: #4285f4;
+    background: var(--bg-card);
+    box-shadow: 0 0 0 4px rgba(66, 133, 244, 0.2);
+}
+
+/* Toolbar e Editor (Bloco SÃ³lido Integrado) */
+.curadoria-toolbar {
+    background: var(--bg-select);
+    border: 1px solid var(--border-input);
+    border-bottom: none;
+    border-radius: 16px 16px 0 0;
+    padding: 12px 20px;
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 12px !important;
+    align-items: center;
+}
+
+.curadoria-editor {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    border-radius: 0 0 16px 16px;
+    color: var(--text-input) !important;
+    padding: 24px;
+    font-family: inherit;
+    font-size: 1.05rem;
+    outline: none;
+    min-height: 200px;
+    line-height: 1.8;
+    transition: all 0.2s;
+}
+.curadoria-editor:focus {
+    border-color: #4285f4;
+    background: var(--bg-card);
+}
+
+/* â”€â”€ Barra de Ferramentas de FormataÃ§Ã£o (DNA Original Digiana) â”€â”€ */
+.curadoria-toolbar {
+    background: #131314 !important; /* Fundo Negro TÃ©cnico */
+    border: 1px solid #333 !important;
+    border-bottom: none !important;
+    border-radius: 12px 12px 0 0 !important;
+    padding: 8px 16px !important;
+    display: flex !important;
+    gap: 4px !important;
+    align-items: center !important;
+    min-height: 48px !important;
+}
+
+.tb-btn {
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    color: #e3e3e3 !important;
+    border-radius: 6px !important;
+    padding: 6px 12px !important;
+    font-size: 0.9rem !important;
+    cursor: pointer !important;
+    font-weight: 600 !important;
+    transition: all 0.15s ease !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 34px !important;
+}
+
+.tb-btn:hover { 
+    background: #2a2b2e !important;
+    border-color: #444 !important;
+    color: #4285f4 !important;
+}
+
+.tb-btn strong { font-size: 1.1rem; }
+.tb-btn em { font-family: serif; font-size: 1.1rem; }
+
+/* Separador TÃ©cnico na Barra */
+.tb-separator {
+    width: 1px !important;
+    background: #333 !important;
+    height: 24px !important;
+    margin: 0 8px !important;
+}
+
+/* Light Mode â€” Barra de Comando Adaptada */
+html.light-mode .curadoria-toolbar {
+    background: #e2e8f0 !important;
+    border-color: #cbd5e1 !important;
+}
+
+html.light-mode .tb-btn {
+    color: #334155 !important;
+}
+
+html.light-mode .tb-btn:hover {
+    background: #cbd5e1 !important;
+    border-color: #94a3b8 !important;
+    color: #1a73e8 !important;
+}
+
+html.light-mode .tb-separator {
+    background: #94a3b8 !important;
+}
+
+/* Light Mode Overrides (Conforme SeÃ§Ã£o 15.1) */
+html.light-mode .curadoria-accordion-header {
+    background: #ffffff;
+    border-color: #c8d0da;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08); /* Sombra de elevaÃ§Ã£o suave */
+}
+html.light-mode .curadoria-accordion-header:hover {
+    background: #f8fafc;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+}
+
+html.light-mode .curadoria-toolbar {
+    background: #f8fafc;
+    border-color: #c8d0da;
+}
+html.light-mode .curadoria-editor {
+    border-color: #c8d0da;
+}
+html.light-mode .tb-btn {
+    background: #ffffff;
+    border-color: #9baab8;
+    color: #1a1a1a;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+html.light-mode .tb-btn:hover {
+    background: #1a73e8;
+    color: #ffffff;
+}
+
+
+
+/* ── Dashboard — Cards de Curtidas / Não Curtidas (Fidelidade Original) ── */
+#stat-likes, .stat-like-value { 
+    color: #4ade80 !important; 
+    text-shadow: 0 0 10px rgba(74, 222, 128, 0.3) !important;
+}
+#stat-dislikes, .stat-dislike-value { 
+    color: #f87171 !important; 
+    text-shadow: 0 0 10px rgba(248, 113, 113, 0.3) !important;
+}
+
+.card-stat-like:hover { border-color: #4ade80 !important; }
+.card-stat-dislike:hover { border-color: #f87171 !important; }
+
+html.light-mode #stat-likes, html.light-mode .stat-like-value { color: #166534 !important; text-shadow: none !important; }
+html.light-mode #stat-dislikes, html.light-mode .stat-dislike-value { color: #b91c1c !important; text-shadow: none !important; }
+

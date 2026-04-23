@@ -195,6 +195,27 @@ class AnagmaLLMEngine:
             cache.set('perfil_anagma', perfil, timeout=300)
         return perfil
 
+    def _extrair_contexto_institucional(self, perfil_texto):
+        """
+        Extrai o bloco narrativo/institucional do perfil cultural para enriquecer
+        respostas de identidade nos interceptores. Suporta diferentes nomes de seção.
+        Retorna string vazia se não encontrar.
+        """
+        if not perfil_texto:
+            return ''
+        import re
+        padrao = re.search(
+            r'(?:\d+\.\s*)?(?:CONTEXTO\s+INSTITUCIONAL|FUNDAÇÃO|HISTÓRIA|SOBRE\s+NÓS|ORIGEM)[^\n]*\n(.*)',
+            perfil_texto,
+            re.IGNORECASE | re.DOTALL
+        )
+        if not padrao:
+            return ''
+        trecho = padrao.group(1).strip()
+        # Remove linhas que parecem início de outra seção numerada
+        trecho = re.sub(r'\n\d+\.\s+[A-ZÁÉÍÓÚÀÃÕÂÊÎÔÛÇ]+[:\s]', '', trecho).strip()
+        return trecho[:500]
+
     def _e_saudacao(self, texto):
         return texto.strip().lower().rstrip('!.,') in SAUDACOES
 
@@ -236,61 +257,110 @@ class AnagmaLLMEngine:
         if not self.pronto:
             return 'Desculpe, o motor de IA não está disponível. Verifique os logs do servidor.'
 
+        import random
+
+        # Contexto base computado uma vez — usado por todos os interceptores e pelo sistema
+        is_first_message = not bool(chat_history)
+        nome = user_name or 'usuário'
+        primeiro_nome = nome.split()[0] if nome else nome
+        cumprimento = saudacao or 'Boa tarde'
+
+        # Perfil carregado cedo (cache < 1ms) para estar disponível nos interceptores
+        perfil_anagma = self._get_perfil_anagma()
+
         # Intercepta saudações simples — o modelo pequeno não segue instruções sobre isso
         if self._e_saudacao(user_query):
-            import random
-            nome = user_name or 'usuário'
-            primeiro_nome = nome.split()[0] if nome else nome
-            cumprimento = saudacao or 'Boa tarde'
-            texto_limpo = user_query.strip().lower().rstrip('!.,')
-            _informais = {'oi', 'olá', 'ola', 'hello', 'hi', 'hey', 'oi!', 'olá!'}
-            informal = texto_limpo in _informais
-            if informal:
-                opcoes = [
-                    f"Oi, {primeiro_nome}! Tudo bem? Como posso ajudar hoje?",
-                    f"Olá, {primeiro_nome}! Pode perguntar, estou aqui para ajudar.",
-                    f"Oi! Por aqui tudo certo, {primeiro_nome}. O que você precisa?",
-                ]
+            if is_first_message:
+                texto_limpo = user_query.strip().lower().rstrip('!.,')
+                _informais = {'oi', 'olá', 'ola', 'hello', 'hi', 'hey', 'oi!', 'olá!'}
+                if texto_limpo in _informais:
+                    opcoes = [
+                        f"Oi, {primeiro_nome}! Tudo bem? Como posso ajudar hoje?",
+                        f"Olá, {primeiro_nome}! Pode perguntar, estou aqui para ajudar.",
+                        f"Oi! Por aqui tudo certo, {primeiro_nome}. O que você precisa?",
+                    ]
+                else:
+                    opcoes = [
+                        f"{cumprimento}, {primeiro_nome}! Como posso ajudar você hoje?",
+                        f"{cumprimento}, {primeiro_nome}! Pronta para ajudar. O que precisa?",
+                        f"{cumprimento}, {primeiro_nome}! Em que posso ser útil?",
+                    ]
             else:
+                # Conversa em andamento — resposta curta e natural
                 opcoes = [
-                    f"{cumprimento}, {primeiro_nome}! Como posso ajudar você hoje?",
-                    f"{cumprimento}, {primeiro_nome}! Pronta para ajudar. O que precisa?",
-                    f"{cumprimento}, {primeiro_nome}! Em que posso ser útil?",
+                    f"Aqui estou! Tem mais alguma dúvida sobre contabilidade, {primeiro_nome}?",
+                    f"Pode perguntar! O que mais precisa resolver?",
+                    f"Em que mais posso ajudar, {primeiro_nome}?",
                 ]
             return random.choice(opcoes)
 
-        # Intercepta perguntas sobre a própria IA — o modelo pequeno tende a virar "manual"
+        # Intercepta perguntas sobre a própria IA e suas fontes de conhecimento
         if self._e_pergunta_sobre_ia(user_query):
-            import random
-            primeiro_nome = (user_name or 'usuário').split()[0]
-            opcoes = [
-                (
-                    f"Sou a **Digiana IA**, sua assistente de contabilidade e tributos brasileiros, {primeiro_nome}! "
-                    f"Você pode me perguntar sobre IRPJ, CSLL, Simples Nacional, folha de pagamento, notas fiscais, "
-                    f"SPED, eSocial — qualquer coisa da área contábil e fiscal. "
-                    f"Também recebo documentos em PDF ou imagem direto no chat para analisar na hora. "
-                    f"O que você quer resolver hoje?"
-                ),
-                (
-                    f"Olha, {primeiro_nome}, sou especialista em contabilidade e tributação brasileira. "
-                    f"Tiro dúvidas sobre impostos, regimes tributários, obrigações acessórias, folha de pagamento e muito mais. "
-                    f"Se tiver um documento para analisar, é só anexar aqui no chat — leio PDF e imagem. "
-                    f"Por onde quer começar?"
-                ),
-                (
-                    f"Sou a Digiana! Funciono como um especialista contábil disponível aqui no sistema, {primeiro_nome}. "
-                    f"Pode me mandar perguntas sobre tributos, escrituração, IRRF, CSLL, ICMS, ISS, folha — tudo da área. "
-                    f"Também analiso documentos que você anexar. "
-                    f"Tem alguma dúvida específica?"
-                ),
-            ]
+            # Contexto institucional do perfil cultural (quem somos, origem, propósito)
+            contexto_inst = self._extrair_contexto_institucional(perfil_anagma)
+            nota_perfil = f"\n\n{contexto_inst}\n" if contexto_inst else '\n'
+
+            base_conhecimento = (
+                f"\nMinhas respostas são baseadas no conhecimento interno da **Anagma**:\n"
+                f"- **Documentos da empresa** — PDFs e arquivos enviados e aprovados pela equipe.\n"
+                f"- **Banco de Ideias** — orientações e boas práticas registradas pelos colaboradores.\n"
+                f"- **Aprendizado contínuo** — cada correção feita pelos responsáveis melhora minhas respostas futuras.\n\n"
+                f"Quanto mais a equipe registra, mais precisa fico. É só perguntar!"
+            )
+
+            if is_first_message:
+                opcoes = [
+                    (
+                        f"Sou a **Digiana**, assistente de contabilidade e tributos da **Anagma**, {primeiro_nome}!"
+                        f"{nota_perfil}"
+                        f"Posso ajudar com impostos, folha de pagamento, notas fiscais, obrigações da empresa e muito mais. "
+                        f"Se quiser, também posso analisar um documento — é só anexar aqui no chat."
+                        f"{base_conhecimento}"
+                        f"O que você quer resolver hoje?"
+                    ),
+                    (
+                        f"{cumprimento}, {primeiro_nome}! Sou a Digiana, especialista em contabilidade aqui na Anagma."
+                        f"{nota_perfil}"
+                        f"Tire dúvidas sobre impostos, regimes de tributação, folha de pagamento, escrituração e documentos fiscais. "
+                        f"Pode me enviar PDFs e imagens direto no chat para eu analisar."
+                        f"{base_conhecimento}"
+                        f"Por onde quer começar?"
+                    ),
+                    (
+                        f"Aqui é a **Digiana**, {primeiro_nome}! Sou a assistente contábil da Anagma."
+                        f"{nota_perfil}"
+                        f"Minhas respostas vêm do conhecimento interno da equipe — não faço buscas genéricas na internet. "
+                        f"Trabalho com o que a própria Anagma registrou: documentos, orientações e experiência acumulada."
+                        f"{base_conhecimento}"
+                        f"Tem alguma dúvida?"
+                    ),
+                ]
+            else:
+                # Conversa em andamento — explica o ciclo de aprendizado de forma precisa e simples
+                opcoes = [
+                    (
+                        f"Sim! O aprendizado é automático e contínuo, {primeiro_nome}.\n\n"
+                        f"Quando a equipe registra uma **nova ideia** e o responsável a ativa, já passo a usar esse conhecimento nas próximas respostas — na hora, sem reiniciar o sistema.\n"
+                        f"O mesmo vale para **documentos enviados à Biblioteca**: assim que aprovados, o conteúdo é incorporado automaticamente.\n"
+                        f"E quando um responsável **corrige uma resposta minha**, essa correção guia minhas respostas futuras em situações parecidas.\n\n"
+                        f"Quanto mais a equipe contribui, mais precisa fico. O que mais queria saber?"
+                    ),
+                    (
+                        f"Exatamente, {primeiro_nome}! Funciona assim:\n\n"
+                        f"- **Nova ideia ativada** → já uso esse conhecimento na próxima pergunta.\n"
+                        f"- **Documento aprovado na Biblioteca** → conteúdo incorporado na hora.\n"
+                        f"- **Correção feita por um responsável** → melhora minhas respostas em perguntas similares.\n\n"
+                        f"Tudo acontece automaticamente, sem intervenção técnica. A equipe ensina, eu aprendo. Tem mais alguma dúvida?"
+                    ),
+                    (
+                        f"Sim, {primeiro_nome}! Consulto automaticamente os documentos e orientações registrados pela equipe da Anagma. "
+                        f"Tudo interno — sem busca na internet. O que mais precisa?"
+                    ),
+                ]
             return random.choice(opcoes)
 
         # Intercepta temas fora do domínio contábil (Guardrails)
         if self._e_fora_do_dominio(user_query):
-            import random
-            primeiro_nome = (user_name or 'usuário').split()[0]
-            cumprimento = saudacao or 'Boa tarde'
             opcoes = [
                 (
                     f"{cumprimento}, {primeiro_nome}! Como sou uma IA focada exclusivamente em **contabilidade, tributos e gestão financeira**, "
@@ -308,29 +378,47 @@ class AnagmaLLMEngine:
 
         # Usa search_query (contextualizada) para busca no RAG, mas responde ao user_query original
         contexto_rag = self.rag.buscar_conhecimento(search_query or user_query, user=user)
-        perfil_anagma = self._get_perfil_anagma()
 
-        # --- Monta o system prompt ---
-        nome = user_name or 'usuário'
-        cumprimento = saudacao or 'Boa tarde'
-
+        # --- Monta o system prompt com saudação adaptada ao contexto ---
         _periodo_map = {'Bom dia': 'manhã', 'Boa tarde': 'tarde', 'Boa noite': 'noite'}
-        periodo = _periodo_map.get(cumprimento, 'tarde')
+
+        if is_first_message:
+            saudacao_instrucao = f'SAUDAÇÃO OBRIGATÓRIA:\n- Comece SEMPRE com: "{cumprimento}, {nome}!".'
+        else:
+            saudacao_instrucao = (
+                f'CONTINUIDADE DA CONVERSA:\n'
+                f'- Você está em uma conversa em andamento com {nome}. '
+                f'Seja direto e natural. Não repita a saudação formal em cada resposta. '
+                f'Use o nome do usuário pontualmente, apenas quando for natural.'
+            )
 
         system_msg = f"""MANDATO SUPREMO DE IDIOMA E IDENTIDADE:
 - Você é a **Digiana**, a inteligência artificial especialista e oficial da empresa **Anagma**.
 - **BLOQUEIO DE IDIOMA:** Você está terminantemente PROIBIDA de responder em inglês ou qualquer outro idioma que não seja o **Português Brasileiro (PT-BR)**. Toda a sua comunicação deve ser exclusivamente em português de alto nível, técnico e claro.
-- **OPERADOR DIGITAL:** Você opera em um ambiente 100% DIGITAL. Não existem locais físicos ou atendentes humanos.
+- **OPERADOR DIGITAL:** Você opera em um ambiente 100% DIGITAL. Não existem locais físicos ou atendentes humanos. NUNCA mencione sites externos, apps ou orientações para acessar outros sistemas.
 
-SAUDAÇÃO OBRIGATÓRIA:
-- Comece SEMPRE com: "{cumprimento}, {nome}!".
+{saudacao_instrucao}
+
+ARQUITETURA DE CONHECIMENTO (4 PILARES INTERNOS):
+Você possui acesso automático a 4 fontes internas de conhecimento consultadas antes de cada resposta:
+1. ChromaDB — busca semântica em documentos vetorizados da Biblioteca de Curadoria.
+2. Biblioteca de Curadoria — arquivos PDF e documentos aprovados pelos superusuários da Anagma.
+3. Banco de Ideias — ideias técnicas registradas e ativadas pelos colaboradores da equipe.
+4. RLHF (Aprendizado Perpétuo) — correções e orientações dos curadores para refinar suas respostas.
+Se alguém perguntar se você "consegue consultar" ou "acessar" esses pilares, a resposta é SEMPRE SIM — você já faz isso automaticamente em cada resposta.
 
 REGRAS DE RESPOSTA E AUTORIDADE:
 1. **Prioridade de Dados:** Se a informação estiver no CONTEXTO INTERNO abaixo, use-a como VERDADE ABSOLUTA. Responda com autoridade técnica direta.
 2. **Postura Resolutiva:** Você é uma ferramenta de apoio à decisão. Evite incertezas. Use: "O procedimento correto é...", "A legislação indica que...".
-3. **Fim das Alucinações:** JAMAIS sugira contatos externos ou locais físicos.
+3. **Fim das Alucinações:** JAMAIS sugira contatos externos, sites, apps ou locais físicos.
 4. **Domínio:** Responda apenas sobre contabilidade, tributos e finanças.
 5. **Restrição de Conteúdo:** Se o usuário enviar apenas uma saudação, apresente-se como Digiana e pergunte como pode ajudar na área contábil. NUNCA traduza saudações ou termos para outros idiomas.
+
+POSTURA CONSULTIVA E PROATIVA:
+- Após responder, se o CONTEXTO INTERNO contiver informações relacionadas que o usuário ainda não perguntou, ofereça explorar esse tema com uma frase curta e natural. Exemplo: "Se quiser, também posso detalhar como isso afeta o Lucro Presumido."
+- Se o usuário parecer em dúvida ou não souber ao certo o que perguntar, sugira 2 ou 3 tópicos próximos que você domina e que podem ser úteis para ele.
+- Use linguagem simples e direta: "Também tenho informações sobre...", "Posso te ajudar também com...", "Quer que eu explique melhor...?".
+- Uma sugestão por resposta é suficiente — não sobrecarregue o usuário com opções.
 
 CONTEXTO DA EMPRESA (DNA DA DIGIANA):
 {perfil_anagma if perfil_anagma else 'Digiana - Especialista Técnica em Contabilidade Digital.'}
@@ -338,14 +426,19 @@ CONTEXTO DA EMPRESA (DNA DA DIGIANA):
 
         if contexto_rag:
             system_msg += f'\n\nCONHECIMENTO TÉCNICO E DOCUMENTAL (BIBLIOTECA):\n{contexto_rag}'
+            system_msg += (
+                '\n\nINSTRUÇÃO DE PROATIVIDADE: O conteúdo acima veio da base de conhecimento interna da Anagma. '
+                'Use-o para responder E, se houver temas relacionados que o usuário ainda não explorou, '
+                'mencione brevemente ao final que pode aprofundar. Não invente temas — sugira apenas o que está no contexto acima.'
+            )
 
         # --- GESTÃO DE CONTEXTO ---
         MAX_CONTEXT_TOKENS = 3500
         tokens_fixos = self._contar_tokens_aprox(system_msg) + self._contar_tokens_aprox(user_query)
         available_for_history = MAX_CONTEXT_TOKENS - tokens_fixos
-        
+
         messages = [{'role': 'system', 'content': system_msg}]
-        
+
         if chat_history:
             temp_history = []
             current_history_tokens = 0
@@ -365,20 +458,17 @@ CONTEXTO DA EMPRESA (DNA DA DIGIANA):
             res = self._gerar_gguf(messages)
         else:
             res = self._gerar_safetensors(messages)
-            
+
         res_limpa = self._limpar_resposta(res)
-        
+
         # KILL-SWITCH DE IDIOMA: Se o modelo falhar e responder em inglês
         if self._is_ingles(res_limpa):
-            import random
-            nome = (user_name or 'usuário').split()[0]
-            cumprimento = saudacao or 'Boa tarde'
             opcoes = [
-                f"{cumprimento}, {nome}! Identifiquei uma falha na geração do idioma. Como sou uma IA focada exclusivamente na contabilidade brasileira, minha comunicação deve ser em Português Brasileiro. Em que posso ajudá-lo hoje com suas dúvidas técnicas?",
-                f"{cumprimento}, {nome}. Houve uma tentativa de resposta em idioma estrangeiro pelo modelo base. Como sua assistente técnica Digiana, mantenho meu foco apenas em Português e temas contábeis brasileiros. Como posso ser útil agora?",
+                f"{cumprimento}, {primeiro_nome}! Identifiquei uma falha na geração do idioma. Como sou uma IA focada exclusivamente na contabilidade brasileira, minha comunicação deve ser em Português Brasileiro. Em que posso ajudá-lo hoje com suas dúvidas técnicas?",
+                f"{cumprimento}, {primeiro_nome}. Houve uma tentativa de resposta em idioma estrangeiro pelo modelo base. Como sua assistente técnica Digiana, mantenho meu foco apenas em Português e temas contábeis brasileiros. Como posso ser útil agora?",
             ]
             return random.choice(opcoes)
-            
+
         return res_limpa
 
     def _limpar_resposta(self, texto):
@@ -405,7 +495,7 @@ CONTEXTO DA EMPRESA (DNA DA DIGIANA):
             try:
                 resultado = self._llm.create_chat_completion(
                     messages=messages,
-                    max_tokens=800,
+                    max_tokens=1200,
                     temperature=0.2,
                     top_p=0.9,
                     repeat_penalty=1.1,
@@ -425,7 +515,7 @@ CONTEXTO DA EMPRESA (DNA DA DIGIANA):
                 messages, tokenize=False, add_generation_prompt=True
             )
             gen_config = GenerationConfig(
-                max_new_tokens=500, temperature=0.3, do_sample=True,
+                max_new_tokens=900, temperature=0.3, do_sample=True,
                 eos_token_id=[32000, 32001, 32007], pad_token_id=32000,
             )
             output = self._pipe(full_prompt, generation_config=gen_config, return_full_text=False)

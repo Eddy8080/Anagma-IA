@@ -43,15 +43,22 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f'Documentos: {ok}/{total} vetorizados.'))
 
         if not so_docs:
-            correcoes = AIConsistencyCorrection.objects.exclude(user_query='').exclude(suggested_improvement='')
+            correcoes = (
+                AIConsistencyCorrection.objects
+                .filter(is_integrated=False)
+                .exclude(user_query='')
+                .exclude(suggested_improvement='')
+            )
             total = correcoes.count()
-            self.stdout.write(f'Vetorizando {total} correções RLHF...')
+            self.stdout.write(f'Vetorizando {total} correções RLHF pendentes...')
             ok = 0
             for cor in correcoes:
                 try:
                     titulo = cor.titulo_melhoria or f"RLHF-{cor.id}"
                     texto = f"Pergunta: {cor.user_query}\nResposta ideal: {cor.suggested_improvement}"
                     rag.vetorizar_texto(texto, f"RLHF:{titulo}")
+                    cor.is_integrated = True
+                    cor.save(update_fields=['is_integrated'])
                     ok += 1
                     self.stdout.write(f'  ✓ {titulo}')
                 except Exception as e:

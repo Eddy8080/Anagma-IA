@@ -3,79 +3,76 @@
 {% block title %}Feedback {{ label }} — Painel Admin{% endblock %}
 
 {% block content %}
-<div class="page-title text-dynamic" style="display:flex; justify-content:space-between; align-items:center;">
+<div class="page-title text-dynamic" style="display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:32px;">
     <div>
         <a href="{% url 'admin_panel:dashboard' %}" style="text-decoration:none; color:inherit;">📊 Dashboard</a> 
         / {{ label }}
     </div>
-    <a href="{% url 'admin_panel:dashboard' %}" 
-       style="background:#333537; border:1px solid #444; color:#e3e3e3; border-radius:8px; 
-              padding:6px 16px; text-decoration:none; font-size:0.85rem; transition:background 0.2s;"
-       onmouseover="this.style.background='#444'" onmouseout="this.style.background='#333537'">
+    <a href="{% url 'admin_panel:dashboard' %}" class="btn-nova-ideia"
+       style="padding:10px 24px; text-decoration:none; font-size:0.85rem; margin-right:120px;">
         ← Voltar ao Dashboard
     </a>
 </div>
 
 <div class="card">
-    <h3 class="text-dynamic" style="margin-top:0; font-weight:500;">Usuários que enviaram feedbacks</h3>
+    <h3 class="text-dynamic" style="margin-top:0; font-weight:600;">Usuários que enviaram feedbacks</h3>
     <p class="text-dynamic-muted" style="font-size:0.9rem; margin-bottom:24px;">Clique em um usuário para ver as mensagens específicas.</p>
 
     <div style="display:flex; flex-direction:column; gap:12px;">
         {% for usuario in usuarios %}
-        <div class="card" style="display:flex !important; flex-direction:row !important; flex-wrap:nowrap !important; justify-content:space-between !important; align-items:center !important; transition:background 0.2s; margin-bottom:0;" onmouseover="this.style.background='rgba(66, 133, 244, 0.1)'" onmouseout="this.style.background='var(--card-bg)'">
+        <div class="card" style="display:flex !important; flex-direction:row !important; flex-wrap:nowrap !important; justify-content:space-between !important; align-items:center !important; transition:background 0.2s, border-color 0.2s; margin-bottom:0; padding:16px 24px;">
             <a href="{% url 'admin_panel:feedback_messages' user_id=usuario.id tipo=tipo %}" style="text-decoration:none; flex:1; min-width:0; display:flex !important; flex-direction:row !important; justify-content:space-between !important; align-items:center !important; margin-right:16px;">
                 <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">
-                    <div class="text-dynamic" style="font-weight:600; overflow:hidden; text-overflow:ellipsis;">{{ usuario.nome_completo|default:usuario.username }}</div>
-                    <div class="text-dynamic-muted" style="font-size:0.8rem; overflow:hidden; text-overflow:ellipsis;">{{ usuario.email }}</div>
+                    <div class="text-dynamic" style="font-weight:700; overflow:hidden; text-overflow:ellipsis;">{{ usuario.nome_completo|default:usuario.username }}</div>
+                    <div class="text-dynamic-muted" style="font-size:0.85rem; overflow:hidden; text-overflow:ellipsis; font-weight:600;">{{ usuario.email }}</div>
                 </div>
-                <div style="background:{% if tipo == 'like' %}#1a2e1a{% else %}#2e1a1a{% endif %}; 
-                            color:{% if tipo == 'like' %}#4ade80{% else %}#f87171{% endif %}; 
-                            padding:4px 12px; border-radius:12px; font-weight:600; font-size:0.9rem; flex-shrink:0; margin-left:12px;">
+                <div style="background:{% if tipo == 'like' %}rgba(74, 222, 128, 0.15){% else %}rgba(248, 113, 113, 0.15){% endif %}; 
+                            color:{% if tipo == 'like' %}var(--stat-success){% else %}var(--stat-danger){% endif %}; 
+                            padding:4px 14px; border-radius:12px; font-weight:700; font-size:0.95rem; flex-shrink:0; margin-left:12px; border:1px solid {% if tipo == 'like' %}rgba(74, 222, 128, 0.2){% else %}rgba(248, 113, 113, 0.2){% endif %};">
                     {{ usuario.total_feedback }}
                 </div>
             </a>
             
-            <button type="button" class="btn btn-danger" onclick="openDeleteModal('{{ usuario.id }}', '{{ usuario.username|escapejs }}')" style="flex-shrink:0 !important; padding:6px 14px; font-size:0.8rem; white-space:nowrap !important;">
+            <button type="button" class="btn-gov-excluir" onclick="openDeleteModal('{{ usuario.id }}', '{{ usuario.username|escapejs }}')" style="padding:6px 14px; font-size:0.8rem;">
                 Excluir Usuário
             </button>
         </div>
         {% empty %}
-        <p style="text-align:center; color:#555; padding:40px;">Nenhum feedback deste tipo registrado ainda.</p>
+        <p style="text-align:center; color:var(--text-muted); padding:40px; font-weight:600;">Nenhum feedback deste tipo registrado ainda.</p>
         {% endfor %}
     </div>
 </div>
 
-{# ── Modal de Confirmação de Exclusão (Exclusão Inteligente) ── #}
-<div id="delete-user-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
-                               background:rgba(0,0,0,0.8); z-index:10000; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
-    <div style="background:#1e1f20; border:1px solid #3c4043; border-radius:16px; padding:32px; width:90%; max-width:420px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.6);">
-        <div style="font-size:2.5rem; margin-bottom:16px;">⚠️</div>
-        <h3 style="margin:0 0 12px; color:#e3e3e3; font-weight:500;">Excluir usuário <span id="del-username" style="color:var(--accent-color);"></span>?</h3>
-        <p style="color:#999; font-size:0.9rem; line-height:1.5; margin-bottom:24px;">Escolha como deseja tratar os dados gerados por este usuário:</p>
+{# ── Modal de Confirmação de Exclusão (Adaptativo) ── #}
+<div id="delete-user-modal" class="modal-overlay">
+    <div class="card-modal card-modal-md">
+        <div class="modal-icon">⚠️</div>
+        <h3 class="modal-title text-dynamic">Excluir usuário <span id="del-username" class="modal-username-hl"></span>?</h3>
+        <p class="modal-desc text-dynamic-muted">Escolha como deseja tratar os dados gerados por este usuário:</p>
         
         <form id="delete-form-real" method="post" action="" style="margin:0;">
             {% csrf_token %}
             <div style="display:flex; flex-direction:column; gap:12px;">
-                <button type="submit" name="modo" value="keep" 
-                        style="background:#333537; color:#e3e3e3; border:1px solid #444; border-radius:10px; padding:12px; cursor:pointer; font-weight:500; text-align:left; display:flex; align-items:center; gap:12px;">
-                    <div style="background:#4ade8022; color:#4ade80; padding:8px; border-radius:8px;">🧠</div>
+                <button type="submit" name="modo" value="keep" class="btn-modal-secondary" 
+                        style="text-align:left; padding:12px; display:flex; align-items:center; gap:12px;">
+                    <div style="background:rgba(74, 222, 128, 0.1); color:var(--stat-success); padding:8px; border-radius:8px; font-size:1.2rem;">🧠</div>
                     <div>
-                        <div style="font-weight:600;">Preservar Dados para IA</div>
-                        <div style="font-size:0.75rem; color:#888;">Mantém histórico de ideias e conversas para treinamento.</div>
+                        <div class="text-dynamic" style="font-weight:700;">Preservar Dados para IA</div>
+                        <div class="text-dynamic-muted" style="font-size:0.75rem;">Mantém histórico de ideias e conversas para treinamento.</div>
                     </div>
                 </button>
 
-                <button type="submit" name="modo" value="purge" 
-                        style="background:#3b1a1a; color:#f87171; border:1px solid #d93025; border-radius:10px; padding:12px; cursor:pointer; font-weight:500; text-align:left; display:flex; align-items:center; gap:12px;">
-                    <div style="background:#d9302522; color:#d93025; padding:8px; border-radius:8px;">🔥</div>
+                <button type="submit" name="modo" value="purge" class="btn-danger-action" 
+                        style="text-align:left; padding:12px; display:flex; align-items:center; gap:12px;">
+                    <div style="background:rgba(217, 48, 37, 0.1); color:white; padding:8px; border-radius:8px; font-size:1.2rem;">🔥</div>
                     <div>
-                        <div style="font-weight:600;">Purga Total</div>
-                        <div style="font-size:0.75rem; color:#888;">Elimina permanentemente todos os registros vinculados.</div>
+                        <div style="font-weight:700;">Purga Total</div>
+                        <div style="font-size:0.75rem; opacity:0.9;">Elimina permanentemente todos os registros vinculados.</div>
                     </div>
                 </button>
             </div>
             
-            <button type="button" onclick="closeDeleteModal()" style="margin-top:20px; background:none; border:none; color:#666; cursor:pointer; font-size:0.9rem; text-decoration:underline;">Cancelar</button>
+            <button type="button" onclick="closeDeleteModal()" class="btn-modal-secondary" style="margin-top:20px; border:none; background:none !important;">Cancelar</button>
         </form>
     </div>
 </div>
@@ -86,11 +83,11 @@ function openDeleteModal(userId, username) {
     const form = document.getElementById('delete-form-real');
     document.getElementById('del-username').textContent = username;
     form.action = `/admin-panel/usuarios/${userId}/deletar/`;
-    modal.style.display = 'flex';
+    modal.classList.add('is-open');
 }
 
 function closeDeleteModal() {
-    document.getElementById('delete-user-modal').style.display = 'none';
+    document.getElementById('delete-user-modal').classList.remove('is-open');
 }
 </script>
 {% endblock %}

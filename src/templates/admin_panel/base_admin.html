@@ -140,7 +140,50 @@
     </style>
 </head>
 <body>
-    <button id="theme-toggle" title="Modo claro">☀️</button>
+    <label class="theme-switch-label" title="Alternar tema">
+        <input type="checkbox" class="theme-toggle-input" id="theme-toggle">
+        <svg viewBox="0 0 220 250" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <filter id="glow-filter" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="15" result="coloredBlur"/>
+                    <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+                <filter id="arm-shadow" x="-30%" y="-30%" width="160%" height="160%">
+                    <feDropShadow dx="0" dy="0" stdDeviation="2.5" flood-color="#7a3e10" flood-opacity="0.9"/>
+                </filter>
+            </defs>
+            <g class="cord">
+                <line x1="150" y1="0" x2="150" y2="100" stroke="#bdc3c7" stroke-width="2"/>
+                <circle cx="150" cy="100" r="5" fill="#e74c3c"/>
+                <polygon points="147,105 153,105 155,115 145,115" fill="#c0392b"/>
+            </g>
+            <circle cx="100" cy="100" r="55" class="bulb-aura" fill="#f1c40f" filter="url(#glow-filter)"/>
+            <g class="lightbulb">
+                <path d="M 85 160 L 115 160 L 110 190 L 90 190 Z" fill="#7f8c8d"/>
+                <line x1="86" y1="165" x2="114" y2="165" stroke="#34495e" stroke-width="2"/>
+                <line x1="87" y1="175" x2="113" y2="175" stroke="#34495e" stroke-width="2"/>
+                <line x1="88" y1="185" x2="112" y2="185" stroke="#34495e" stroke-width="2"/>
+                <path d="M 95 190 Q 100 200 105 190 Z" fill="#2c3e50"/>
+                <path d="M 60 135 C 60 160 85 160 85 160 L 115 160 C 115 160 140 160 140 135 A 50 50 0 1 0 60 135 Z" class="bulb-glass" stroke-width="2"/>
+                <circle cx="85" cy="95" r="4" fill="#2c3e50"/>
+                <circle cx="115" cy="95" r="4" fill="#2c3e50"/>
+                <circle cx="83" cy="93" r="1.5" fill="#ffffff"/>
+                <circle cx="113" cy="93" r="1.5" fill="#ffffff"/>
+                <circle cx="72" cy="105" r="5" fill="#e74c3c" opacity="0.5"/>
+                <circle cx="128" cy="105" r="5" fill="#e74c3c" opacity="0.5"/>
+                <path d="M 88 110 Q 100 125 112 110" fill="transparent" stroke="#2c3e50" stroke-width="2.5" stroke-linecap="round"/>
+            </g>
+            <g class="bulb-arm" filter="url(#arm-shadow)">
+                <circle cx="140" cy="138" r="6" fill="#e8a87c"/>
+                <line x1="140" y1="138" x2="148" y2="122" stroke="#d4845a" stroke-width="7" stroke-linecap="round"/>
+                <line x1="148" y1="122" x2="152" y2="110" stroke="#d4845a" stroke-width="6" stroke-linecap="round"/>
+                <ellipse cx="153" cy="106" rx="8" ry="6" fill="#d4845a" transform="rotate(-65, 153, 106)"/>
+            </g>
+        </svg>
+    </label>
     <div class="sidebar">
         <div class="sidebar-title">Painel Admin</div>
         <a href="{% url 'admin_panel:dashboard' %}" {% if request.resolver_match.url_name == 'dashboard' %}class="active"{% endif %}>📊 Dashboard</a>

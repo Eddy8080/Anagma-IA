@@ -5,39 +5,56 @@
 {% block content %}
 <div class="page-title text-dynamic">📊 Dashboard</div>
 
+{# --- Linha 1: Métricas de Volume --- #}
 <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:16px;">
     <a href="{% url 'admin_panel:usuarios' %}" style="text-decoration:none;">
-        <div class="card" style="text-align:center; cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='#a8c7fa'" onmouseout="this.style.borderColor='#333'">
-            <div id="stat-usuarios" style="font-size:2rem; font-weight:700; color:#a8c7fa;">{{ total_usuarios }}</div>
-            <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px;">Usuários cadastrados</div>
+        <div class="card card-hover-stat card-stat-users" style="text-align:center; cursor:pointer;">
+            <div id="stat-usuarios" style="font-size:2rem; font-weight:700; color:#a8c7fa; text-shadow:0 0 10px rgba(168, 199, 250, 0.2);">{{ total_usuarios }}</div>
+            <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px; font-weight:700;">Usuários cadastrados</div>
         </div>
     </a>
     <a href="{% url 'admin_panel:ideias' %}" style="text-decoration:none;">
-        <div class="card" style="text-align:center; cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='#4ade80'" onmouseout="this.style.borderColor='#333'">
-            <div id="stat-ideias" style="font-size:2rem; font-weight:700; color:#4ade80;">{{ total_ideias_ativas }}</div>
-            <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px;">Ideias ativas</div>
+        <div class="card card-hover-stat card-stat-ideas" style="text-align:center; cursor:pointer;">
+            <div id="stat-ideias" style="font-size:2rem; font-weight:700; color:#4ade80; text-shadow:0 0 10px rgba(74, 222, 128, 0.2);">{{ total_ideias_ativas }}</div>
+            <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px; font-weight:700;">Ideias ativas</div>
         </div>
     </a>
     <a href="{% url 'admin_panel:insights' %}" style="text-decoration:none;">
-        <div class="card" style="text-align:center; cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='#facc15'" onmouseout="this.style.borderColor='#333'">
-            <div id="stat-sessoes" style="font-size:2rem; font-weight:700; color:#facc15;">{{ sessoes_hoje }}</div>
-            <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px;">Sessões de chat hoje</div>
+        <div class="card card-hover-stat card-stat-sessions" style="text-align:center; cursor:pointer;">
+            <div id="stat-sessoes" style="font-size:2rem; font-weight:700; color:#facc15; text-shadow:0 0 10px rgba(250, 204, 21, 0.2);">{{ sessoes_hoje }}</div>
+            <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px; font-weight:700;">Sessões de chat hoje</div>
         </div>
     </a>
 </div>
-<div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:32px;">
+
+{# --- Linha 2: Métricas de Engajamento/Qualidade --- #}
+<div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:16px;">
     <a href="{% url 'admin_panel:feedback_list' tipo='like' %}" style="text-decoration:none;">
-        <div class="card" style="text-align:center; cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='#4ade80'" onmouseout="this.style.borderColor='#333'">
-            <div style="font-size:2rem; font-weight:700; color:#4ade80;">👍 <span id="stat-likes">{{ total_likes }}</span></div>
-            <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px;">Respostas curtidas</div>
+        <div class="card card-hover-stat card-stat-like" style="text-align:center; cursor:pointer;">
+            <div style="font-size:2rem; font-weight:700; color:#4ade80;">👍 <span id="stat-likes" style="color:#4ade80 !important; text-shadow:0 0 10px rgba(74, 222, 128, 0.3);">{{ total_likes }}</span></div>
+            <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px; font-weight:700;">Respostas curtidas</div>
         </div>
     </a>
     <a href="{% url 'admin_panel:feedback_list' tipo='dislike' %}" style="text-decoration:none;">
-        <div class="card" style="text-align:center; cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='#f87171'" onmouseout="this.style.borderColor='#333'">
-            <div style="font-size:2rem; font-weight:700; color:#f87171;">👎 <span id="stat-dislikes">{{ total_dislikes }}</span></div>
-            <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px;">Respostas não curtidas</div>
+        <div class="card card-hover-stat card-stat-dislike" style="text-align:center; cursor:pointer;">
+            <div style="font-size:2rem; font-weight:700; color:#f87171;">👎 <span id="stat-dislikes" style="color:#f87171 !important; text-shadow:0 0 10px rgba(248, 113, 113, 0.3);">{{ total_dislikes }}</span></div>
+            <div class="text-dynamic-muted" style="font-size:0.85rem; margin-top:4px; font-weight:700;">Respostas não curtidas</div>
         </div>
     </a>
+</div>
+
+{# --- Linha 3: Novos Indicadores Analíticos (Substituindo Botões) --- #}
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:32px;">
+    <div class="card card-hover-stat card-stat-online" style="text-align:center; padding:24px;">
+        <div id="stat-online" style="font-size:2.5rem; font-weight:800; color:#4ade80; text-shadow:0 0 15px rgba(74, 222, 128, 0.4);">{{ usuarios_online }}</div>
+        <div class="text-dynamic" style="font-size:1.1rem; font-weight:700; margin-top:8px;">Usuários Conectados</div>
+        <div class="text-dynamic-muted" style="font-size:0.85rem; font-weight:600;">Atividade detectada nos últimos 5 minutos</div>
+    </div>
+    <div class="card card-hover-stat card-stat-yesterday" style="text-align:center; padding:24px;">
+        <div id="stat-ontem" style="font-size:2.5rem; font-weight:800; color:#a8c7fa; text-shadow:0 0 15px rgba(168, 199, 250, 0.4);">{{ usuarios_ontem }}</div>
+        <div class="text-dynamic" style="font-size:1.1rem; font-weight:700; margin-top:8px;">Usuários ontem</div>
+        <div class="text-dynamic-muted" style="font-size:0.85rem; font-weight:600;">Total de usuários únicos no dia anterior</div>
+    </div>
 </div>
 
 <script>
@@ -47,7 +64,7 @@
 
     function updateStat(id, value) {
         var el = document.getElementById(id);
-        if (el && el.textContent != String(value)) {
+        if (el && el.textContent.trim() !== String(value)) {
             el.style.transition = 'opacity 0.25s';
             el.style.opacity = '0.3';
             setTimeout(function () {
@@ -61,45 +78,86 @@
         if (es) es.close();
         es = new EventSource(STREAM_URL);
         es.onmessage = function (e) {
-            var d = JSON.parse(e.data);
-            updateStat('stat-usuarios', d.total_usuarios);
-            updateStat('stat-ideias',   d.total_ideias_ativas);
-            updateStat('stat-sessoes',  d.sessoes_hoje);
-            updateStat('stat-likes',    d.total_likes);
-            updateStat('stat-dislikes', d.total_dislikes);
+            try {
+                var d = JSON.parse(e.data);
+                updateStat('stat-usuarios', d.total_usuarios);
+                updateStat('stat-ideias',   d.total_ideias_ativas);
+                updateStat('stat-sessoes',  d.sessoes_hoje);
+                updateStat('stat-likes',    d.total_likes);
+                updateStat('stat-dislikes', d.total_dislikes);
+                updateStat('stat-online',   d.usuarios_online);
+                updateStat('stat-ontem',    d.usuarios_ontem);
+            } catch (err) {
+                console.error("Erro no stream de dados:", err);
+            }
         };
         es.onerror = function () {
             es.close();
-            setTimeout(connect, 5000); // reconecta após 5s se cair
+            setTimeout(connect, 5000); 
         };
     }
 
     connect();
 
-    // Reconecta ao voltar para a aba
     document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'visible') connect();
     });
 
-    // Fecha o canal ao sair da página para liberar o worker do servidor
     window.addEventListener('beforeunload', function () {
         if (es) es.close();
     });
 })();
 </script>
 
-<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-    <a href="{% url 'admin_panel:usuarios' %}" style="text-decoration:none;">
-        <div class="card" style="cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='#a8c7fa'" onmouseout="this.style.borderColor='#333'">
-            <div class="text-dynamic" style="font-size:1.1rem; font-weight:600; margin-bottom:8px;">👥 Gerenciar Usuários</div>
-            <div class="text-dynamic-muted" style="font-size:0.88rem;">Promova ou rebaixe usuários ao nível de superusuário.</div>
-        </div>
-    </a>
-    <a href="{% url 'admin_panel:ideias' %}" style="text-decoration:none;">
-        <div class="card" style="cursor:pointer; transition:border-color 0.2s;" onmouseover="this.style.borderColor='#a8c7fa'" onmouseout="this.style.borderColor='#333'">
-            <div class="text-dynamic" style="font-size:1.1rem; font-weight:600; margin-bottom:8px;">💡 Auditar Ideias</div>
-            <div class="text-dynamic-muted" style="font-size:0.88rem;">Ative, desative ou exclua ideias da base de conhecimento.</div>
-        </div>
-    </a>
-</div>
+<style>
+/* Estilos Base e Transições */
+.card-hover-stat { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid var(--border-card) !important; position: relative; overflow: hidden; }
+.card-hover-stat:hover { 
+    transform: translateY(-5px);
+    border-color: var(--accent-main) !important; 
+    box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+}
+
+/* Efeitos Glow Customizados (DNA Digiana) */
+.card-stat-users:hover {
+    border-color: #a8c7fa !important;
+    box-shadow: 0 0 25px rgba(168, 199, 250, 0.35) !important;
+}
+.card-stat-ideas:hover {
+    border-color: #4ade80 !important;
+    box-shadow: 0 0 25px rgba(74, 222, 128, 0.25) !important;
+}
+.card-stat-sessions:hover {
+    border-color: #facc15 !important;
+    box-shadow: 0 0 25px rgba(250, 204, 21, 0.25) !important;
+}
+.card-stat-like:hover { 
+    border-color: #4ade80 !important; 
+    box-shadow: 0 0 25px rgba(74, 222, 128, 0.25) !important;
+}
+.card-stat-dislike:hover { 
+    border-color: #f87171 !important; 
+    box-shadow: 0 0 25px rgba(248, 113, 113, 0.25) !important;
+}
+
+/* Novos Glows Analíticos */
+.card-stat-online:hover {
+    border-color: #4ade80 !important;
+    box-shadow: 0 0 30px rgba(74, 222, 128, 0.3) !important;
+}
+.card-stat-yesterday:hover {
+    border-color: #a8c7fa !important;
+    box-shadow: 0 0 30px rgba(168, 199, 250, 0.3) !important;
+}
+
+/* Light Mode Overrides */
+html.light-mode #stat-likes, html.light-mode #stat-online { color: #137333 !important; text-shadow: none !important; }
+html.light-mode #stat-dislikes { color: #d93025 !important; text-shadow: none !important; }
+html.light-mode #stat-ideias { color: #137333 !important; text-shadow: none !important; }
+html.light-mode #stat-ontem, html.light-mode #stat-usuarios { color: #1a73e8 !important; text-shadow: none !important; }
+
+html.light-mode .card-hover-stat:hover { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+html.light-mode .card-stat-online:hover { border-color: #137333 !important; }
+html.light-mode .card-stat-yesterday:hover { border-color: #1a73e8 !important; }
+</style>
 {% endblock %}

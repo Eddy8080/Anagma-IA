@@ -138,13 +138,44 @@ def criar_ideia(request):
 
 def _get_dashboard_stats():
     from chat_ai.models import ChatSession, ChatMessage
-    hoje = timezone.now().date()
+    from django.db import connection
+    from django.db.models import Q
+    from django.contrib.sessions.models import Session
+    from datetime import timedelta
+    # Força a limpeza de cache de query para esta thread de stream
+    connection.close() 
+    
+    agora = timezone.now()
+    hoje = agora.date()
+    ontem = hoje - timedelta(days=1)
+    
+    # 1. Usuários Online: Baseado em Sessões Não Expiradas e Ativas
+    sessions = Session.objects.filter(expire_date__gte=agora)
+    online_ids = []
+    for session in sessions:
+        data = session.get_decoded()
+        uid = data.get('_auth_user_id')
+        if uid:
+            online_ids.append(uid)
+    
+    # Remove duplicados (um usuário pode ter mais de uma sessão aberta)
+    total_online = len(set(online_ids))
+
+    # 2. Usuários Ativos Ontem: Interagiram com o sistema no dia anterior
+    users_ontem_ids = CustomUser.objects.filter(
+        Q(last_login__date=ontem) |
+        Q(sessions__messages__timestamp__date=ontem)
+    ).values_list('id', flat=True).distinct()
+    
     return {
         'total_usuarios': CustomUser.objects.count(),
         'total_ideias_ativas': GlobalIdeia.objects.filter(ativa=True).count(),
         'sessoes_hoje': ChatSession.objects.filter(criado_em__date=hoje).count(),
         'total_likes': ChatMessage.objects.filter(feedback='like', session__isnull=False, session__deleted_at__isnull=True).count(),
         'total_dislikes': ChatMessage.objects.filter(feedback='dislike', session__isnull=False, session__deleted_at__isnull=True).count(),
+        # Métricas de Atividade Real
+        'usuarios_online': total_online,
+        'usuarios_ontem': len(users_ontem_ids),
     }
 
 @superuser_required

@@ -115,8 +115,19 @@ class AnagmaRAGEngine:
                     query_rlhf = Q()
                     for p in palavras_tecnicas[:5]:
                         query_rlhf |= Q(user_query__icontains=p) | Q(titulo_melhoria__icontains=p)
-                    
-                    correcoes = AIConsistencyCorrection.objects.filter(query_rlhf).only('user_query', 'suggested_improvement', 'titulo_melhoria')[:2]
+
+                    candidatos_rlhf = list(
+                        AIConsistencyCorrection.objects.filter(query_rlhf)
+                        .only('user_query', 'suggested_improvement', 'titulo_melhoria')[:6]
+                    )
+                    correcoes = sorted(
+                        candidatos_rlhf,
+                        key=lambda c: sum(
+                            1 for p in palavras_tecnicas
+                            if p.lower() in (c.user_query + ' ' + (c.titulo_melhoria or '')).lower()
+                        ),
+                        reverse=True
+                    )[:2]
                     for cor in correcoes:
                         titulo = cor.titulo_melhoria or "Regra Técnica"
                         contexto_final.append(f"INSTRUÇÃO DE CURADORIA APROVADA ({titulo}):\nPergunta do Usuário: {cor.user_query}\nResposta Ideal (Siga este padrão): {cor.suggested_improvement}")
@@ -139,8 +150,18 @@ class AnagmaRAGEngine:
                     sub_query |= Q(conteudo_extraido__icontains=p) | Q(nome_arquivo__icontains=p)
                 query_bib &= sub_query
 
-            docs_biblioteca = DocumentoBiblioteca.objects.filter(query_bib).only('conteudo_extraido', 'nome_arquivo')[:2]
-            
+            candidatos_bib = list(
+                DocumentoBiblioteca.objects.filter(query_bib).only('conteudo_extraido', 'nome_arquivo')[:8]
+            )
+            docs_biblioteca = sorted(
+                candidatos_bib,
+                key=lambda d: sum(
+                    1 for p in palavras
+                    if p.lower() in (d.conteudo_extraido + ' ' + d.nome_arquivo).lower()
+                ),
+                reverse=True
+            )[:2]
+
             for doc in docs_biblioteca:
                 contexto_final.append(f"DOCUMENTO APROVADO ({doc.nome_arquivo}):\n{doc.conteudo_extraido[:2000]}")
 
