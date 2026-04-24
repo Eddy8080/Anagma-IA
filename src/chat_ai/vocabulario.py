@@ -223,14 +223,14 @@ TERMOS_DETECCAO_INGLES = frozenset({
 # Termos do domínio contábil/fiscal/financeiro
 # ---------------------------------------------------------------------------
 TERMOS_CONTABEIS = (
-    'contab', 'tribut', 'fiscal', ' imposto', 'irpj', 'irpf', 'irrf', 'csll',
-    ' pis ', 'cofins', ' iss ', 'icms', ' inss', ' fgts', 'simples nacional',
-    'lucro presumido', 'lucro real', ' mei ', 'balanço', 'balancete', ' dre ',
-    ' ativo', ' passivo', 'patrimônio', 'receita', 'despesa', 'provisão',
-    'depreciação', 'amortizaç', 'fluxo de caixa', ' sped', 'esocial',
-    ' ecf ', ' ecd ', ' dctf', 'pgdas', 'nota fiscal', ' nfe', ' nfse',
+    'contab', 'tribut', 'fiscal', 'imposto', 'irpj', 'irpf', 'irrf', 'csll',
+    'pis', 'cofins', 'iss', 'icms', 'inss', 'fgts', 'simples nacional',
+    'lucro presumido', 'lucro real', 'mei', 'balanço', 'balancete', 'dre',
+    'ativo', 'passivo', 'patrimônio', 'receita', 'despesa', 'provisão',
+    'depreciação', 'amortizaç', 'fluxo de caixa', 'sped', 'esocial',
+    'ecf', 'ecd', 'dctf', 'pgdas', 'nota fiscal', 'nfe', 'nfse',
     'folha de pagamento', 'rescisão', 'auditoria', 'perícia', 'escrituração',
-    'lançamento', ' cpc ', ' nbc ', ' cfc ', 'contador', 'tributário',
+    'lançamento', 'cpc', 'nbc', 'cfc', 'contador', 'tributário',
     'capital social', 'conciliação', 'obrigação acessória', 'regime de caixa',
     'regime de competência', 'demonstração financeira', 'demonstração contábil',
     'custo', 'inventário', 'estoque', 'orçamento', 'financeiro', 'financeira',

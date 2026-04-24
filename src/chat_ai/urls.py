@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    chat_home, send_message, chat_session, rename_session,
+    chat_home, send_message, chat_stream, chat_session, rename_session,
     delete_session, pin_session, message_feedback, upload_document,
     meus_envios
 )
@@ -10,6 +10,7 @@ app_name = 'chat'
 urlpatterns = [
     path('', chat_home, name='home'),
     path('send/', send_message, name='send_message'),
+    path('stream/', chat_stream, name='chat_stream'),
     path('upload/', upload_document, name='upload_document'),
     path('s/<int:session_id>/', chat_session, name='session'),
     path('s/<int:session_id>/rename/', rename_session, name='rename_session'),

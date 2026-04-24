@@ -31,6 +31,7 @@
     line-height: 1.65;
     white-space: pre-wrap;
     word-break: break-word;
+    text-align: justify;
 }
 .user-bubble {
     background: #2a2b2e;
@@ -280,16 +281,26 @@ document.addEventListener('DOMContentLoaded', () => {
     let isSending            = false;
     let pendingItem          = null;
     let abortController      = null;
+    let activeEventSource    = null; // Referência global para o stream atual
 
     // ── Interromper Geração ──────────────────────────────────
     function stopGeneration() {
+        // Para SSE (Streaming)
+        if (activeEventSource) {
+            activeEventSource.close();
+            activeEventSource = null;
+            console.log('Stream SSE interrompido.');
+        }
+        
+        // Para Fetch comum (Upload)
         if (abortController) {
             abortController.abort();
             abortController = null;
-            setLoading(false);
-            const loader = document.getElementById('loading-row');
-            if (loader) loader.remove();
         }
+
+        setLoading(false);
+        const loader = document.getElementById('loading-row');
+        if (loader) loader.remove();
     }
 
     if (stopBtn) stopBtn.addEventListener('click', stopGeneration);
@@ -302,8 +313,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ── Utilitários ─────────────────────────────────────────
-    const scrollToBottom = () =>
-        setTimeout(() => chatWindow.scrollTo({ top: chatWindow.scrollHeight, behavior: 'smooth' }), 60);
+    const scrollToBottom = (isInstant = false) => {
+        if (isInstant) {
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        } else {
+            setTimeout(() => chatWindow.scrollTo({ top: chatWindow.scrollHeight, behavior: 'auto' }), 10);
+        }
+    };
 
     function getCsrf() {
         // 1. Tenta pela meta tag (mais rápido)
@@ -395,6 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const txt = document.createElement('div');
+        txt.className = 'message-text';
         txt.textContent = content;
         bubble.appendChild(txt);
 
@@ -433,7 +450,8 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.innerHTML = '⎘ Copiar';
 
             btn.addEventListener('click', async () => {
-                await copyText(content);
+                const currentContent = txt.textContent;
+                await copyText(currentContent);
                 btn.innerHTML = '✓ Copiado';
                 btn.classList.add('copied');
                 setTimeout(() => {
@@ -467,12 +485,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Rastreia mensagem sob cursor para Ctrl+C
-        row.addEventListener('mouseenter', () => { hoveredMsgContent = content; });
+        row.addEventListener('mouseenter', () => { hoveredMsgContent = txt.textContent; });
         row.addEventListener('mouseleave', () => { hoveredMsgContent = null; });
 
         msgContainer.appendChild(row);
         if (scroll) scrollToBottom();
-        return row;
+        return { row, textElement: txt };
     }
 
     // ── Indicador "pensando" ─────────────────────────────────
@@ -624,98 +642,93 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ── Envio de mensagem ou arquivo ─────────────────────────
     async function handleSend() {
-        // Se já está enviando, interrompe a anterior e começa a nova (requisito: "a IA continuará")
-        if (isSending) {
-            stopGeneration();
-        }
+        if (isSending) { stopGeneration(); }
 
         const text = chatInput.value.trim();
         const hasFiles = fileInput.files && fileInput.files.length > 0;
         const selectedFile = hasFiles ? fileInput.files[0] : null;
 
         if (!text && !hasFiles) return;
-
         if (text === '/lista') { await handleLista(); return; }
 
         setLoading(true);
-        const loader = addLoader();
-        abortController = new AbortController();
+        const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-        // Limpa o campo IMEDIATAMENTE após o envio para melhor UX
-        chatInput.value = '';
-        chatInput.style.height = 'auto';
-        fileInput.value = '';
-        filePreview.innerHTML = '';
-
-        try {
-            let res, data;
-            const csrf = getCsrf();
-
-            if (hasFiles && selectedFile) {
-                // Lógica de Upload de Arquivo
-                const formData = new FormData();
-                formData.append('file', selectedFile);
-                if (currentSessionId) formData.append('session_id', currentSessionId);
-
-                const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                buildMessage('user', `[Anexo: ${selectedFile.name}]`, now, true);
-
-                res = await fetch('/chat/upload/', {
+        if (hasFiles && selectedFile) {
+            // Lógica de Upload (Mantém POST comum)
+            const loader = addLoader();
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            if (currentSessionId) formData.append('session_id', currentSessionId);
+            
+            buildMessage('user', `[Anexo: ${selectedFile.name}]`, now, true);
+            
+            chatInput.value = ''; fileInput.value = ''; filePreview.innerHTML = '';
+            
+            try {
+                const res = await fetch('/chat/upload/', {
                     method: 'POST',
-                    headers: { 'X-CSRFToken': csrf },
-                    body: formData,
-                    signal: abortController.signal
+                    headers: { 'X-CSRFToken': getCsrf() },
+                    body: formData
                 });
-            } else {
-                // Lógica de Mensagem de Texto
-                const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                buildMessage('user', text, now, true);
-
-                res = await fetch('/chat/send/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrf,
-                    },
-                    body: JSON.stringify({ message: text, session_id: currentSessionId }),
-                    signal: abortController.signal
-                });
-            }
-
-            data = await res.json();
-            loader.remove();
-
-            if (data.status === 'success') {
-                if (!currentSessionId) {
-                    currentSessionId = data.session_id;
-                    window.history.replaceState(null, '', `/chat/s/${data.session_id}/`);
-                }
-                if (data.is_new) {
-                    if (pendingItem) { pendingItem.remove(); pendingItem = null; }
-                    addToSidebar(data.session_id, data.session_title);
-                }
-                buildMessage('assistant', data.response, data.time || null, true, data.message_id || null, null);
-                
-                // Força reload se for upload para atualizar a badge de "Pendente"
-                if (hasFiles) {
+                const data = await res.json();
+                loader.remove();
+                if (data.status === 'success') {
+                    if (!currentSessionId) { currentSessionId = data.session_id; }
+                    buildMessage('assistant', data.response, data.time, true);
                     setTimeout(() => window.location.reload(), 800);
                 }
-            } else {
-                buildMessage('assistant', `Erro: ${data.message || 'Falha ao processar.'}`, null, true);
-            }
-        } catch (err) {
-            if (err.name === 'AbortError') {
-                console.log('Geração interrompida pelo usuário.');
-                buildMessage('assistant', 'Geração interrompida.', null, true);
-            } else {
-                console.error(err);
-                if (loader) loader.remove();
-                buildMessage('assistant', 'Erro de conexão com o servidor.', null, true);
-            }
-        } finally {
+            } catch (err) { console.error(err); loader.remove(); }
             setLoading(false);
-            abortController = null;
+            return;
         }
+
+        // SALTO PARA O UX: Streaming de Texto
+        buildMessage('user', text, now, true);
+        chatInput.value = ''; chatInput.style.height = 'auto';
+        
+        const loader = addLoader();
+        let aiMsgObj = null;
+        let fullResponse = "";
+
+        // Conecta ao canal SSE dedicado ao Chat
+        activeEventSource = new EventSource(`/chat/stream/?message=${encodeURIComponent(text)}&session_id=${currentSessionId || ''}`);
+        
+        activeEventSource.addEventListener('session_id', (e) => {
+            if (!currentSessionId) {
+                currentSessionId = e.data;
+                window.history.replaceState(null, '', `/chat/s/${e.data}/`);
+                addToSidebar(e.data, text.substring(0, 50));
+                if (pendingItem) { pendingItem.remove(); pendingItem = null; }
+            }
+        });
+
+        activeEventSource.onmessage = (e) => {
+            if (loader) { loader.remove(); }
+            
+            // Cria a bolha da IA na primeira recepção de token
+            if (!aiMsgObj) {
+                aiMsgObj = buildMessage('assistant', "", now, true);
+            }
+            
+            // Adiciona o token (espaços e quebras de linha são preservados pelo EventSource)
+            const token = e.data;
+            fullResponse += token;
+            aiMsgObj.textElement.textContent = fullResponse;
+            scrollToBottom(true); // Scroll instantâneo durante streaming
+        };
+
+        activeEventSource.onerror = (e) => {
+            if (activeEventSource) {
+                activeEventSource.close();
+                activeEventSource = null;
+            }
+            setLoading(false);
+            if (!fullResponse && !aiMsgObj) {
+                if (loader) loader.remove();
+                buildMessage('assistant', "Erro na conexão com o servidor.", now, true);
+            }
+        };
     }
 
     // ── Sidebar: adicionar nova sessão ───────────────────────

@@ -18,7 +18,7 @@ from .vocabulario import (
 
 
 class AnagmaLLMEngine:
-    """Singleton dinâmico que permite trocar de cérebro em tempo real."""
+    """Motor unificado de alta performance (Meta Llama 3 8B)."""
 
     _instance = None
     _lock = threading.Lock()
@@ -30,7 +30,6 @@ class AnagmaLLMEngine:
                 cls._instance.rag = AnagmaRAGEngine()
                 cls._instance._backend = None
                 cls._instance._llm = None
-                cls._instance._pipe = None
                 cls._instance._load_model()
         return cls._instance
 
@@ -46,8 +45,7 @@ class AnagmaLLMEngine:
             config.etapa_nome = etapa
             config.progresso = progresso
             config.status = status
-            if modelo:
-                config.modelo_em_uso = modelo
+            config.modelo_em_uso = 'DIGIANA 8B'
             if erro:
                 config.ultimo_erro = str(erro)
             config.save()
@@ -55,57 +53,26 @@ class AnagmaLLMEngine:
             pass
 
     def _load_model(self):
-        """Decide qual modelo carregar com base na preferência do Admin."""
-        from core.models import ConfiguracaoIA
-        pref = ConfiguracaoIA.get_solo().modelo_preferido
-        
+        """Carrega o motor Digiana 8B (Llama 3)."""
         self._update_status("Iniciando ativação da Digiana...", 10)
+        gguf_path = os.path.abspath(getattr(settings, 'GGUF_MODEL_PATH', ''))
         
-        if pref == 'LEVE':
-            self._ativar_modo_leve()
+        if os.path.exists(gguf_path):
+            self._update_status("Carregando inteligência contábil...", 40)
+            self._update_status("Sincronizando bibliotecas...", 70)
+            self._carregar_gguf(gguf_path)
+            self._update_status("Motor pronto para uso!", 100, status='PRONTO')
         else:
-            self._ativar_modo_completo()
+            self._update_status("Erro: Arquivo do modelo não encontrado.", 0, status='ERRO', erro='Arquivo ausente')
 
     def _limpar_memoria(self):
-        """Expurga modelos anteriores da RAM para evitar travamentos."""
-        self._update_status("Limpando memória para o novo cérebro...", 20)
+        """Expurga modelos anteriores da RAM."""
         self._llm = None
-        self._pipe = None
-        self._model = None
-        self._tokenizer = None
         self._backend = None
         gc.collect()
 
-    def _ativar_modo_leve(self):
-        gguf_path = os.path.abspath(getattr(settings, 'GGUF_MODEL_PATH', ''))
-        if os.path.exists(gguf_path):
-            self._update_status("Carregando módulo de aprendizado existente...", 40)
-            # Simulação de carga de aprendizado (RAG já inicializado)
-            self._update_status("Sincronizando histórico de conversas...", 60)
-            self._update_status("Preparando modelo LEVE...", 80)
-            self._carregar_gguf(gguf_path)
-            self._update_status("Carregamento completo!", 100, status='PRONTO', modelo='LEVE')
-        else:
-            self._update_status("Erro: Arquivo GGUF não encontrado.", 0, status='ERRO', erro='Arquivo ausente')
-
-    def _ativar_modo_completo(self):
-        safetensors_path = os.path.abspath(getattr(settings, 'MICROSOFT_MODEL_PATH', ''))
-        if os.path.exists(safetensors_path):
-            self._update_status("Carregando módulo de aprendizado existente...", 30)
-            self._update_status("Sincronizando histórico de conversas...", 50)
-            self._update_status("Preparando modelo COMPLETO...", 70)
-            sucesso = self._carregar_safetensors(safetensors_path)
-            if sucesso:
-                self._update_status("Carregamento completo!", 100, status='PRONTO', modelo='COMPLETO')
-            else:
-                self._update_status("Erro ao carregar Safetensors. Recuando para modo LEVE.", 50, status='HIBERNACAO')
-                self._ativar_modo_leve()
-        else:
-            self._update_status("Modelo COMPLETO não encontrado. Ativando modo LEVE.", 40, status='HIBERNACAO')
-            self._ativar_modo_leve()
-
     def recarregar_modelo(self):
-        """Interface pública para trocar de cérebro via Admin."""
+        """Interface pública para reinicializar o cérebro da Digiana."""
         with self._lock:
             self._limpar_memoria()
             self._load_model()
@@ -116,61 +83,30 @@ class AnagmaLLMEngine:
             import psutil
 
             ram_antes = psutil.virtual_memory().used / 1e9
-            print(f'[SISTEMA] Carregando GGUF: {model_path}', flush=True)
+            print(f'[SISTEMA] Ativando Cérebro Digiana 8B: {model_path}', flush=True)
 
-            n_threads = max(1, os.cpu_count() // 2)
+            # Otimização: Usar quase todos os núcleos para velocidade máxima
+            n_threads = max(1, os.cpu_count() - 1)
 
             self._llm = Llama(
                 model_path=model_path,
                 n_ctx=4096,
                 n_threads=n_threads,
+                n_batch=512,
                 n_gpu_layers=0,
                 verbose=False,
             )
             self._backend = 'gguf'
 
             ram_depois = psutil.virtual_memory().used / 1e9
-            print(f'[SISTEMA] RAM: +{ram_depois - ram_antes:.1f} GB | Threads: {n_threads}', flush=True)
-            print('[SISTEMA] --- SUCESSO: ANAGMA IA ESTÁ PRONTA (GGUF) ---\n', flush=True)
-
-        except ImportError:
-            safetensors_path = os.path.abspath(getattr(settings, 'MICROSOFT_MODEL_PATH', ''))
-            if os.path.exists(safetensors_path):
-                self._carregar_safetensors(safetensors_path)
-        except MemoryError:
-            print('[ERRO CRÍTICO] RAM insuficiente para o modelo GGUF.', flush=True)
-        except Exception as e:
-            print(f'[ERRO CRÍTICO] Falha ao carregar GGUF: {e}', flush=True)
-            traceback.print_exc()
-
-    def _carregar_safetensors(self, model_path):
-        try:
-            import torch
-            from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, AutoConfig
-
-            config = AutoConfig.from_pretrained(model_path, trust_remote_code=False)
-            config.use_cache = False
-
-            self._tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=False)
-
-            print('[SISTEMA] Alocando pesos safetensors em float16...', flush=True)
-            self._model = AutoModelForCausalLM.from_pretrained(
-                model_path, config=config, trust_remote_code=False,
-                dtype=torch.float16, device_map='cpu',
-                low_cpu_mem_usage=True, attn_implementation='eager',
-            )
-            self._pipe = pipeline('text-generation', model=self._model, tokenizer=self._tokenizer)
-            self._backend = 'transformers'
-            print('[SISTEMA] --- SUCESSO: ANAGMA IA ESTÁ PRONTA (safetensors) ---\n', flush=True)
-            return True
+            print(f'[SISTEMA] RAM Alocada: {ram_depois - ram_antes:.1f} GB | Threads: {n_threads}', flush=True)
+            print('[SISTEMA] --- SUCESSO: DIGIANA 8B ESTÁ PRONTA ---\n', flush=True)
 
         except MemoryError:
-            print('[ERRO CRÍTICO] RAM insuficiente.', flush=True)
-            return False
+            print('[ERRO CRÍTICO] RAM insuficiente para o modelo 8B.', flush=True)
         except Exception as e:
-            print(f'[ERRO CRÍTICO] Falha ao carregar safetensors: {e}', flush=True)
+            print(f'[ERRO CRÍTICO] Falha ao carregar motor: {e}', flush=True)
             traceback.print_exc()
-            return False
 
     # ------------------------------------------------------------------
     # Geração de resposta
@@ -310,6 +246,96 @@ class AnagmaLLMEngine:
                 return True
         return False
 
+    def gerar_resposta_stream(self, user_query, chat_history=None, user_name=None, saudacao=None, search_query=None, user=None):
+        """
+        Versão de streaming com MODO DE SEGURANÇA DE DOMÍNIO FECHADO.
+        """
+        if not self.pronto:
+            yield "Erro: Motor de IA não disponível."
+            return
+
+        nome = user_name or 'usuário'
+        primeiro_nome = nome.split()[0] if nome else nome
+        cumprimento = saudacao or 'Boa tarde'
+        perfil_anagma = self._get_perfil_anagma()
+        is_first_message = not bool(chat_history)
+
+        # 1. Interceptores Rápidos
+        if self._e_saudacao(user_query) or self._e_fora_do_dominio(user_query) or self._e_pergunta_sobre_ia(user_query):
+            yield self.gerar_resposta(user_query, chat_history, user_name, saudacao, search_query, user)
+            return
+
+        # 2. Busca RAG Soberana
+        contexto_rag, has_db_hits = self.rag.buscar_conhecimento(search_query or user_query, user=user)
+
+        # --- LOG DE DEPURAÇÃO VISUAL (Terminal) ---
+        print("\n" + "█" * 60)
+        print(f"  DIAGNÓSTICO RAG - Pergunta: {user_query}")
+        print(f"  Hits na Biblioteca/Ideias: {'SIM' if has_db_hits else 'NÃO'}")
+        if contexto_rag:
+            print(f"  Contexto Localizado:\n{contexto_rag[:500]}...")
+        else:
+            print("  AVISO: NENHUM CONTEXTO LOCALIZADO NO RAG.")
+        print("█" * 60 + "\n", flush=True)
+
+        # 3. Montagem do System Prompt (Técnica Recency Bias)
+        base_msg = f"""Você é a **Digiana**, oficial da Anagma.
+### CONTEXTO DA EMPRESA:
+{perfil_anagma if perfil_anagma else 'Base Técnica Anagma.'}
+"""
+        if contexto_rag:
+            base_msg += f"\n\n### CONHECIMENTO TÉCNICO INTERNO (ÚNICA VERDADE):\n{contexto_rag}"
+
+        system_msg = base_msg + """
+\n### MANDATO SUPREMO (SEGURANÇA):
+1. Seu conhecimento externo foi BLOQUEADO.
+2. Use EXCLUSIVAMENTE o 'CONHECIMENTO TÉCNICO INTERNO' acima para responder.
+3. Se a informação NÃO estiver no texto acima, diga: "Não localizei registros específicos sobre este assunto na base de dados interna da Anagma."
+4. PROIBIDO INVENTAR nomes de leis, datas ou significados de siglas.
+5. RESPONDA APENAS EM PORTUGUÊS BRASILEIRO.
+"""
+
+        # 4. Gestão de Mensagens
+        messages = [{'role': 'system', 'content': system_msg}]
+        if chat_history:
+            for msg in chat_history[-3:]: # Reduzido para focar no mandato
+                messages.append({'role': msg['role'], 'content': msg['content']})
+        messages.append({'role': 'user', 'content': user_query})
+
+        # 5. Loop de Streaming
+        try:
+            full_response = ""
+            if self._backend == 'gguf':
+                stream = self._llm.create_chat_completion(
+                    messages=messages,
+                    max_tokens=1000,
+                    temperature=0.1, # Temperatura mínima para reduzir criatividade
+                    stream=True,
+                    stop=['<|end|>', '<|endoftext|>', '<|user|>']
+                )
+                for chunk in stream:
+                    delta = chunk['choices'][0]['delta']
+                    if 'content' in delta:
+                        token = delta['content']
+                        full_response += token
+                        yield token
+            else:
+                # Transformers Streaming (Safe Mode)
+                from transformers import TextIteratorStreamer
+                from threading import Thread
+                streamer = TextIteratorStreamer(self._tokenizer, skip_prompt=True, skip_special_tokens=True)
+                full_prompt = self._tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+                inputs = self._tokenizer([full_prompt], return_tensors="pt").to("cpu")
+                generation_kwargs = dict(inputs, streamer=streamer, max_new_tokens=800, temperature=0.1)
+                thread = Thread(target=self._model.generate, kwargs=generation_kwargs)
+                thread.start()
+                for token in streamer:
+                    full_response += token
+                    yield token
+
+        except Exception as e:
+            yield f" Erro no processamento: {str(e)}"
+
     def gerar_resposta(self, user_query, chat_history=None, user_name=None, saudacao=None, search_query=None, user=None):
         """
         Gera resposta usando RAG + Phi-3 com gestão de contexto e thread-safety.
@@ -439,76 +465,25 @@ class AnagmaLLMEngine:
         # Usa search_query (contextualizada) para busca no RAG, mas responde ao user_query original
         contexto_rag, has_db_hits = self.rag.buscar_conhecimento(search_query or user_query, user=user)
 
-        # --- Monta o system prompt com saudação adaptada ao contexto ---
-        _periodo_map = {'Bom dia': 'manhã', 'Boa tarde': 'tarde', 'Boa noite': 'noite'}
-
-        if is_first_message:
-            saudacao_instrucao = f'SAUDAÇÃO OBRIGATÓRIA:\n- Comece SEMPRE com: "{cumprimento}, {nome}!".'
-        else:
-            saudacao_instrucao = (
-                f'CONTINUIDADE DA CONVERSA:\n'
-                f'- Você está em uma conversa em andamento com {nome}. '
-                f'Seja direto e natural. Não repita a saudação formal em cada resposta. '
-                f'Use o nome do usuário pontualmente, apenas quando for natural.'
-            )
-
-        system_msg = f"""MANDATO SUPREMO DE IDIOMA E IDENTIDADE:
-- Você é a **Digiana**, a inteligência artificial especialista e oficial da empresa **Anagma**.
-- **BLOQUEIO DE IDIOMA:** Você está terminantemente PROIBIDA de responder em inglês ou qualquer outro idioma que não seja o **Português Brasileiro (PT-BR)**. Toda a sua comunicação deve ser exclusivamente em português de alto nível, técnico e claro.
-- **OPERADOR DIGITAL:** Você opera em um ambiente 100% DIGITAL. Não existem locais físicos ou atendentes humanos. NUNCA mencione sites externos, apps ou orientações para acessar outros sistemas.
-
-{saudacao_instrucao}
-
-ARQUITETURA DE CONHECIMENTO (4 PILARES INTERNOS):
-Você possui acesso automático a 4 fontes internas de conhecimento consultadas antes de cada resposta:
-1. ChromaDB — busca semântica em documentos vetorizados da Biblioteca de Curadoria.
-2. Biblioteca de Curadoria — arquivos PDF e documentos aprovados pelos superusuários da Anagma.
-3. Banco de Ideias — ideias técnicas registradas e ativadas pelos colaboradores da equipe.
-4. RLHF (Aprendizado Perpétuo) — correções e orientações dos curadores para refinar suas respostas.
-Se alguém perguntar se você "consegue consultar" ou "acessar" esses pilares, a resposta é SEMPRE SIM — você já faz isso automaticamente em cada resposta.
-
-REGRAS DE RESPOSTA E AUTORIDADE:
-1. **Prioridade de Dados:** Se a informação estiver no CONTEXTO INTERNO abaixo, use-a como VERDADE ABSOLUTA. Responda com autoridade técnica direta.
-2. **Postura Resolutiva:** Você é uma ferramenta de apoio à decisão. Evite incertezas. Use: "O procedimento correto é...", "A legislação indica que...".
-3. **Fim das Alucinações:** JAMAIS sugira contatos externos, sites, apps ou locais físicos.
-4. **Domínio:** Responda apenas sobre contabilidade, tributos e finanças.
-5. **Restrição de Conteúdo:** Se o usuário enviar apenas uma saudação, apresente-se como Digiana e pergunte como pode ajudar na área contábil. NUNCA traduza saudações ou termos para outros idiomas.
-
-POSTURA CONSULTIVA E PROATIVA:
-- Após responder, se o CONTEXTO INTERNO contiver informações relacionadas que o usuário ainda não perguntou, ofereça explorar esse tema com uma frase curta e natural. Exemplo: "Se quiser, também posso detalhar como isso afeta o Lucro Presumido."
-- Se o usuário parecer em dúvida ou não souber ao certo o que perguntar, sugira 2 ou 3 tópicos próximos que você domina e que podem ser úteis para ele.
-- Use linguagem simples e direta: "Também tenho informações sobre...", "Posso te ajudar também com...", "Quer que eu explique melhor...?".
-- Uma sugestão por resposta é suficiente — não sobrecarregue o usuário com opções.
-
-CONTEXTO DA EMPRESA (DNA DA DIGIANA):
-{perfil_anagma if perfil_anagma else 'Digiana - Especialista Técnica em Contabilidade Digital.'}
+        # --- Montagem do System Message (Técnica Recency Bias) ---
+        base_msg = f"""Você é a **Digiana**, assistente oficial de contabilidade da **Anagma**.
+### CONTEXTO DA EMPRESA (DNA):
+{perfil_anagma if perfil_anagma else 'Base Técnica Anagma.'}
 """
-
         if contexto_rag:
-            if has_db_hits:
-                # CONHECIMENTO PRIORITÁRIO (Soberania de Dados)
-                system_msg += (
-                    f'\n\nCONHECIMENTO TÉCNICO OFICIAL DA ANAGMA:\n'
-                    f'{contexto_rag}\n\n'
-                    f'DIRETRIZ DE AUTORIDADE:\n'
-                    f'1. Use as informações acima como sua base principal de dados reais.\n'
-                    f'2. Se o texto acima citar limites, leis, datas ou valores, use-os exatamente como descritos.\n'
-                    f'3. PROIBIÇÃO DE INVENÇÃO: Se o texto acima NÃO citar uma lei ou número específico que o usuário perguntou, '
-                    f'responda com base na teoria contábil geral, mas informe explicitamente que "não possui o registro exato deste dado na biblioteca interna".\n'
-                    f'4. Nunca invente nomes de leis, decretos ou números de artigos.'
-                )
-            else:
-                # CONTEXTO DE APOIO (Conceitual)
-                system_msg += (
-                    f'\n\nCONTEXTO CONCEITUAL RELACIONADO:\n{contexto_rag}\n\n'
-                    f'Use o contexto acima para guiar sua explicação técnica de forma fluida.'
-                )
+            base_msg += f"\n\n### CONHECIMENTO TÉCNICO INTERNO (ÚNICA FONTE DE VERDADE):\n{contexto_rag}"
 
+        # Mandato Supremo inserido por último para combater a teimosia do modelo
+        system_msg = base_msg + """
+\n### MANDATO SUPREMO DE SEGURANÇA (LEIA COM ATENÇÃO):
+1. Seu conhecimento de treinamento externo foi BLOQUEADO para fatos técnicos.
+2. Use EXCLUSIVAMENTE o 'CONHECIMENTO TÉCNICO INTERNO' acima para responder sobre leis, siglas ou datas.
+3. Se a informação NÃO estiver no texto acima, responda: "Não localizei registros específicos sobre este assunto na base de dados interna da Anagma."
+4. PROIBIDO INVENTAR ou DEDUZIR significados para siglas.
+5. RESPONDA APENAS EM PORTUGUÊS BRASILEIRO.
+"""
+        
         # --- GESTÃO DE CONTEXTO ---
-        MAX_CONTEXT_TOKENS = 3200
-        tokens_fixos = self._contar_tokens_aprox(system_msg) + self._contar_tokens_aprox(user_query)
-        available_for_history = MAX_CONTEXT_TOKENS - tokens_fixos
-
         messages = [{'role': 'system', 'content': system_msg}]
 
         if chat_history:

@@ -99,8 +99,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Configurações de E-mail (Para teste de recuperação de senha)
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
-# Caminho do modelo safetensors (mantido como fallback)
-MICROSOFT_MODEL_PATH = os.path.join(BASE_DIR.parent, 'assets', 'models', 'phi-3-mini')
+# Caminho do motor principal da Digiana (Meta Llama 3 8B Instruct GGUF)
+GGUF_MODEL_PATH = os.path.join(BASE_DIR.parent, 'assets', 'models', 'Meta-Llama-3-8B-Instruct-Q4_K_M.gguf')
 
-# Caminho do modelo GGUF quantizado (Q4_K_M) — principal, para uso com llama-cpp-python
-GGUF_MODEL_PATH = os.path.join(BASE_DIR.parent, 'assets', 'models', 'phi-3-mini-gguf', 'Phi-3-mini-4k-instruct-q4.gguf')

@@ -97,7 +97,13 @@ class AnagmaRAGEngine:
         
         # Identifica se a pergunta foca em termos técnicos específicos da nossa base
         palavras_query = [p for p in query_limpa.split() if p not in STOPWORDS_RAG and len(p) > 2]
-        termos_tecnicos_encontrados = [t.strip().lower() for t in TERMOS_CONTABEIS if t.strip().lower() in query_limpa]
+        
+        # Detecção robusta com bordas de palavra (\b)
+        termos_tecnicos_encontrados = []
+        for t in TERMOS_CONTABEIS:
+            t_limpo = t.strip().lower()
+            if re.search(r'\b' + re.escape(t_limpo) + r'\b', query_limpa):
+                termos_tecnicos_encontrados.append(t_limpo)
         
         def calcular_relevancia_tecnica(texto):
             """Calcula o quanto o texto foca nos termos da pergunta."""

@@ -161,6 +161,67 @@ def chat_home(request):
     return render(request, 'chat/home.html', context)
 
 
+from django.http import StreamingHttpResponse
+
+@login_required
+def chat_stream(request):
+    """
+    Endpoint de Streaming SSE para o chat.
+    Recebe message e session_id via GET.
+    """
+    user_prompt = request.GET.get('message', '').strip()
+    session_id = request.GET.get('session_id')
+    
+    if not user_prompt:
+        return JsonResponse({'status': 'error', 'message': 'Mensagem vazia'}, status=400)
+
+    def event_stream():
+        llm_engine = get_llm_engine()
+        session = None
+        if session_id:
+            session = ChatSession.objects.filter(id=session_id, user=request.user, deleted_at__isnull=True).first()
+        
+        if not session:
+            titulo = user_prompt[:50] + ('...' if len(user_prompt) > 50 else '')
+            session = ChatSession.objects.create(user=request.user, titulo=titulo)
+        
+        # Registra pergunta do usuário se for nova sessão ou última msg não for essa
+        ultima_msg = session.messages.order_by('-timestamp').first()
+        if not ultima_msg or ultima_msg.content != user_prompt:
+            ChatMessage.objects.create(session=session, role='user', content=user_prompt)
+
+        history_msgs = session.messages.order_by('timestamp')
+        chat_history = [{'role': m.role, 'content': m.content} for m in history_msgs]
+        
+        user_name = request.user.nome_completo or request.user.username
+        saudacao = _get_saudacao()
+        
+        full_response = ""
+        # Envia ID da sessão no primeiro evento para o frontend se for nova
+        yield f"event: session_id\ndata: {session.id}\n\n"
+
+        for token in llm_engine.gerar_resposta_stream(
+            user_query=user_prompt,
+            chat_history=chat_history,
+            user_name=user_name,
+            saudacao=saudacao,
+            search_query=user_prompt,
+            user=request.user
+        ):
+            full_response += token
+            # Protocolo SSE: cada pedaço de dado deve começar com "data: " e terminar com "\n\n"
+            yield f"data: {token}\n\n"
+
+        # Salva a resposta completa no banco ao final
+        if full_response:
+            ChatMessage.objects.create(session=session, role='assistant', content=full_response)
+            session.save()
+
+    response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'  # Importante para Nginx não fazer buffer do stream
+    return response
+
 @login_required
 def send_message(request):
     if request.method != 'POST':
