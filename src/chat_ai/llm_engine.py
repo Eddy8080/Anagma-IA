@@ -484,6 +484,10 @@ class AnagmaLLMEngine:
 """
         
         # --- GESTÃO DE CONTEXTO ---
+        MAX_CONTEXT_TOKENS = 3200
+        tokens_fixos = self._contar_tokens_aprox(system_msg) + self._contar_tokens_aprox(user_query)
+        available_for_history = MAX_CONTEXT_TOKENS - tokens_fixos
+
         messages = [{'role': 'system', 'content': system_msg}]
 
         if chat_history:
