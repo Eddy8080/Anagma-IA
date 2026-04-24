@@ -198,13 +198,14 @@ def send_message(request):
 
     try:
         llm_engine = get_llm_engine()
-        query_contextual = f"{user_prompt} {session.titulo}"
+        # A busca deve focar apenas no prompt atual para ser precisa.
+        # Adicionar o título da sessão pode causar ruído e impedir que o RAG encontre documentos exatos.
         ai_response = llm_engine.gerar_resposta(
             user_query=user_prompt,
             chat_history=chat_history,
             user_name=user_name,
             saudacao=saudacao,
-            search_query=query_contextual,
+            search_query=user_prompt,
             user=request.user
         )
     except Exception:

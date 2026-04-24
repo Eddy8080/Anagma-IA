@@ -1,4 +1,5 @@
 import os
+import re
 import pandas as pd
 from langchain_community.document_loaders import UnstructuredFileLoader, PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -83,102 +84,83 @@ class AnagmaRAGEngine:
 
     def buscar_conhecimento(self, query, k=3, user=None):
         """
-        Busca semântica nos documentos vetorizados (ChromaDB)
-        E busca textual nos documentos aprovados na Biblioteca.
+        Busca Híbrida Universal:
+        - Layer 1: Busca Semântica (ChromaDB) - Captura o conceito/contexto.
+        - Layer 2: Busca por Atributos (DB/Palavras) - Garante precisão em termos técnicos.
         """
         contexto_final = []
+        has_db_hits = False
 
-        # 1. Busca no ChromaDB (Documentos Fixos)
+        # --- PRÉ-PROCESSAMENTO: Identificação de Intenção ---
+        query_limpa = re.sub(r'[.,?!:;()\[\]"\']', ' ', query.lower())
+        from .vocabulario import TERMOS_CONTABEIS, STOPWORDS_RAG
+        
+        # Identifica se a pergunta foca em termos técnicos específicos da nossa base
+        palavras_query = [p for p in query_limpa.split() if p not in STOPWORDS_RAG and len(p) > 2]
+        termos_tecnicos_encontrados = [t.strip().lower() for t in TERMOS_CONTABEIS if t.strip().lower() in query_limpa]
+        
+        def calcular_relevancia_tecnica(texto):
+            """Calcula o quanto o texto foca nos termos da pergunta."""
+            texto_l = texto.lower()
+            matches = sum(1 for t in termos_tecnicos_encontrados if t in texto_l)
+            matches += sum(1 for p in palavras_query if p in texto_l)
+            return matches
+
+        # --- LAYER 1: Busca Semântica (O "Cérebro" Vetorial) ---
         try:
-            results = self.vector_store.similarity_search(query, k=k)
-            if results:
-                contexto_final.append("\n---\n".join([doc.page_content for doc in results]))
+            # Buscamos por proximidade de conceito, sem thresholds matemáticos rígidos
+            docs_vetoriais = self.vector_store.similarity_search(query, k=k)
+            
+            for doc in docs_vetoriais:
+                # Se o documento vetorial tiver pelo menos um termo técnico ou palavra da query, 
+                # ele é considerado um "hit" de alta relevância (Biblioteca).
+                if calcular_relevancia_tecnica(doc.page_content) > 0:
+                    fonte = doc.metadata.get('source', 'Documento Interno')
+                    contexto_final.append(f"CONHECIMENTO OFICIAL (Fonte: {fonte}):\n{doc.page_content}")
+                    has_db_hits = True
+                else:
+                    # Se for apenas semanticamente próximo, entra como contexto de apoio
+                    contexto_final.append(f"CONTEXTO DE APOIO (Conceitos Relacionados):\n{doc.page_content}")
         except Exception as e:
-            print(f"[RAG Chroma] Erro: {e}")
+            print(f"[RAG Chroma] Erro: {e}", flush=True)
 
-        # 2. Busca na Biblioteca de Curadoria (Documentos Aprovados e Correções RLHF)
+        # --- LAYER 2: Keyword Search (RLHF e Ideias) ---
         try:
             from core.models import DocumentoBiblioteca, GlobalIdeia
             from .models import AIConsistencyCorrection
             from django.db.models import Q
-            
-            # Busca simples por palavras-chave na query (melhor performance para banco)
-            palavras = [p for p in query.split() if len(p) > 3]
-            
-            # --- 2.1 BUSCA EM CORREÇÕES DE CONSISTÊNCIA (RLHF - APRENDIZADO PERPÉTUO) ---
-            # Prioridade máxima: se o superusuário já corrigiu algo similar, a IA deve saber.
-            if palavras:
-                # Filtramos palavras técnicas e ignoramos saudações comuns para evitar o "modo dicionário"
-                palavras_tecnicas = [p for p in palavras if p.lower() not in STOPWORDS_RAG and len(p) > 4]
+
+            # Busca no DB por palavras-chave para complementar o vetor
+            if palavras_query:
+                q_filter = Q()
+                for p in palavras_query[:3]:
+                    q_filter |= Q(user_query__icontains=p) | Q(titulo_melhoria__icontains=p)
                 
-                if palavras_tecnicas:
-                    query_rlhf = Q()
-                    for p in palavras_tecnicas[:5]:
-                        query_rlhf |= Q(user_query__icontains=p) | Q(titulo_melhoria__icontains=p)
-
-                    candidatos_rlhf = list(
-                        AIConsistencyCorrection.objects.filter(query_rlhf)
-                        .only('user_query', 'suggested_improvement', 'titulo_melhoria')[:6]
+                # RLHF (Correções de Curadoria)
+                correcoes = AIConsistencyCorrection.objects.filter(q_filter)[:2]
+                for cor in correcoes:
+                    contexto_final.append(
+                        f"REGRA DE CURADORIA (Instrução Aprovada):\n"
+                        f"Pergunta: {cor.user_query}\n"
+                        f"Resposta a seguir: {cor.suggested_improvement}"
                     )
-                    correcoes = sorted(
-                        candidatos_rlhf,
-                        key=lambda c: sum(
-                            1 for p in palavras_tecnicas
-                            if p.lower() in (c.user_query + ' ' + (c.titulo_melhoria or '')).lower()
-                        ),
-                        reverse=True
-                    )[:2]
-                    for cor in correcoes:
-                        titulo = cor.titulo_melhoria or "Regra Técnica"
-                        contexto_final.append(f"INSTRUÇÃO DE CURADORIA APROVADA ({titulo}):\nPergunta do Usuário: {cor.user_query}\nResposta Ideal (Siga este padrão): {cor.suggested_improvement}")
+                    has_db_hits = True
 
-            # --- 2.2 BUSCA NA BIBLIOTECA ---
-            # Primeiro, busca exata por nome de arquivo para informar status
-            docs_status = DocumentoBiblioteca.objects.filter(nome_arquivo__icontains=query).only('nome_arquivo', 'status')[:3]
-            for ds in docs_status:
-                status_pt = dict(DocumentoBiblioteca.STATUS_CHOICES).get(ds.status, ds.status)
-                contexto_final.append(f"INFO SISTEMA: O arquivo '{ds.nome_arquivo}' existe no sistema com o status: {status_pt}.")
-
-            # Depois, busca conteúdo dos aprovados OU dos pendentes do próprio usuário
-            query_bib = Q(status='approved')
-            if user and user.is_authenticated:
-                query_bib |= Q(status='pending', enviado_por=user)
-
-            if palavras:
-                sub_query = Q()
-                for p in palavras[:5]:
-                    sub_query |= Q(conteudo_extraido__icontains=p) | Q(nome_arquivo__icontains=p)
-                query_bib &= sub_query
-
-            candidatos_bib = list(
-                DocumentoBiblioteca.objects.filter(query_bib).only('conteudo_extraido', 'nome_arquivo')[:8]
-            )
-            docs_biblioteca = sorted(
-                candidatos_bib,
-                key=lambda d: sum(
-                    1 for p in palavras
-                    if p.lower() in (d.conteudo_extraido + ' ' + d.nome_arquivo).lower()
-                ),
-                reverse=True
-            )[:2]
-
-            for doc in docs_biblioteca:
-                contexto_final.append(f"DOCUMENTO APROVADO ({doc.nome_arquivo}):\n{doc.conteudo_extraido[:2000]}")
-
-            # --- BUSCA NO BANCO DE IDEIAS (GlobalIdeia) ---
-            query_ideias = Q(ativa=True)
-            if palavras:
-                sub_query_ideia = Q()
-                for p in palavras[:5]:
-                    sub_query_ideia |= Q(titulo__icontains=p) | Q(conteudo__icontains=p)
-                query_ideias &= sub_query_ideia
-
-            ideias = GlobalIdeia.objects.filter(query_ideias).only('titulo', 'conteudo')[:3]
-            
-            for ideia in ideias:
-                contexto_final.append(f"IDEIA DO BANCO DE IDEIAS ({ideia.titulo}):\n{ideia.conteudo}")
+                # Banco de Ideias
+                q_ideias = Q(ativa=True)
+                sub_ideias = Q()
+                for p in palavras_query[:3]:
+                    sub_ideias |= Q(titulo__icontains=p) | Q(conteudo__icontains=p)
+                
+                ideias = GlobalIdeia.objects.filter(q_ideias & sub_ideias)[:2]
+                for ideia in ideias:
+                    contexto_final.append(f"IDEIA REGISTRADA (Tema: {ideia.titulo}):\n{ideia.conteudo}")
+                    has_db_hits = True
 
         except Exception as e:
-            print(f"[RAG Banco de Dados] Erro: {e}")
+            print(f"[RAG DB] Erro: {e}", flush=True)
 
-        return "\n\n=== CONTEXTO ADICIONAL ===\n\n".join(contexto_final)
+        return "\n\n---\n\n".join(contexto_final), has_db_hits
+
+        has_db_hits = chroma_contributed or keyword_contributed
+        return "\n\n=== CONTEXTO ADICIONAL ===\n\n".join(contexto_final), has_db_hits

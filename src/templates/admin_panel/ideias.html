@@ -70,7 +70,7 @@
 
     sseSource.onmessage = function(event) {
         const data = JSON.parse(event.data);
-        if (document.getElementById('idea-' + data.pk)) return;
+        if (document.getElementById('ideia-' + data.pk)) return;
 
         const tr = document.createElement('tr');
         tr.id = 'ideia-' + data.pk;
@@ -82,10 +82,13 @@
             
         const toggleText = data.ativa ? 'Desativar' : 'Ativar';
 
+        // Escapar aspas simples para o onclick
+        const escapedTitulo = data.titulo.replace(/'/g, "\\'");
+
         tr.innerHTML = `
             <td style="max-width:300px;">
                 <div style="font-weight:600;" class="text-dynamic">${data.titulo}</div>
-                <div class="text-dynamic-muted" style="font-size:0.8rem; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:280px;">${data.conteudo}</div>
+                <div class="text-dynamic-muted" style="font-size:0.8rem; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:280px;">${data.conteudo.replace(/<[^>]*>?/gm, '')}</div>
             </td>
             <td style="color:var(--accent-main); font-weight:600;">${data.autor}</td>
             <td class="text-dynamic-muted" style="font-size:0.85rem;">${data.criado_em}</td>
@@ -100,7 +103,7 @@
                     {% csrf_token %}
                     <button type="submit" class="btn btn-outline text-dynamic" style="margin-right:6px;">${toggleText}</button>
                 </form>
-                <button type="button" class="btn btn-danger" onclick="openDeleteIdeiaModal('${data.pk}', '${data.titulo.replace(/'/g, "\\'")}')">
+                <button type="button" class="btn btn-danger" onclick="openDeleteIdeiaModal('${data.pk}', '${escapedTitulo}')">
                     Excluir
                 </button>
             </td>
@@ -167,6 +170,13 @@
         </div>
     </div>
 </div>
+
+<!-- Formulário Oculto para Submissão -->
+<form id="form-editar" method="post" action="" style="display:none;">
+    {% csrf_token %}
+    <input type="hidden" id="hidden-titulo" name="titulo">
+    <input type="hidden" id="hidden-conteudo" name="conteudo">
+</form>
 
 {# ── Modal de Confirmação de Exclusão (Padrão Digiana) ── #}
 <div id="delete-ideia-modal" class="modal-overlay">

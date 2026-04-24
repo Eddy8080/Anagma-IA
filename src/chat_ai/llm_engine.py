@@ -195,6 +195,66 @@ class AnagmaLLMEngine:
             cache.set('perfil_anagma', perfil, timeout=300)
         return perfil
 
+    def _montar_resposta_biblioteca(self, contexto_rag, primeiro_nome):
+        """
+        Extrai conteúdo de documentos/ideias do banco e monta resposta diretamente,
+        sem passar pelo LLM. Evita alucinações do Phi-3-mini quando há conteúdo específico.
+        Retorna None se não encontrar blocos reconhecíveis (fallback para o modelo).
+        """
+        import re
+        blocos = []
+
+        # Extrai blocos de DOCUMENTO APROVADO
+        for match in re.finditer(
+            r'DOCUMENTO APROVADO \(([^)]+)\):\n(.*?)(?=\n\n=== CONTEXTO ADICIONAL ===|IDEIA DO BANCO|INSTRUÇÃO DE CURADORIA|$)',
+            contexto_rag, re.DOTALL
+        ):
+            nome_doc = match.group(1).strip()
+            conteudo = match.group(2).strip()
+            if conteudo:
+                blocos.append(('documento', nome_doc, conteudo[:1500]))
+
+        # Extrai blocos de IDEIA REGISTRADA
+        for match in re.finditer(
+            r'IDEIA REGISTRADA \((?:Tema: )?([^)]+)\):\n(.*?)(?=\n\n---|\n\n=== CONTEXTO ADICIONAL ===|DOCUMENTO APROVADO|CONHECIMENTO OFICIAL|INSTRUÇÃO DE CURADORIA|$)',
+            contexto_rag, re.DOTALL
+        ):
+            titulo_ideia = match.group(1).strip()
+            conteudo = match.group(2).strip()
+            if conteudo:
+                blocos.append(('ideia', titulo_ideia, conteudo[:1500]))
+
+        # Extrai blocos de INSTRUÇÃO DE CURADORIA (RLHF)
+        for match in re.finditer(
+            r'INSTRUÇÃO DE CURADORIA APROVADA \(([^)]+)\):\nPergunta do Usuário:.*?\nResposta Ideal \(Siga este padrão\): (.*?)(?=\n\n=== CONTEXTO ADICIONAL ===|DOCUMENTO APROVADO|IDEIA DO BANCO|$)',
+            contexto_rag, re.DOTALL
+        ):
+            titulo_cor = match.group(1).strip()
+            resposta_ideal = match.group(2).strip()
+            if resposta_ideal:
+                blocos.append(('rlhf', titulo_cor, resposta_ideal[:1500]))
+
+        if not blocos:
+            return None
+
+        # Monta resposta estruturada a partir dos blocos encontrados
+        partes = []
+        for tipo, fonte, conteudo in blocos:
+            if tipo == 'rlhf':
+                partes.append(conteudo)
+            elif tipo == 'documento':
+                partes.append(f"Com base no documento **{fonte}** da Biblioteca da Digiana:\n\n{conteudo}")
+            else:
+                partes.append(f"**{fonte}**\n\n{conteudo}")
+
+        resposta = "\n\n---\n\n".join(partes)
+
+        # Adiciona convite ao final se houver mais de um bloco
+        if len(blocos) > 1:
+            resposta += f"\n\nTem mais alguma dúvida sobre esse ou outro tema contábil, {primeiro_nome}?"
+
+        return resposta
+
     def _extrair_contexto_institucional(self, perfil_texto):
         """
         Extrai o bloco narrativo/institucional do perfil cultural para enriquecer
@@ -301,11 +361,11 @@ class AnagmaLLMEngine:
             nota_perfil = f"\n\n{contexto_inst}\n" if contexto_inst else '\n'
 
             base_conhecimento = (
-                f"\nMinhas respostas são baseadas no conhecimento interno da **Anagma**:\n"
-                f"- **Documentos da empresa** — PDFs e arquivos enviados e aprovados pela equipe.\n"
+                f"\nMinhas respostas combinam meu conhecimento de treinamento com o conhecimento interno registrado pela equipe:\n"
+                f"- **Documentos da empresa** — PDFs e arquivos enviados e aprovados.\n"
                 f"- **Banco de Ideias** — orientações e boas práticas registradas pelos colaboradores.\n"
                 f"- **Aprendizado contínuo** — cada correção feita pelos responsáveis melhora minhas respostas futuras.\n\n"
-                f"Quanto mais a equipe registra, mais precisa fico. É só perguntar!"
+                f"Quanto mais a equipe registra, mais precisa e assertiva fico. É só perguntar!"
             )
 
             if is_first_message:
@@ -377,7 +437,7 @@ class AnagmaLLMEngine:
             return random.choice(opcoes)
 
         # Usa search_query (contextualizada) para busca no RAG, mas responde ao user_query original
-        contexto_rag = self.rag.buscar_conhecimento(search_query or user_query, user=user)
+        contexto_rag, has_db_hits = self.rag.buscar_conhecimento(search_query or user_query, user=user)
 
         # --- Monta o system prompt com saudação adaptada ao contexto ---
         _periodo_map = {'Bom dia': 'manhã', 'Boa tarde': 'tarde', 'Boa noite': 'noite'}
@@ -425,15 +485,27 @@ CONTEXTO DA EMPRESA (DNA DA DIGIANA):
 """
 
         if contexto_rag:
-            system_msg += f'\n\nCONHECIMENTO TÉCNICO E DOCUMENTAL (BIBLIOTECA):\n{contexto_rag}'
-            system_msg += (
-                '\n\nINSTRUÇÃO DE PROATIVIDADE: O conteúdo acima veio da base de conhecimento interna da Anagma. '
-                'Use-o para responder E, se houver temas relacionados que o usuário ainda não explorou, '
-                'mencione brevemente ao final que pode aprofundar. Não invente temas — sugira apenas o que está no contexto acima.'
-            )
+            if has_db_hits:
+                # CONHECIMENTO PRIORITÁRIO (Soberania de Dados)
+                system_msg += (
+                    f'\n\nCONHECIMENTO TÉCNICO OFICIAL DA ANAGMA:\n'
+                    f'{contexto_rag}\n\n'
+                    f'DIRETRIZ DE AUTORIDADE:\n'
+                    f'1. Use as informações acima como sua base principal de dados reais.\n'
+                    f'2. Se o texto acima citar limites, leis, datas ou valores, use-os exatamente como descritos.\n'
+                    f'3. PROIBIÇÃO DE INVENÇÃO: Se o texto acima NÃO citar uma lei ou número específico que o usuário perguntou, '
+                    f'responda com base na teoria contábil geral, mas informe explicitamente que "não possui o registro exato deste dado na biblioteca interna".\n'
+                    f'4. Nunca invente nomes de leis, decretos ou números de artigos.'
+                )
+            else:
+                # CONTEXTO DE APOIO (Conceitual)
+                system_msg += (
+                    f'\n\nCONTEXTO CONCEITUAL RELACIONADO:\n{contexto_rag}\n\n'
+                    f'Use o contexto acima para guiar sua explicação técnica de forma fluida.'
+                )
 
         # --- GESTÃO DE CONTEXTO ---
-        MAX_CONTEXT_TOKENS = 3500
+        MAX_CONTEXT_TOKENS = 3200
         tokens_fixos = self._contar_tokens_aprox(system_msg) + self._contar_tokens_aprox(user_query)
         available_for_history = MAX_CONTEXT_TOKENS - tokens_fixos
 
@@ -461,7 +533,7 @@ CONTEXTO DA EMPRESA (DNA DA DIGIANA):
 
         res_limpa = self._limpar_resposta(res)
 
-        # KILL-SWITCH DE IDIOMA: Se o modelo falhar e responder em inglês
+        # KILL-SWITCH DE IDIOMA
         if self._is_ingles(res_limpa):
             opcoes = [
                 f"{cumprimento}, {primeiro_nome}! Identifiquei uma falha na geração do idioma. Como sou uma IA focada exclusivamente na contabilidade brasileira, minha comunicação deve ser em Português Brasileiro. Em que posso ajudá-lo hoje com suas dúvidas técnicas?",

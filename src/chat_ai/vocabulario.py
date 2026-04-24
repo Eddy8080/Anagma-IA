@@ -54,7 +54,9 @@ GATILHOS_SOBRE_IA = (
     'você consulta', 'voce consulta',
     'você acessa', 'voce acessa',
     'acessa a biblioteca', 'consulta a biblioteca',
-    'biblioteca de curadoria', 'banco de ideias',
+    # REMOVIDO: 'biblioteca de curadoria' e 'banco de ideias'
+    # Esses termos indicam PEDIDO DE BUSCA, não pergunta sobre a IA.
+    # Ex: "verifique na biblioteca de curadoria" deve ir ao RAG, não ao interceptor.
     'você lê os documentos', 'voce le os documentos',
     'você usa os documentos', 'voce usa os documentos',
     'acessa os arquivos', 'consulta os arquivos',
@@ -105,13 +107,12 @@ PARES_SOBRE_IA = (
     ('você', 'lê'),
     ('voce', 'le'),
     ('vc', 'le'),
-    # Fontes de conhecimento
+    # Fontes de conhecimento — apenas quando é pergunta SOBRE a IA, não pedido de busca
     ('ideias', 'registradas'),
     ('arquivos', 'enviados'),
-    ('arquivos', 'biblioteca'),
-    ('documentos', 'biblioteca'),
-    ('documentos', 'curadoria'),
-    ('ideias', 'banco'),
+    # REMOVIDO: ('arquivos', 'biblioteca'), ('documentos', 'biblioteca'),
+    # ('documentos', 'curadoria'), ('ideias', 'banco')
+    # Esses pares interceptavam pedidos de busca como "verifique na biblioteca".
     # Aprendizado e evolução
     ('digiana', 'aprende'),
     ('digiana', 'melhora'),
@@ -170,11 +171,40 @@ PARES_FORA_DO_DOMINIO = (
 # Stopwords do RAG — ignoradas na busca semântica para evitar ruído
 # ---------------------------------------------------------------------------
 STOPWORDS_RAG = frozenset({
+    # Saudações e conectivos genéricos
     'bom', 'boa', 'dia', 'tarde', 'noite',
     'ola', 'olá', 'oi', 'tudo', 'bem',
     'você', 'voce', 'para', 'como', 'que',
     'uma', 'uns', 'umas', 'isso', 'esse',
     'essa', 'com', 'sem', 'por', 'nos',
+    # Verbos e pronomes curtos que não são siglas contábeis
+    'vai', 'vem', 'tem', 'faz', 'dar', 'ver', 'ser',
+    'ele', 'ela', 'eles', 'elas', 'seu', 'sua', 'seus',
+    'foi', 'era', 'são', 'num', 'nas', 'dos', 'das',
+    'aos', 'aí', 'lhe', 'me', 'te', 'se', 'já',
+    # Palavras da pergunta que não são termos técnicos
+    'fala', 'fale', 'ouviu', 'falar', 'dizer', 'sabe',
+    'sobre', 'qual', 'onde', 'quando', 'quem',
+    # Verbos de comando/pergunta — descrevem o QUE o usuário quer fazer,
+    # não o ASSUNTO que está buscando. Nunca aparecem em documentos contábeis.
+    # Ex: "Explique o MEI" → filtrar "explique", buscar apenas "MEI".
+    'explique', 'explica', 'explicar', 'explicação', 'explicacao',
+    'defina', 'define', 'definir',
+    'descreva', 'descreve', 'descrever',
+    'detalhe', 'detalhar', 'detalha',
+    'comente', 'comenta', 'comentar',
+    'mostre', 'mostrar', 'mostra',
+    'apresente', 'apresentar', 'apresenta',
+    'discorra', 'discorrer',
+    'disserte', 'dissertar',
+    'resuma', 'resumir', 'resume',
+    'liste', 'listar',
+    'diga',
+    'conte', 'contar',
+    # SIGLAS CONTÁBEIS PROTEGIDAS — NUNCA devem estar aqui
+    # MEI, CPF, ISS, DAS, IPI, IOF, PIS, DRE, CPC, NBC, CFC,
+    # CNPJ, IRPF, IRPJ, IRRF, CSLL, FGTS, INSS, ICMS, SPED,
+    # PGDAS, COFINS, ECF, ECD, DCTF — essas NUNCA devem ser stopwords
 })
 
 # ---------------------------------------------------------------------------
