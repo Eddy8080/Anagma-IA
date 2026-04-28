@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 Motor de Inferência da Anagma IA.
-Backend primário : llama-cpp-python com Phi-3-mini GGUF Q4_K_M (~2.4 GB, CPU)
-Backend fallback : transformers + safetensors float16 (~4.6 GB, CPU)
+Backend : llama-cpp-python com Meta Llama 3 8B GGUF (Digiana 8B)
 """
 import os
 import traceback
 import threading
 import gc
+import re
 from django.conf import settings
 from .rag_engine import AnagmaRAGEngine
 from .vocabulario import (
@@ -85,12 +85,13 @@ class AnagmaLLMEngine:
             ram_antes = psutil.virtual_memory().used / 1e9
             print(f'[SISTEMA] Ativando Cérebro Digiana 8B: {model_path}', flush=True)
 
-            # Otimização: Usar quase todos os núcleos para velocidade máxima
-            n_threads = max(1, os.cpu_count() - 1)
+            # Otimização: Uso equilibrado de threads para evitar saturação do sistema
+            cpu_count = os.cpu_count() or 4
+            n_threads = min(8, max(1, cpu_count - 1))
 
             self._llm = Llama(
                 model_path=model_path,
-                n_ctx=4096,
+                n_ctx=8192,
                 n_threads=n_threads,
                 n_batch=512,
                 n_gpu_layers=0,
@@ -107,6 +108,65 @@ class AnagmaLLMEngine:
         except Exception as e:
             print(f'[ERRO CRÍTICO] Falha ao carregar motor: {e}', flush=True)
             traceback.print_exc()
+
+    # ------------------------------------------------------------------
+    # Self-Audit: verificação de relevância entre RAG e LLM
+    # ------------------------------------------------------------------
+
+    def _self_audit_documentos(self, query, blocos):
+        """
+        Etapa de verificação entre o RAG e o LLM.
+        Usa o próprio modelo para avaliar quais blocos de contexto respondem
+        diretamente à pergunta, descartando os que tratam de outro assunto.
+        Arquitetura geral — sem hard-code de domínios ou temas.
+        """
+        if not blocos or not self._llm:
+            return blocos
+
+        lista = ""
+        for i, bloco in enumerate(blocos):
+            linhas = bloco.strip().split('\n')
+            cabecalho = linhas[0][:80] if linhas else ''
+            trecho = ' '.join(linhas[1:6])[:400] if len(linhas) > 1 else ''
+            lista += f"[{i+1}] {cabecalho}\n    {trecho}\n\n"
+
+        prompt = (
+            f'Pergunta: "{query}"\n\n'
+            f"Documentos recuperados:\n{lista}"
+            f"Para cada documento, responda SIM apenas se ele contém dados específicos que RESPONDEM a pergunta "
+            f"(regras, valores, procedimentos, obrigações sobre o assunto perguntado). "
+            f"Responda NÃO se o documento trata de outro assunto OU aborda o mesmo tema mas sem dados que respondam a pergunta.\n"
+            f"Responda APENAS neste formato sem espaços: [1]:SIM [2]:NÃO [3]:SIM\n"
+            f"Resposta:"
+        )
+
+        try:
+            with self._lock:
+                resultado = self._llm.create_chat_completion(
+                    messages=[{'role': 'user', 'content': prompt}],
+                    max_tokens=80,
+                    temperature=0.0,
+                    stop=['\n\n', '<|end|>', '<|endoftext|>'],
+                )
+            resposta = resultado['choices'][0]['message']['content'].strip()
+            print(f"[SELF-AUDIT] Veredicto: {resposta}", flush=True)
+
+            aprovados = []
+            for i, bloco in enumerate(blocos):
+                match = re.search(rf'\[{i+1}\]:\s*(SIM|NÃO|NAO|YES|NO)\b', resposta, re.IGNORECASE)
+                if match and match.group(1).upper() in ('NÃO', 'NAO', 'NO'):
+                    print(f"[SELF-AUDIT] Descartado: {bloco.split(chr(10))[0][:70]}", flush=True)
+                else:
+                    aprovados.append(bloco)
+
+            if not aprovados:
+                print("[SELF-AUDIT] Nenhum documento aprovado — modo conhecimento geral ativado.", flush=True)
+
+            return aprovados
+
+        except Exception as e:
+            print(f"[SELF-AUDIT ERRO] {e}", flush=True)
+            return blocos
 
     # ------------------------------------------------------------------
     # Geração de resposta
@@ -134,7 +194,7 @@ class AnagmaLLMEngine:
     def _montar_resposta_biblioteca(self, contexto_rag, primeiro_nome):
         """
         Extrai conteúdo de documentos/ideias do banco e monta resposta diretamente,
-        sem passar pelo LLM. Evita alucinações do Phi-3-mini quando há conteúdo específico.
+        sem passar pelo LLM. Garante fidelidade total aos dados da biblioteca.
         Retorna None se não encontrar blocos reconhecíveis (fallback para o modelo).
         """
         import re
@@ -250,95 +310,138 @@ class AnagmaLLMEngine:
         """
         Versão de streaming com MODO DE SEGURANÇA DE DOMÍNIO FECHADO.
         """
-        if not self.pronto:
-            yield "Erro: Motor de IA não disponível."
-            return
+        try:
+            if not self.pronto:
+                yield "Erro: Motor de IA não disponível."
+                return
 
-        nome = user_name or 'usuário'
-        primeiro_nome = nome.split()[0] if nome else nome
-        cumprimento = saudacao or 'Boa tarde'
-        perfil_anagma = self._get_perfil_anagma()
-        is_first_message = not bool(chat_history)
+            nome = user_name or 'usuário'
+            primeiro_nome = nome.split()[0] if nome else nome
+            cumprimento = saudacao or 'Boa tarde'
+            perfil_anagma = self._get_perfil_anagma()
+            is_first_message = not bool(chat_history)
 
-        # 1. Interceptores Rápidos
-        if self._e_saudacao(user_query) or self._e_fora_do_dominio(user_query) or self._e_pergunta_sobre_ia(user_query):
-            yield self.gerar_resposta(user_query, chat_history, user_name, saudacao, search_query, user)
-            return
+            # 1. Interceptores Rápidos
+            if self._e_saudacao(user_query) or self._e_fora_do_dominio(user_query) or self._e_pergunta_sobre_ia(user_query):
+                yield self.gerar_resposta(user_query, chat_history, user_name, saudacao, search_query, user)
+                return
 
-        # 2. Busca RAG Soberana
-        contexto_rag, has_db_hits = self.rag.buscar_conhecimento(search_query or user_query, user=user)
+            # 2. Busca RAG Soberana + Self-Audit
+            try:
+                blocos_rag, has_db_hits = self.rag.buscar_documentos(search_query or user_query, user=user)
+                if has_db_hits:
+                    blocos_rag = self._self_audit_documentos(user_query, blocos_rag)
+                    has_db_hits = bool(blocos_rag)
+                contexto_rag = "\n\n---\n\n".join(blocos_rag)
+                if contexto_rag and len(contexto_rag) > 15000:
+                    contexto_rag = contexto_rag[:15000] + "... [Conteúdo truncado por limite de contexto]"
+            except Exception as e:
+                print(f"[ERRO RAG] {e}")
+                traceback.print_exc()
+                contexto_rag, has_db_hits = "", False
 
-        # --- LOG DE DEPURAÇÃO VISUAL (Terminal) ---
-        print("\n" + "█" * 60)
-        print(f"  DIAGNÓSTICO RAG - Pergunta: {user_query}")
-        print(f"  Hits na Biblioteca/Ideias: {'SIM' if has_db_hits else 'NÃO'}")
-        if contexto_rag:
-            print(f"  Contexto Localizado:\n{contexto_rag[:500]}...")
-        else:
-            print("  AVISO: NENHUM CONTEXTO LOCALIZADO NO RAG.")
-        print("█" * 60 + "\n", flush=True)
+            # --- LOG DE DEPURAÇÃO VISUAL (Terminal) ---
+            print("\n" + "█" * 60)
+            print(f"  DIAGNÓSTICO RAG - Pergunta: {user_query}")
+            print(f"  Hits na Biblioteca/Ideias: {'SIM' if has_db_hits else 'NÃO'}")
+            if contexto_rag:
+                print(f"  Contexto Localizado:\n{contexto_rag[:500]}...")
+            else:
+                print("  AVISO: NENHUM CONTEXTO LOCALIZADO NO RAG.")
+            print("█" * 60 + "\n", flush=True)
 
-        # 3. Montagem do System Prompt (Técnica Recency Bias)
-        base_msg = f"""Você é a **Digiana**, oficial da Anagma.
+            # 3. Montagem do System Prompt (MODO DE SEGURANÇA REFORÇADO)
+            if has_db_hits:
+                system_msg = f"""Você é a **Digiana**, assistente oficial de contabilidade da **Anagma**.
+
+### MODO: BIBLIOTECA INTERNA ATIVA
+
+### FORMATO DE RESPOSTA OBRIGATÓRIO
+Você DEVE responder sempre neste formato de duas seções, sem exceção:
+
+**Verificação:**
+Transcreva aqui os trechos literais dos documentos abaixo que respondem diretamente à pergunta.
+Se nenhum documento contém o dado específico perguntado, escreva exatamente:
+"O documento [nome do documento] aborda [tema geral do documento] mas não contém dados específicos sobre [assunto da pergunta]."
+
+**Resposta:**
+Responda baseando-se EXCLUSIVAMENTE no que foi declarado em Verificação acima.
+— Se a Verificação encontrou o dado: cite-o com precisão e indique o documento de origem.
+— Se a Verificação declarou ausência: informe que a biblioteca não detalha esse dado e indique a fonte oficial adequada (Receita Federal, Portal do Simples Nacional, eSocial, etc.).
+Nunca adicione dados, alíquotas, obrigações ou artigos de lei que não estejam na Verificação.
+Se os dados contiverem tabelas markdown, reproduza-as exatamente como tabela.
+
 ### CONTEXTO DA EMPRESA:
 {perfil_anagma if perfil_anagma else 'Base Técnica Anagma.'}
-"""
-        if contexto_rag:
-            base_msg += f"\n\n### CONHECIMENTO TÉCNICO INTERNO (ÚNICA VERDADE):\n{contexto_rag}"
 
-        system_msg = base_msg + """
-\n### MANDATO SUPREMO (SEGURANÇA):
-1. Seu conhecimento externo foi BLOQUEADO.
-2. Use EXCLUSIVAMENTE o 'CONHECIMENTO TÉCNICO INTERNO' acima para responder.
-3. Se a informação NÃO estiver no texto acima, diga: "Não localizei registros específicos sobre este assunto na base de dados interna da Anagma."
-4. PROIBIDO INVENTAR nomes de leis, datas ou significados de siglas.
-5. RESPONDA APENAS EM PORTUGUÊS BRASILEIRO.
-"""
-
-        # 4. Gestão de Mensagens
-        messages = [{'role': 'system', 'content': system_msg}]
-        if chat_history:
-            for msg in chat_history[-3:]: # Reduzido para focar no mandato
-                messages.append({'role': msg['role'], 'content': msg['content']})
-        messages.append({'role': 'user', 'content': user_query})
-
-        # 5. Loop de Streaming
-        try:
-            full_response = ""
-            if self._backend == 'gguf':
-                stream = self._llm.create_chat_completion(
-                    messages=messages,
-                    max_tokens=1000,
-                    temperature=0.1, # Temperatura mínima para reduzir criatividade
-                    stream=True,
-                    stop=['<|end|>', '<|endoftext|>', '<|user|>']
-                )
-                for chunk in stream:
-                    delta = chunk['choices'][0]['delta']
-                    if 'content' in delta:
-                        token = delta['content']
-                        full_response += token
-                        yield token
+### DADOS DA BIBLIOTECA INTERNA:
+{contexto_rag}"""
             else:
-                # Transformers Streaming (Safe Mode)
-                from transformers import TextIteratorStreamer
-                from threading import Thread
-                streamer = TextIteratorStreamer(self._tokenizer, skip_prompt=True, skip_special_tokens=True)
-                full_prompt = self._tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-                inputs = self._tokenizer([full_prompt], return_tensors="pt").to("cpu")
-                generation_kwargs = dict(inputs, streamer=streamer, max_new_tokens=800, temperature=0.1)
-                thread = Thread(target=self._model.generate, kwargs=generation_kwargs)
-                thread.start()
-                for token in streamer:
+                system_msg = f"""Você é a **Digiana**, assistente oficial de contabilidade da **Anagma**.
+
+### MODO: BIBLIOTECA OMISSA
+
+### FORMATO DE RESPOSTA OBRIGATÓRIO
+Você DEVE responder neste formato de duas seções, sem exceção:
+
+**Verificação:**
+Escreva exatamente: "Nenhum documento encontrado na biblioteca da Anagma sobre [descreva o assunto da pergunta]."
+
+**Resposta:**
+— Informe que a biblioteca não possui registros específicos sobre este tema.
+— Indique a fonte oficial adequada (Receita Federal, Portal do Simples Nacional, eSocial, Prefeitura, etc.).
+— Você pode contextualizar brevemente o que é o tema (conceito geral), mas NUNCA cite alíquotas, valores, datas, artigos de lei ou obrigações específicas.
+— Encerre recomendando a consulta à fonte oficial.
+
+### CONTEXTO DA EMPRESA:
+{perfil_anagma if perfil_anagma else 'Base Técnica Anagma.'}"""
+
+            # 4. Gestão de Mensagens com controle de budget de tokens
+            # n_ctx=8192, reservamos 1200 para a resposta → ~7000 disponíveis para input
+            MAX_INPUT_TOKENS = 7000
+            tokens_sistema = self._contar_tokens_aprox(system_msg)
+            tokens_query   = self._contar_tokens_aprox(user_query)
+            budget_historico = MAX_INPUT_TOKENS - tokens_sistema - tokens_query
+
+            messages = [{'role': 'system', 'content': system_msg}]
+            if chat_history and budget_historico > 0:
+                usados = 0
+                historico_filtrado = []
+                for msg in reversed(chat_history):
+                    if msg.get('role') in ('user', 'assistant') and msg.get('content'):
+                        t = self._contar_tokens_aprox(msg['content'])
+                        if usados + t < budget_historico:
+                            historico_filtrado.insert(0, {'role': msg['role'], 'content': msg['content']})
+                            usados += t
+                        else:
+                            break
+                messages.extend(historico_filtrado)
+            messages.append({'role': 'user', 'content': user_query})
+
+            # 5. Loop de Streaming
+            full_response = ""
+            stream = self._llm.create_chat_completion(
+                messages=messages,
+                max_tokens=1000,
+                temperature=0.0, # Temperatura zero para eliminar alucinações
+                stream=True,
+                stop=['<|end|>', '<|endoftext|>', '<|user|>']
+            )
+            for chunk in stream:
+                delta = chunk['choices'][0]['delta']
+                if 'content' in delta:
+                    token = delta['content']
                     full_response += token
                     yield token
 
         except Exception as e:
+            traceback.print_exc()
             yield f" Erro no processamento: {str(e)}"
+
 
     def gerar_resposta(self, user_query, chat_history=None, user_name=None, saudacao=None, search_query=None, user=None):
         """
-        Gera resposta usando RAG + Phi-3 com gestão de contexto e thread-safety.
+        Gera resposta usando RAG + Llama 3 com gestão de contexto e thread-safety.
         """
         if not self.pronto:
             return 'Desculpe, o motor de IA não está disponível. Verifique os logs do servidor.'
@@ -354,29 +457,27 @@ class AnagmaLLMEngine:
         # Perfil carregado cedo (cache < 1ms) para estar disponível nos interceptores
         perfil_anagma = self._get_perfil_anagma()
 
-        # Intercepta saudações simples — o modelo pequeno não segue instruções sobre isso
+        # Intercepta saudações simples
         if self._e_saudacao(user_query):
+            query_l = user_query.lower()
+            resp_cumprimento = cumprimento
+            if 'bom dia' in query_l: resp_cumprimento = "Bom dia"
+            elif 'boa tarde' in query_l: resp_cumprimento = "Boa tarde"
+            elif 'boa noite' in query_l: resp_cumprimento = "Boa noite"
+            elif 'olá' in query_l or 'ola' in query_l: resp_cumprimento = "Olá"
+            elif 'oi' in query_l: resp_cumprimento = "Olá"
+
             if is_first_message:
-                texto_limpo = user_query.strip().lower().rstrip('!.,')
-                _informais = {'oi', 'olá', 'ola', 'hello', 'hi', 'hey', 'oi!', 'olá!'}
-                if texto_limpo in _informais:
-                    opcoes = [
-                        f"Oi, {primeiro_nome}! Tudo bem? Como posso ajudar hoje?",
-                        f"Olá, {primeiro_nome}! Pode perguntar, estou aqui para ajudar.",
-                        f"Oi! Por aqui tudo certo, {primeiro_nome}. O que você precisa?",
-                    ]
-                else:
-                    opcoes = [
-                        f"{cumprimento}, {primeiro_nome}! Como posso ajudar você hoje?",
-                        f"{cumprimento}, {primeiro_nome}! Pronta para ajudar. O que precisa?",
-                        f"{cumprimento}, {primeiro_nome}! Em que posso ser útil?",
-                    ]
-            else:
-                # Conversa em andamento — resposta curta e natural
                 opcoes = [
-                    f"Aqui estou! Tem mais alguma dúvida sobre contabilidade, {primeiro_nome}?",
-                    f"Pode perguntar! O que mais precisa resolver?",
-                    f"Em que mais posso ajudar, {primeiro_nome}?",
+                    f"{resp_cumprimento}, {primeiro_nome}! Sou a Digiana, sua consultora técnica na Anagma. Em que posso auxiliar em suas questões contábeis hoje?",
+                    f"{resp_cumprimento}, {primeiro_nome}. Estou à disposição para analisar seus documentos e esclarecer dúvidas fiscais. Por onde gostaria de começar?",
+                    f"{resp_cumprimento}! Seja bem-vindo à inteligência da Anagma, {primeiro_nome}. Qual tema técnico vamos abordar agora?",
+                ]
+            else:
+                opcoes = [
+                    f"{resp_cumprimento}, {primeiro_nome}! Prossiga com sua dúvida. Em que mais posso contribuir para sua análise contábil?",
+                    f"{resp_cumprimento}. Estou aqui para ajudar. Qual o próximo ponto técnico que deseja discutir?",
+                    f"{resp_cumprimento}, {primeiro_nome}. Compreendido. Deseja aprofundar algum assunto da nossa base de documentos ou ideias?",
                 ]
             return random.choice(opcoes)
 
@@ -463,64 +564,103 @@ class AnagmaLLMEngine:
             return random.choice(opcoes)
 
         # Usa search_query (contextualizada) para busca no RAG, mas responde ao user_query original
-        contexto_rag, has_db_hits = self.rag.buscar_conhecimento(search_query or user_query, user=user)
+        try:
+            blocos_rag, has_db_hits = self.rag.buscar_documentos(search_query or user_query, user=user)
+            if has_db_hits:
+                blocos_rag = self._self_audit_documentos(user_query, blocos_rag)
+                has_db_hits = bool(blocos_rag)
+            contexto_rag = "\n\n---\n\n".join(blocos_rag)
+            if contexto_rag and len(contexto_rag) > 15000:
+                contexto_rag = contexto_rag[:15000] + "... [Conteúdo truncado]"
+        except Exception as e:
+            print(f"[ERRO RAG] {e}")
+            contexto_rag, has_db_hits = "", False
 
-        # --- Montagem do System Message (Técnica Recency Bias) ---
-        base_msg = f"""Você é a **Digiana**, assistente oficial de contabilidade da **Anagma**.
+        # --- Montagem do System Message (condicional: biblioteca vs. conhecimento geral) ---
+        try:
+            if has_db_hits:
+                system_msg = f"""Você é a **Digiana**, assistente oficial de contabilidade da **Anagma**.
+
+### MODO: BIBLIOTECA INTERNA ATIVA
+
+### FORMATO DE RESPOSTA OBRIGATÓRIO
+Você DEVE responder sempre neste formato de duas seções, sem exceção:
+
+**Verificação:**
+Transcreva aqui os trechos literais dos documentos abaixo que respondem diretamente à pergunta.
+Se nenhum documento contém o dado específico perguntado, escreva exatamente:
+"O documento [nome do documento] aborda [tema geral do documento] mas não contém dados específicos sobre [assunto da pergunta]."
+
+**Resposta:**
+Responda baseando-se EXCLUSIVAMENTE no que foi declarado em Verificação acima.
+— Se a Verificação encontrou o dado: cite-o com precisão e indique o documento de origem.
+— Se a Verificação declarou ausência: informe que a biblioteca não detalha esse dado e indique a fonte oficial adequada (Receita Federal, Portal do Simples Nacional, eSocial, etc.).
+Nunca adicione dados, alíquotas, obrigações ou artigos de lei que não estejam na Verificação.
+Se os dados contiverem tabelas markdown, reproduza-as exatamente como tabela.
+
 ### CONTEXTO DA EMPRESA (DNA):
 {perfil_anagma if perfil_anagma else 'Base Técnica Anagma.'}
-"""
-        if contexto_rag:
-            base_msg += f"\n\n### CONHECIMENTO TÉCNICO INTERNO (ÚNICA FONTE DE VERDADE):\n{contexto_rag}"
 
-        # Mandato Supremo inserido por último para combater a teimosia do modelo
-        system_msg = base_msg + """
-\n### MANDATO SUPREMO DE SEGURANÇA (LEIA COM ATENÇÃO):
-1. Seu conhecimento de treinamento externo foi BLOQUEADO para fatos técnicos.
-2. Use EXCLUSIVAMENTE o 'CONHECIMENTO TÉCNICO INTERNO' acima para responder sobre leis, siglas ou datas.
-3. Se a informação NÃO estiver no texto acima, responda: "Não localizei registros específicos sobre este assunto na base de dados interna da Anagma."
-4. PROIBIDO INVENTAR ou DEDUZIR significados para siglas.
-5. RESPONDA APENAS EM PORTUGUÊS BRASILEIRO.
-"""
-        
-        # --- GESTÃO DE CONTEXTO ---
-        MAX_CONTEXT_TOKENS = 3200
-        tokens_fixos = self._contar_tokens_aprox(system_msg) + self._contar_tokens_aprox(user_query)
-        available_for_history = MAX_CONTEXT_TOKENS - tokens_fixos
+### DADOS DA BIBLIOTECA INTERNA:
+{contexto_rag}"""
+            else:
+                system_msg = f"""Você é a **Digiana**, assistente oficial de contabilidade da **Anagma**.
 
-        messages = [{'role': 'system', 'content': system_msg}]
+### MODO: BIBLIOTECA OMISSA
 
-        if chat_history:
-            temp_history = []
-            current_history_tokens = 0
-            for msg in reversed(chat_history):
-                if msg.get('role') in ('user', 'assistant') and msg.get('content'):
-                    msg_tokens = self._contar_tokens_aprox(msg['content'])
-                    if current_history_tokens + msg_tokens < available_for_history:
-                        temp_history.insert(0, {'role': msg['role'], 'content': msg['content']})
-                        current_history_tokens += msg_tokens
-                    else:
-                        break
-            messages.extend(temp_history)
+### FORMATO DE RESPOSTA OBRIGATÓRIO
+Você DEVE responder neste formato de duas seções, sem exceção:
 
-        messages.append({'role': 'user', 'content': user_query})
+**Verificação:**
+Escreva exatamente: "Nenhum documento encontrado na biblioteca da Anagma sobre [descreva o assunto da pergunta]."
 
-        if self._backend == 'gguf':
+**Resposta:**
+— Informe que a biblioteca não possui registros específicos sobre este tema.
+— Indique a fonte oficial adequada (Receita Federal, Portal do Simples Nacional, eSocial, Prefeitura, etc.).
+— Você pode contextualizar brevemente o que é o tema (conceito geral), mas NUNCA cite alíquotas, valores, datas, artigos de lei ou obrigações específicas.
+— Encerre recomendando a consulta à fonte oficial.
+
+### CONTEXTO DA EMPRESA (DNA):
+{perfil_anagma if perfil_anagma else 'Base Técnica Anagma.'}"""
+
+            # --- GESTÃO DE CONTEXTO ---
+            MAX_CONTEXT_TOKENS = 7000
+            tokens_fixos = self._contar_tokens_aprox(system_msg) + self._contar_tokens_aprox(user_query)
+            available_for_history = MAX_CONTEXT_TOKENS - tokens_fixos
+
+            messages = [{'role': 'system', 'content': system_msg}]
+
+            if chat_history:
+                temp_history = []
+                current_history_tokens = 0
+                for msg in reversed(chat_history):
+                    if msg.get('role') in ('user', 'assistant') and msg.get('content'):
+                        msg_tokens = self._contar_tokens_aprox(msg['content'])
+                        if current_history_tokens + msg_tokens < available_for_history:
+                            temp_history.insert(0, {'role': msg['role'], 'content': msg['content']})
+                            current_history_tokens += msg_tokens
+                        else:
+                            break
+                messages.extend(temp_history)
+
+            messages.append({'role': 'user', 'content': user_query})
+
             res = self._gerar_gguf(messages)
-        else:
-            res = self._gerar_safetensors(messages)
+            res_limpa = self._limpar_resposta(res)
 
-        res_limpa = self._limpar_resposta(res)
+            # KILL-SWITCH DE IDIOMA
+            if self._is_ingles(res_limpa):
+                opcoes = [
+                    f"{cumprimento}, {primeiro_nome}! Identifiquei uma falha na geração do idioma. Como sou uma IA focada exclusivamente na contabilidade brasileira, minha comunicação deve ser em Português Brasileiro. Em que posso ajudá-lo hoje com suas dúvidas técnicas?",
+                    f"{cumprimento}, {primeiro_nome}. Houve uma tentativa de resposta em idioma estrangeiro pelo modelo base. Como sua assistente técnica Digiana, mantenho meu foco apenas em Português e temas contábeis brasileiros. Como posso ser útil agora?",
+                ]
+                return random.choice(opcoes)
 
-        # KILL-SWITCH DE IDIOMA
-        if self._is_ingles(res_limpa):
-            opcoes = [
-                f"{cumprimento}, {primeiro_nome}! Identifiquei uma falha na geração do idioma. Como sou uma IA focada exclusivamente na contabilidade brasileira, minha comunicação deve ser em Português Brasileiro. Em que posso ajudá-lo hoje com suas dúvidas técnicas?",
-                f"{cumprimento}, {primeiro_nome}. Houve uma tentativa de resposta em idioma estrangeiro pelo modelo base. Como sua assistente técnica Digiana, mantenho meu foco apenas em Português e temas contábeis brasileiros. Como posso ser útil agora?",
-            ]
-            return random.choice(opcoes)
+            return res_limpa
 
-        return res_limpa
+        except Exception as e:
+            traceback.print_exc()
+            return f"Desculpe, {primeiro_nome}, ocorreu um erro técnico ao processar sua resposta. Pode tentar reformular a pergunta?"
 
     def _limpar_resposta(self, texto):
         """Remove notas explicativas ou metadados que o modelo possa anexar por erro de instrução."""
@@ -547,7 +687,7 @@ class AnagmaLLMEngine:
                 resultado = self._llm.create_chat_completion(
                     messages=messages,
                     max_tokens=1200,
-                    temperature=0.2,
+                    temperature=0.0, # Rigor total
                     top_p=0.9,
                     repeat_penalty=1.1,
                     stop=['<|end|>', '<|endoftext|>', '<|user|>'],
@@ -558,19 +698,3 @@ class AnagmaLLMEngine:
                 if "llama_decode" in str(e) or "access violation" in str(e).lower():
                     print(f"[ERRO CRÍTICO MEMÓRIA] {e}", flush=True)
                 return f'Erro ao gerar resposta (GGUF): {e}'
-
-    def _gerar_safetensors(self, messages):
-        try:
-            from transformers import GenerationConfig
-            full_prompt = self._tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
-            )
-            gen_config = GenerationConfig(
-                max_new_tokens=900, temperature=0.3, do_sample=True,
-                eos_token_id=[32000, 32001, 32007], pad_token_id=32000,
-            )
-            output = self._pipe(full_prompt, generation_config=gen_config, return_full_text=False)
-            return output[0]['generated_text'].strip()
-        except Exception as e:
-            traceback.print_exc()
-            return f'Erro ao gerar resposta (Transformers): {e}'

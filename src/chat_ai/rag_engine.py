@@ -26,9 +26,10 @@ class AnagmaRAGEngine:
         )
 
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=150,
-            separators=["\n\n", "\n", " ", ""]
+            chunk_size=2000,
+            chunk_overlap=200,
+            # "\n|" impede que uma linha de tabela markdown seja cortada no meio
+            separators=["\n\n\n", "\n\n", "\n|", "\n", " ", ""]
         )
 
         # Vector store persistido — reutilizado em todas as buscas (sem reconectar a cada chamada)
@@ -82,91 +83,138 @@ class AnagmaRAGEngine:
         doc = Document(page_content=texto, metadata={"source": source_name})
         return self._vetorizar_documentos([doc])
 
-    def buscar_conhecimento(self, query, k=3, user=None):
+    @staticmethod
+    def _extrair_trecho_relevante(texto, palavras_query, max_chars=1500):
+        """Extrai o trecho do texto mais próximo das palavras da query."""
+        if not texto:
+            return ''
+        texto_l = texto.lower()
+        melhor_pos = len(texto)
+        for p in palavras_query:
+            idx = texto_l.find(p.lower())
+            if 0 <= idx < melhor_pos:
+                melhor_pos = idx
+        inicio = max(0, melhor_pos - 300)
+        fim = min(len(texto), inicio + max_chars)
+        trecho = texto[inicio:fim].strip()
+        if inicio > 0:
+            trecho = '…' + trecho
+        if fim < len(texto):
+            trecho += '…'
+        return trecho
+
+    def buscar_documentos(self, query, k=6, user=None):
         """
-        Busca Híbrida Universal:
-        - Layer 1: Busca Semântica (ChromaDB) - Captura o conceito/contexto.
-        - Layer 2: Busca por Atributos (DB/Palavras) - Garante precisão em termos técnicos.
+        Busca Híbrida Universal — retorna lista de blocos de contexto (para Self-Audit).
+        - Layer 1: Semântica (ChromaDB) — captura conceito e contexto.
+        - Layer 2: Palavras-chave (DB) — RLHF, Ideias e Documentos da Biblioteca.
+          O Layer 2 serve de fallback para documentos ainda não vetorizados no ChromaDB.
         """
         contexto_final = []
         has_db_hits = False
+        fontes_vetoriais = set()  # evita duplicatas entre Layer 1 e Layer 2
 
-        # --- PRÉ-PROCESSAMENTO: Identificação de Intenção ---
+        # --- PRÉ-PROCESSAMENTO ---
         query_limpa = re.sub(r'[.,?!:;()\[\]"\']', ' ', query.lower())
         from .vocabulario import TERMOS_CONTABEIS, STOPWORDS_RAG
-        
-        # Identifica se a pergunta foca em termos técnicos específicos da nossa base
+
         palavras_query = [p for p in query_limpa.split() if p not in STOPWORDS_RAG and len(p) > 2]
-        
-        # Detecção robusta com bordas de palavra (\b)
-        termos_tecnicos_encontrados = []
+
+        termos_tecnicos = []
         for t in TERMOS_CONTABEIS:
             t_limpo = t.strip().lower()
             if re.search(r'\b' + re.escape(t_limpo) + r'\b', query_limpa):
-                termos_tecnicos_encontrados.append(t_limpo)
-        
-        def calcular_relevancia_tecnica(texto):
-            """Calcula o quanto o texto foca nos termos da pergunta."""
-            texto_l = texto.lower()
-            matches = sum(1 for t in termos_tecnicos_encontrados if t in texto_l)
-            matches += sum(1 for p in palavras_query if p in texto_l)
-            return matches
+                termos_tecnicos.append(t_limpo)
 
-        # --- LAYER 1: Busca Semântica (O "Cérebro" Vetorial) ---
+        def calcular_relevancia(texto, fonte=''):
+            texto_l = (texto + ' ' + fonte).lower()
+            score = 0
+            # Peso para termos técnicos (Contabilidade)
+            for t in termos_tecnicos:
+                if t in texto_l: score += 2
+            # Peso para palavras da query
+            for p in palavras_query:
+                if p in texto_l: score += 1
+            # Bônus se a palavra da query estiver no nome do arquivo (Indicação forte de assunto)
+            fonte_l = fonte.lower()
+            for p in palavras_query:
+                if p in fonte_l: score += 3
+            return score
+
+        # --- LAYER 1: Busca Semântica (ChromaDB) ---
         try:
-            # Buscamos por proximidade de conceito, sem thresholds matemáticos rígidos
+            # Recupera com scores (se disponível na versão da lib) ou usa busca padrão
             docs_vetoriais = self.vector_store.similarity_search(query, k=k)
-            
             for doc in docs_vetoriais:
-                # Se o documento vetorial tiver pelo menos um termo técnico ou palavra da query, 
-                # ele é considerado um "hit" de alta relevância (Biblioteca).
-                if calcular_relevancia_tecnica(doc.page_content) > 0:
-                    fonte = doc.metadata.get('source', 'Documento Interno')
-                    contexto_final.append(f"CONHECIMENTO OFICIAL (Fonte: {fonte}):\n{doc.page_content}")
+                fonte = doc.metadata.get('source', 'Documento Interno')
+                fontes_vetoriais.add(fonte)
+                
+                score = calcular_relevancia(doc.page_content, fonte)
+                
+                # THRESHOLD DE SEGURANÇA (Rigor Contábil):
+                # Só considera "Hit da Biblioteca" se houver uma correlação forte (Score >= 5).
+                # Se o score for baixo, o documento é descartado para evitar induzir a IA ao erro.
+                if score >= 5:
+                    contexto_final.append(f"DOCUMENTO APROVADO ({fonte}):\n{doc.page_content}")
                     has_db_hits = True
                 else:
-                    # Se for apenas semanticamente próximo, entra como contexto de apoio
-                    contexto_final.append(f"CONTEXTO DE APOIO (Conceitos Relacionados):\n{doc.page_content}")
+                    # Log interno para depuração, mas não enviamos para o LLM.
+                    print(f"[RAG] Documento {fonte} descartado por baixa relevância (Score: {score}).", flush=True)
         except Exception as e:
             print(f"[RAG Chroma] Erro: {e}", flush=True)
 
-        # --- LAYER 2: Keyword Search (RLHF e Ideias) ---
+        # --- LAYER 2: Keyword Search (RLHF, Ideias e Biblioteca) ---
         try:
             from core.models import DocumentoBiblioteca, GlobalIdeia
             from .models import AIConsistencyCorrection
             from django.db.models import Q
 
-            # Busca no DB por palavras-chave para complementar o vetor
             if palavras_query:
-                q_filter = Q()
-                for p in palavras_query[:3]:
-                    q_filter |= Q(user_query__icontains=p) | Q(titulo_melhoria__icontains=p)
-                
                 # RLHF (Correções de Curadoria)
-                correcoes = AIConsistencyCorrection.objects.filter(q_filter)[:2]
-                for cor in correcoes:
+                q_rlhf = Q()
+                for p in palavras_query[:3]:
+                    q_rlhf |= Q(user_query__icontains=p) | Q(titulo_melhoria__icontains=p)
+                for cor in AIConsistencyCorrection.objects.filter(q_rlhf)[:2]:
                     contexto_final.append(
-                        f"REGRA DE CURADORIA (Instrução Aprovada):\n"
-                        f"Pergunta: {cor.user_query}\n"
-                        f"Resposta a seguir: {cor.suggested_improvement}"
+                        f"INSTRUÇÃO DE CURADORIA APROVADA ({cor.titulo_melhoria or 'RLHF'}):\n"
+                        f"Pergunta do Usuário: {cor.user_query}\n"
+                        f"Resposta Ideal (Siga este padrão): {cor.suggested_improvement}"
                     )
                     has_db_hits = True
 
                 # Banco de Ideias
-                q_ideias = Q(ativa=True)
-                sub_ideias = Q()
+                q_ideias = Q()
                 for p in palavras_query[:3]:
-                    sub_ideias |= Q(titulo__icontains=p) | Q(conteudo__icontains=p)
-                
-                ideias = GlobalIdeia.objects.filter(q_ideias & sub_ideias)[:2]
-                for ideia in ideias:
+                    q_ideias |= Q(titulo__icontains=p) | Q(conteudo__icontains=p)
+                for ideia in GlobalIdeia.objects.filter(ativa=True).filter(q_ideias)[:2]:
                     contexto_final.append(f"IDEIA REGISTRADA (Tema: {ideia.titulo}):\n{ideia.conteudo}")
                     has_db_hits = True
+
+                # Biblioteca de Documentos — fallback para docs não vetorizados no ChromaDB
+                q_bib = Q()
+                for p in palavras_query[:4]:
+                    q_bib |= Q(nome_arquivo__icontains=p) | Q(conteudo_extraido__icontains=p)
+                docs_bib = (
+                    DocumentoBiblioteca.objects
+                    .filter(Q(status='approved') & q_bib)
+                    .exclude(nome_arquivo__in=fontes_vetoriais)[:2]
+                )
+                for doc_bib in docs_bib:
+                    trecho = self._extrair_trecho_relevante(
+                        doc_bib.conteudo_extraido or '', palavras_query
+                    )
+                    if trecho:
+                        contexto_final.append(
+                            f"DOCUMENTO APROVADO ({doc_bib.nome_arquivo}):\n{trecho}"
+                        )
+                        has_db_hits = True
 
         except Exception as e:
             print(f"[RAG DB] Erro: {e}", flush=True)
 
-        return "\n\n---\n\n".join(contexto_final), has_db_hits
+        return contexto_final, has_db_hits
 
-        has_db_hits = chroma_contributed or keyword_contributed
-        return "\n\n=== CONTEXTO ADICIONAL ===\n\n".join(contexto_final), has_db_hits
+    def buscar_conhecimento(self, query, k=6, user=None):
+        """Wrapper de compatibilidade — retorna string formatada."""
+        blocos, has_hits = self.buscar_documentos(query, k, user)
+        return "\n\n---\n\n".join(blocos), has_hits

@@ -184,6 +184,95 @@
     color: #fbbf24;
     border-color: rgba(251, 191, 36, 0.2);
 }
+
+/* ── Tour de Boas-vindas ── */
+#tour-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.78);
+    z-index: 20000;
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(5px);
+    animation: tour-fade-in 0.45s ease;
+}
+#tour-overlay.tour-hidden { display: none; }
+@keyframes tour-fade-in  { from { opacity:0 } to { opacity:1 } }
+@keyframes tour-fade-out { from { opacity:1 } to { opacity:0 } }
+.tour-modal {
+    background: #1a1b1d;
+    border: 1px solid #2e2f33;
+    border-radius: 22px;
+    padding: 38px 42px 28px;
+    width: 92%; max-width: 500px;
+    box-shadow: 0 24px 70px rgba(0,0,0,0.65);
+}
+.tour-slide { display: none; flex-direction: column; align-items: center; min-height: 290px; }
+.tour-slide.tour-active {
+    display: flex;
+    animation: tour-slide-in 0.32s ease;
+}
+@keyframes tour-slide-in {
+    from { opacity:0; transform:translateX(22px) }
+    to   { opacity:1; transform:translateX(0)    }
+}
+/* Lâmpada flutuante */
+.tour-lamp-wrap { margin-bottom: 18px; }
+@keyframes tour-float {
+    0%,100% { transform: translateY(0px) }
+    50%     { transform: translateY(-11px) }
+}
+.tour-lamp { animation: tour-float 3.2s ease-in-out infinite; display: block; }
+/* Textos */
+.tour-slide-icon { font-size: 2.6rem; margin-bottom: 10px; }
+.tour-slide-title {
+    font-size: 1.38rem; font-weight: 600; text-align: center; margin-bottom: 14px;
+    background: linear-gradient(to right, #4285f4, #9b72cb);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.tour-slide-body { color: #b8b8b8; font-size: 0.93rem; line-height: 1.7; width: 100%; }
+.tour-slide-body p { text-align: center; color: #999; }
+.tour-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 9px; }
+.tour-item-ic { font-size: 1.05rem; flex-shrink: 0; margin-top: 2px; }
+.tour-example {
+    background: #242527; border-radius: 8px; padding: 7px 13px;
+    margin-bottom: 6px; font-size: 0.87rem; color: #b0b0b0; font-style: italic;
+}
+.tour-verif {
+    background: rgba(155,114,203,0.07); border-left: 3px solid #9b72cb;
+    border-radius: 0 8px 8px 0; padding: 9px 14px; margin-bottom: 8px;
+    font-size: 0.88rem; color: #c0b0d8;
+}
+.tour-tip {
+    background: rgba(66,133,244,0.07); border: 1px solid rgba(66,133,244,0.18);
+    border-radius: 8px; padding: 9px 13px; margin-top: 12px;
+    font-size: 0.86rem; color: #7aabf4;
+}
+/* Dots */
+.tour-dots { display: flex; gap: 8px; justify-content: center; margin: 22px 0 18px; }
+.tour-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #2e2f33; cursor: pointer;
+    transition: background 0.22s, transform 0.22s;
+}
+.tour-dot.tour-dot-active { background: #9b72cb; transform: scale(1.35); }
+/* Rodapé */
+.tour-footer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tour-no-show {
+    display: flex; align-items: center; gap: 7px;
+    color: #555; font-size: 0.81rem; cursor: pointer; user-select: none; flex: 1;
+}
+.tour-no-show input { accent-color: #9b72cb; width: 14px; height: 14px; cursor: pointer; }
+.tour-btn {
+    background: #252628; color: #b0b0b0; border: 1px solid #2e2f33;
+    border-radius: 10px; padding: 9px 18px; font-size: 0.88rem;
+    cursor: pointer; transition: background 0.16s, color 0.16s; font-family: inherit;
+}
+.tour-btn:hover { background: #2e2f32; color: #e0e0e0; }
+.tour-btn:disabled { opacity: 0.28; cursor: default; pointer-events: none; }
+.tour-btn-next {
+    background: linear-gradient(135deg, #4285f4, #9b72cb);
+    color: #fff; border: none;
+}
+.tour-btn-next:hover { opacity: 0.88; background: linear-gradient(135deg, #4285f4, #9b72cb); }
 </style>
 {% endblock %}
 
@@ -254,6 +343,136 @@
             <button id="modal-confirm-btn" style="background:#d93025; color:white; border:none; border-radius:10px; padding:10px 24px; cursor:pointer; font-weight:500; transition:background 0.2s;">Sim, excluir</button>
         </div>
     </div>
+</div>
+{# ── Tour de Boas-vindas ── #}
+<div id="tour-overlay" class="tour-hidden">
+  <div class="tour-modal">
+    <div id="tour-slides">
+
+      {# Slide 1 — Boas-vindas #}
+      <div class="tour-slide tour-active">
+        <div class="tour-lamp-wrap">
+          <svg class="tour-lamp" viewBox="55 42 150 165" xmlns="http://www.w3.org/2000/svg" width="108" height="108">
+            <defs>
+              <filter id="tg" x="-60%" y="-60%" width="220%" height="220%">
+                <feGaussianBlur stdDeviation="13" result="b"/>
+                <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+            </defs>
+            <circle cx="100" cy="98" r="54" fill="#f1c40f" filter="url(#tg)" opacity="0.55"/>
+            <path d="M 85 158 L 115 158 L 110 188 L 90 188 Z" fill="#7f8c8d"/>
+            <line x1="86" y1="163" x2="114" y2="163" stroke="#34495e" stroke-width="2"/>
+            <line x1="87" y1="173" x2="113" y2="173" stroke="#34495e" stroke-width="2"/>
+            <line x1="88" y1="183" x2="112" y2="183" stroke="#34495e" stroke-width="2"/>
+            <path d="M 95 188 Q 100 198 105 188 Z" fill="#2c3e50"/>
+            <path d="M 60 133 C 60 158 85 158 85 158 L 115 158 C 115 158 140 158 140 133 A 50 50 0 1 0 60 133 Z" fill="#f9d71c" stroke="#e6b800" stroke-width="1.5" opacity="0.92"/>
+            <circle cx="85" cy="93" r="4" fill="#2c3e50"/>
+            <circle cx="115" cy="93" r="4" fill="#2c3e50"/>
+            <circle cx="83" cy="91" r="1.5" fill="#ffffff"/>
+            <circle cx="113" cy="91" r="1.5" fill="#ffffff"/>
+            <circle cx="71" cy="104" r="6" fill="#e8a89c" opacity="0.42"/>
+            <circle cx="129" cy="104" r="6" fill="#e8a89c" opacity="0.42"/>
+            <path d="M 88 109 Q 100 123 112 109" fill="transparent" stroke="#2c3e50" stroke-width="2.5" stroke-linecap="round"/>
+            {# Óculos intelectuais #}
+            <circle cx="85" cy="94" r="13" fill="rgba(200,150,20,0.07)" stroke="#c8961e" stroke-width="2.2"/>
+            <circle cx="115" cy="94" r="13" fill="rgba(200,150,20,0.07)" stroke="#c8961e" stroke-width="2.2"/>
+            <line x1="98" y1="94" x2="102" y2="94" stroke="#c8961e" stroke-width="2"/>
+            <line x1="72" y1="95" x2="62" y2="99" stroke="#c8961e" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="128" y1="95" x2="138" y2="99" stroke="#c8961e" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="tour-slide-title">Bem-vindo à Digiana!</div>
+        <div class="tour-slide-body">
+          <p>Sua assistente contábil com inteligência artificial,<br>pronta para responder dúvidas fiscais e tributárias<br>com base na biblioteca de documentos da Anagma.</p>
+        </div>
+      </div>
+
+      {# Slide 2 — Como perguntar #}
+      <div class="tour-slide">
+        <div class="tour-slide-icon">💬</div>
+        <div class="tour-slide-title">Perguntas em linguagem natural</div>
+        <div class="tour-slide-body">
+          <p style="text-align:left; margin-bottom:10px;">Faça perguntas contábeis diretamente. Exemplos:</p>
+          <div class="tour-example">"Qual a alíquota do DAS para MEI em 2024?"</div>
+          <div class="tour-example">"Quais obrigações acessórias do Simples Nacional?"</div>
+          <div class="tour-example">"Como funciona o PGDAS-D?"</div>
+          <div class="tour-tip">💡 Seja específico — quanto mais detalhada a pergunta, mais precisa a resposta.</div>
+        </div>
+      </div>
+
+      {# Slide 3 — Documentos e feedback #}
+      <div class="tour-slide">
+        <div class="tour-slide-icon">📎</div>
+        <div class="tour-slide-title">Enriqueça o conhecimento</div>
+        <div class="tour-slide-body">
+          <div class="tour-item"><span class="tour-item-ic">📎</span><span>Envie PDFs, planilhas ou documentos pelo ícone de anexo — eles entram na fila de curadoria.</span></div>
+          <div class="tour-item"><span class="tour-item-ic">💡</span><span>Registre ideias e orientações internas pelo menu <strong>Nova Ideia</strong>.</span></div>
+          <div class="tour-item"><span class="tour-item-ic">👍</span><span>Curta respostas corretas para reforçar o padrão.</span></div>
+          <div class="tour-item"><span class="tour-item-ic">👎</span><span>Não curta respostas incorretas — o time técnico analisa e registra a correção permanente.</span></div>
+        </div>
+      </div>
+
+      {# Slide 4 — Boas práticas ao enviar documentos #}
+      <div class="tour-slide">
+        <div class="tour-slide-icon">📋</div>
+        <div class="tour-slide-title">Como enviar documentos com qualidade</div>
+        <div class="tour-slide-body">
+          <div class="tour-item"><span class="tour-item-ic">👁️</span><span><strong>Leia antes de subir</strong> — se o arquivo tem muito texto narrativo e poucos dados estruturados, extraia só a parte relevante num <code>.txt</code> antes de enviar.</span></div>
+          <div class="tour-item"><span class="tour-item-ic">🗂️</span><span><strong>Um assunto por arquivo</strong> — documentos que misturam vários temas aumentam o ruído na busca e reduzem a precisão das respostas.</span></div>
+          <div class="tour-item"><span class="tour-item-ic">✅</span><span><strong>Valide após o upload</strong> — faça uma pergunta no chat que aquele documento deveria responder e verifique se a <strong>Verificação</strong> transcreve o trecho correto.</span></div>
+          <div class="tour-item"><span class="tour-item-ic">👎</span><span><strong>Se ainda alucinar</strong> — use o 👎 na resposta incorreta. O time registra a correção e ela vira aprendizado permanente.</span></div>
+        </div>
+      </div>
+
+      {# Slide 5 — Formato das respostas #}
+      <div class="tour-slide">
+        <div class="tour-slide-icon">🔍</div>
+        <div class="tour-slide-title">Entenda as respostas</div>
+        <div class="tour-slide-body">
+          <p style="text-align:left; margin-bottom:12px;">Toda resposta segue dois blocos fixos:</p>
+          <div class="tour-verif"><strong>Verificação:</strong> transcrição literal do trecho do documento que responde à pergunta — ou aviso explícito de que o dado não está na biblioteca.</div>
+          <div class="tour-verif" style="border-color:#4285f4; background:rgba(66,133,244,0.06); color:#9ac0f5;"><strong>Resposta:</strong> baseada exclusivamente na Verificação acima. Se a biblioteca não tiver o dado, a Digiana indica a fonte oficial — sem inventar valores.</div>
+        </div>
+      </div>
+
+      {% if user.is_superuser %}
+      {# Slide 6 — Os 3 pilares (superusuário) #}
+      <div class="tour-slide">
+        <div class="tour-slide-icon">📚</div>
+        <div class="tour-slide-title">Como a Digiana aprende</div>
+        <div class="tour-slide-body">
+          <div class="tour-item"><span class="tour-item-ic">📄</span><span><strong>Biblioteca:</strong> documentos aprovados são vetorizados no ChromaDB. Tabelas de alíquotas e calendários de obrigações têm maior impacto.</span></div>
+          <div class="tour-item"><span class="tour-item-ic">💡</span><span><strong>Ideias:</strong> orientações da equipe injetadas como contexto nas perguntas relacionadas.</span></div>
+          <div class="tour-item"><span class="tour-item-ic">🔄</span><span><strong>RLHF:</strong> cada 👎 curado no painel vira aprendizado permanente — a correção é vetorizada e recuperada em perguntas similares futuras.</span></div>
+        </div>
+      </div>
+
+      {# Slide 7 — Painel Admin (superusuário) #}
+      <div class="tour-slide">
+        <div class="tour-slide-icon">⚙️</div>
+        <div class="tour-slide-title">Painel Administrativo</div>
+        <div class="tour-slide-body">
+          <div class="tour-item"><span class="tour-item-ic">📊</span><span><strong>Dashboard:</strong> métricas em tempo real — usuários online, sessões, curtidas.</span></div>
+          <div class="tour-item"><span class="tour-item-ic">📂</span><span><strong>Biblioteca:</strong> upload em lote, auditoria de pendentes, edição do conteúdo extraído.</span></div>
+          <div class="tour-item"><span class="tour-item-ic">👎</span><span><strong>Feedback:</strong> veja não curtidas, abra a mensagem e grave a correção ideal.</span></div>
+          <div class="tour-item"><span class="tour-item-ic">👤</span><span><strong>Usuários:</strong> criar, ativar, pausar e redefinir senhas.</span></div>
+          <div class="tour-tip">Acesse em <strong>/painel/</strong> ou pelo botão ⚙️ na barra lateral.</div>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+
+    <div class="tour-dots" id="tour-dots"></div>
+
+    <div class="tour-footer">
+      <label class="tour-no-show" for="tour-nao-exibir">
+        <input type="checkbox" id="tour-nao-exibir"> Não exibir novamente
+      </label>
+      <button class="tour-btn tour-btn-prev" id="tour-prev" disabled>← Anterior</button>
+      <button class="tour-btn tour-btn-next" id="tour-next">Próximo →</button>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
@@ -1008,5 +1227,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
     chatInput?.focus();
 });
+</script>
+
+<script>
+(function () {
+    const TOUR_KEY = 'digiana_tour_visto';
+    const overlay  = document.getElementById('tour-overlay');
+    if (!overlay) return;
+    if (localStorage.getItem(TOUR_KEY)) return;
+
+    const slides   = overlay.querySelectorAll('.tour-slide');
+    const dotsWrap = document.getElementById('tour-dots');
+    const prevBtn  = document.getElementById('tour-prev');
+    const nextBtn  = document.getElementById('tour-next');
+    const checkbox = document.getElementById('tour-nao-exibir');
+    let current = 0;
+
+    // Gera dots dinamicamente (funciona para 4 slides [usuário] ou 6 [superusuário])
+    slides.forEach(function(_, i) {
+        const d = document.createElement('div');
+        d.className = 'tour-dot' + (i === 0 ? ' tour-dot-active' : '');
+        d.addEventListener('click', function() { goTo(i); });
+        dotsWrap.appendChild(d);
+    });
+
+    function goTo(n) {
+        slides[current].classList.remove('tour-active');
+        dotsWrap.children[current].classList.remove('tour-dot-active');
+        current = Math.max(0, Math.min(n, slides.length - 1));
+        slides[current].classList.add('tour-active');
+        dotsWrap.children[current].classList.add('tour-dot-active');
+        prevBtn.disabled = current === 0;
+        nextBtn.textContent = current === slides.length - 1 ? 'Começar ✓' : 'Próximo →';
+    }
+
+    function fechar() {
+        if (checkbox.checked) localStorage.setItem(TOUR_KEY, '1');
+        overlay.style.animation = 'tour-fade-out 0.3s ease forwards';
+        setTimeout(function() { overlay.classList.add('tour-hidden'); }, 300);
+    }
+
+    prevBtn.addEventListener('click', function() { if (current > 0) goTo(current - 1); });
+    nextBtn.addEventListener('click', function() {
+        if (current < slides.length - 1) goTo(current + 1);
+        else fechar();
+    });
+
+    // Exibe o tour
+    overlay.classList.remove('tour-hidden');
+})();
 </script>
 {% endblock %}

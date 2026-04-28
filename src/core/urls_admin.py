@@ -20,6 +20,8 @@ from .views import (
     admin_upload_biblioteca,
     admin_auditar_documento,
     admin_deletar_documento,
+    admin_deletar_documentos_batch,
+    admin_documento_conteudo,
     admin_feedback_list,
     admin_feedback_messages,
     admin_save_correction,
@@ -53,6 +55,8 @@ urlpatterns = [
     # Biblioteca de Curadoria
     path('biblioteca/', admin_biblioteca, name='biblioteca'),
     path('biblioteca/upload/', admin_upload_biblioteca, name='upload_biblioteca'),
+    path('biblioteca/deletar-lote/', admin_deletar_documentos_batch, name='deletar_documentos_batch'),
+    path('biblioteca/<int:doc_id>/conteudo/', admin_documento_conteudo, name='documento_conteudo'),
     path('biblioteca/<int:doc_id>/auditar/', admin_auditar_documento, name='auditar_documento'),
     path('biblioteca/<int:doc_id>/deletar/', admin_deletar_documento, name='deletar_documento'),
 

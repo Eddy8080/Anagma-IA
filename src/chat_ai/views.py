@@ -119,6 +119,119 @@ def _get_ideias_ativas():
     return ideias
 
 
+def _manual_usuario(nome):
+    return (
+        f"Olá, **{nome}**! Aqui está o guia de uso da Digiana:\n\n"
+        "---\n\n"
+        "## Como usar a Digiana\n\n"
+        "**Faça perguntas contábeis e fiscais** em linguagem natural. Exemplos:\n"
+        "- *Qual a alíquota do DAS para MEI em 2024?*\n"
+        "- *Quais são as obrigações acessórias do Simples Nacional?*\n"
+        "- *Como funciona o PGDAS?*\n\n"
+        "---\n\n"
+        "## Entendendo as respostas\n\n"
+        "As respostas seguem um formato padrão:\n\n"
+        "**Verificação:** trecho literal do documento da biblioteca que responde à pergunta — "
+        "ou aviso de que o documento não contém o dado específico.\n\n"
+        "**Resposta:** baseada exclusivamente no que foi declarado na Verificação. "
+        "Se a biblioteca não tiver o dado, a Digiana informa a fonte oficial (Receita Federal, Portal do Simples, etc.) "
+        "sem inventar valores ou alíquotas.\n\n"
+        "---\n\n"
+        "## Como enviar documentos\n\n"
+        "Clique no ícone de **anexo (📎)** no chat e envie PDFs, imagens ou documentos (.docx, .xlsx, .txt).\n"
+        "O documento é encaminhado para a **Biblioteca de Curadoria** e fica em análise técnica "
+        "antes de ser integrado ao conhecimento da Digiana.\n\n"
+        "**Boas práticas ao enviar documentos:**\n"
+        "- **Leia antes de subir** — se o arquivo tem muito texto narrativo e poucos dados estruturados, "
+        "considere extrair só a parte relevante num `.txt` antes de enviar.\n"
+        "- **Um assunto por arquivo** — documentos que misturam vários temas aumentam o ruído na busca.\n"
+        "- **Valide após o upload** — faça uma pergunta no chat que aquele documento deveria responder "
+        "e verifique se a **Verificação** transcreve o trecho correto. Se vier vazia, o documento precisa ser revisado.\n\n"
+        "---\n\n"
+        "## Como registrar uma ideia\n\n"
+        "Use o menu **Registrar Ideia** para compartilhar orientações, procedimentos internos "
+        "ou correções de processo. Sua ideia passa por aprovação antes de ser ativada.\n\n"
+        "---\n\n"
+        "## Como dar feedback\n\n"
+        "Use os ícones de **👍 / 👎** em cada resposta da Digiana.\n"
+        "- **👍 Curtiu:** a resposta foi útil e precisa.\n"
+        "- **👎 Não curtiu:** a resposta estava incorreta ou imprecisa — "
+        "o time técnico analisa e registra uma correção permanente.\n\n"
+        "---\n\n"
+        "## O que a Digiana **não** responde\n\n"
+        "- Política, esportes, culinária, turismo, entretenimento.\n"
+        "- Consultas jurídicas ou decisões que exijam responsabilidade técnica de contador.\n"
+        "- Valores ou alíquotas que não estejam na biblioteca — nesses casos ela indica a fonte oficial.\n\n"
+        "---\n\n"
+        "*Digite sua pergunta contábil para começar.*"
+    )
+
+
+def _manual_superusuario(nome):
+    return (
+        f"Olá, **{nome}**! Você tem acesso ao manual completo — uso e administração.\n\n"
+        "---\n\n"
+        "## Guia do Usuário\n\n"
+        "**Faça perguntas contábeis e fiscais** em linguagem natural. Exemplos:\n"
+        "- *Qual a alíquota do DAS para MEI em 2024?*\n"
+        "- *Quais são as obrigações acessórias do Simples Nacional?*\n\n"
+        "**Formato das respostas:**\n"
+        "- **Verificação:** transcrição literal do trecho do documento que responde à pergunta.\n"
+        "- **Resposta:** baseada exclusivamente na Verificação — sem inventar dados.\n\n"
+        "**Feedback:** use 👍 / 👎 em cada resposta. O 👎 alimenta o processo de correção RLHF.\n\n"
+        "**Envio de documentos:** ícone 📎 no chat → vai para a Biblioteca como pendente.\n\n"
+        "**Boas práticas ao enviar documentos:**\n"
+        "- **Leia antes de subir** — se o arquivo tem muito texto narrativo e poucos dados estruturados, "
+        "considere extrair só a parte relevante num `.txt` antes de enviar.\n"
+        "- **Um assunto por arquivo** — documentos que misturam vários temas aumentam o ruído na busca semântica.\n"
+        "- **Valide após o upload** — faça uma pergunta no chat que aquele documento deveria responder "
+        "e verifique se a **Verificação** transcreve o trecho correto. Se vier vazia ou genérica, "
+        "o documento precisa ser revisado ou dividido no painel.\n"
+        "- **Se ainda alucinar** — registre a correção via 👎 no painel de feedback para fechar o ciclo RLHF.\n\n"
+        "---\n\n"
+        "## Como a Digiana aprende — 3 Pilares\n\n"
+        "**1. Biblioteca de Curadoria**\n"
+        "Documentos (PDF, DOCX, XLSX, imagens) enviados e aprovados são vetorizados no ChromaDB. "
+        "A busca semântica recupera os trechos mais relevantes para cada pergunta. "
+        "Documentos com tabelas de alíquotas, calendários de obrigações e legislação consolidada "
+        "têm o maior impacto na precisão das respostas.\n\n"
+        "**2. Banco de Ideias**\n"
+        "Orientações e procedimentos internos da equipe. São injetadas como contexto nas perguntas "
+        "relacionadas. Ideias ativas aparecem imediatamente; as pendentes aguardam aprovação.\n\n"
+        "**3. RLHF — Correção Baseada em Feedback**\n"
+        "Quando um 👎 é registrado, você pode abrir a mensagem no painel de feedback e gravar "
+        "a resposta ideal. Essa correção é vetorizada no ChromaDB com o par pergunta/resposta-ideal "
+        "e passa a ser injetada como contexto em perguntas similares futuras — de forma permanente, "
+        "sem alterar os pesos do modelo.\n\n"
+        "---\n\n"
+        "## Painel Administrativo — `/painel/`\n\n"
+        "**Dashboard**\n"
+        "Métricas em tempo real: usuários online, sessões do dia, total de curtidas/não curtidas.\n\n"
+        "**Biblioteca** → `/painel/biblioteca/`\n"
+        "- Upload em lote de documentos (já aprovados e vetorizados automaticamente).\n"
+        "- Auditoria de documentos pendentes enviados pelos usuários: visualize o conteúdo extraído, "
+        "edite se necessário, e aprove (vetoriza) ou rejeite com motivo.\n\n"
+        "**Ideias** → `/painel/ideias/`\n"
+        "- Gerencie orientações da equipe: criar, editar, ativar/desativar, excluir.\n"
+        "- Ideias criadas por superusuários já nascem ativas.\n\n"
+        "**Feedback (RLHF)** → `/painel/feedback/dislike/`\n"
+        "- Veja quais usuários registraram não curtidas e quantas.\n"
+        "- Acesse as mensagens específicas e grave a correção ideal.\n"
+        "- Cada correção gravada é vetorizada e se torna aprendizado permanente da Digiana.\n\n"
+        "**Usuários** → `/painel/usuarios/`\n"
+        "- Criar usuários (e-mail @anagma.com.br ativa automaticamente).\n"
+        "- Alterar status (Ativo / Inativo / Pausado) e nível de acesso.\n"
+        "- Redefinir senha (usuário é obrigado a trocar no próximo acesso).\n"
+        "- Excluir preservando histórico (para treinamento) ou purga total.\n\n"
+        "**Insights** → `/painel/insights/`\n"
+        "- Gráfico de interações por hora (hoje) e por dia (últimos 7 dias).\n\n"
+        "**Modelos** → `/painel/modelos/`\n"
+        "- Alternar entre modelo Leve e Completo sem reiniciar o servidor.\n\n"
+        "---\n\n"
+        "*Dica: quanto mais documentos específicos e estruturados na biblioteca, menor a chance de alucinação.*"
+    )
+
+
 def _group_sessions(sessions):
     today = timezone.localdate()
     yesterday = today - timedelta(days=1)
@@ -180,25 +293,39 @@ def chat_stream(request):
         session = None
         if session_id:
             session = ChatSession.objects.filter(id=session_id, user=request.user, deleted_at__isnull=True).first()
-        
+
         if not session:
             titulo = user_prompt[:50] + ('...' if len(user_prompt) > 50 else '')
             session = ChatSession.objects.create(user=request.user, titulo=titulo)
-        
+
         # Registra pergunta do usuário se for nova sessão ou última msg não for essa
         ultima_msg = session.messages.order_by('-timestamp').first()
         if not ultima_msg or ultima_msg.content != user_prompt:
             ChatMessage.objects.create(session=session, role='user', content=user_prompt)
 
+        yield f"event: session_id\ndata: {session.id}\n\n"
+
+        # Intercepta comando /manual antes de acionar o LLM
+        if user_prompt.strip().lower().startswith('/manual'):
+            user_name = request.user.nome_completo or request.user.username
+            if request.user.is_superuser:
+                resposta_manual = _manual_superusuario(user_name)
+            else:
+                resposta_manual = _manual_usuario(user_name)
+            # SSE não suporta \n dentro de um data: — cada \n deve virar \ndata:
+            resposta_sse = resposta_manual.replace('\n', '\ndata: ')
+            yield f"data: {resposta_sse}\n\n"
+            ChatMessage.objects.create(session=session, role='assistant', content=resposta_manual)
+            session.save()
+            return
+
         history_msgs = session.messages.order_by('timestamp')
         chat_history = [{'role': m.role, 'content': m.content} for m in history_msgs]
-        
+
         user_name = request.user.nome_completo or request.user.username
         saudacao = _get_saudacao()
-        
+
         full_response = ""
-        # Envia ID da sessão no primeiro evento para o frontend se for nova
-        yield f"event: session_id\ndata: {session.id}\n\n"
 
         for token in llm_engine.gerar_resposta_stream(
             user_query=user_prompt,
@@ -256,6 +383,24 @@ def send_message(request):
 
     user_name = request.user.nome_completo or request.user.username
     saudacao = _get_saudacao()
+
+    # Intercepta comando /manual antes de acionar o LLM
+    if user_prompt.strip().lower().startswith('/manual'):
+        if request.user.is_superuser:
+            ai_response = _manual_superusuario(user_name)
+        else:
+            ai_response = _manual_usuario(user_name)
+        ai_msg = ChatMessage.objects.create(session=session, role='assistant', content=ai_response)
+        session.save()
+        return JsonResponse({
+            'status': 'success',
+            'session_id': session.id,
+            'session_title': session.titulo,
+            'is_new': is_new,
+            'response': ai_response,
+            'message_id': ai_msg.id,
+            'time': timezone.localtime().strftime('%H:%M'),
+        })
 
     try:
         llm_engine = get_llm_engine()

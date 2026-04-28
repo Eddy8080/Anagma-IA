@@ -40,11 +40,12 @@ GATILHOS_SOBRE_IA = (
     'suas capacidades', 'suas funcionalidades',
     'do que você é capaz', 'do que voce e capaz',
     'quais são suas funções', 'quais sao suas funcoes',
-    # como funciona / usar
-    'como funciona', 'como você funciona', 'como voce funciona',
-    'como usar', 'como te usar', 'como posso usar', 'como posso te usar',
-    # pedidos de explicação
-    'me explica', 'me explique como',
+    # como funciona — apenas com sujeito explícito referente à IA
+    'como você funciona', 'como voce funciona',
+    # como usar — apenas referindo-se à IA diretamente
+    'como te usar', 'como posso te usar',
+    # pedidos de explicação sobre a IA
+    'me explica',
     'o que você sabe', 'o que voce sabe',
     # ajuda geral
     'pode me ajudar com', 'no que pode ajudar',

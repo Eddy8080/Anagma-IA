@@ -502,48 +502,100 @@ def admin_biblioteca(request):
 @superuser_required
 def admin_upload_biblioteca(request):
     """
-    Permite ao Superusuário subir documentos diretamente (já aprovados).
+    Permite ao Superusuário subir diversos documentos simultaneamente (já aprovados).
+    Suporta requisições AJAX: retorna JSON com os documentos criados para inserção
+    instantânea na tabela, sem reload de página.
     """
     from .models import DocumentoBiblioteca
     from chat_ai.document_processor import AnagmaDocumentProcessor
-    
-    if request.method == 'POST' and request.FILES.get('arquivo'):
-        uploaded_file = request.FILES['arquivo']
-        nome_original = uploaded_file.name
-        ext = nome_original.split('.')[-1].lower() if '.' in nome_original else ''
-        
-        if ext not in ['pdf', 'png', 'jpg', 'jpeg']:
-            messages.error(request, 'Extensão de arquivo não suportada.')
+
+    if request.method == 'POST':
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        files = request.FILES.getlist('arquivo')
+
+        if not files:
+            if is_ajax:
+                return JsonResponse({'status': 'error', 'message': 'Nenhum arquivo selecionado.'}, status=400)
+            messages.warning(request, 'Nenhum arquivo selecionado.')
             return redirect('admin_panel:biblioteca')
 
-        try:
-            # 1. Cria o registro aprovado
-            doc = DocumentoBiblioteca.objects.create(
-                nome_arquivo=nome_original,
-                arquivo=uploaded_file,
-                extensao=ext,
-                status='approved',
-                auditado_por=request.user,
-                processado_em=timezone.now()
-            )
-            
-            # 2. Processa o texto imediatamente para a IA aprender
-            doc.arquivo.open('rb')
-            try:
-                texto = AnagmaDocumentProcessor.extrair_texto(doc.arquivo, ext)
-            finally:
-                doc.arquivo.close()
-            doc.conteudo_extraido = texto
-            doc.save(update_fields=['conteudo_extraido'])
+        extensoes_permitidas = ['pdf', 'png', 'jpg', 'jpeg', 'docx', 'doc', 'xlsx', 'xls', 'txt']
+        docs_criados = []
+        sucessos = 0
+        erros = 0
 
-            if not texto:
-                messages.warning(request, f'Documento "{nome_original}" adicionado, mas nenhum texto foi identificado.')
-            else:
-                messages.success(request, f'Documento "{nome_original}" adicionado e aprovado com sucesso.')
-        except Exception as e:
-            messages.error(request, f'Erro ao processar documento: {str(e)}')
-            
+        for uploaded_file in files:
+            nome_original = uploaded_file.name
+            ext = nome_original.split('.')[-1].lower() if '.' in nome_original else ''
+
+            if ext not in extensoes_permitidas:
+                erros += 1
+                continue
+
+            try:
+                doc = DocumentoBiblioteca.objects.create(
+                    nome_arquivo=nome_original,
+                    arquivo=uploaded_file,
+                    extensao=ext,
+                    status='approved',
+                    auditado_por=request.user,
+                    processado_em=timezone.now()
+                )
+
+                import io as _io
+                doc.arquivo.open('rb')
+                try:
+                    file_bytes = doc.arquivo.read()
+                finally:
+                    doc.arquivo.close()
+                print(f"[UPLOAD] '{nome_original}' — bytes lidos do storage: {len(file_bytes)}", flush=True)
+                texto = AnagmaDocumentProcessor.extrair_texto(_io.BytesIO(file_bytes), ext)
+
+                doc.conteudo_extraido = texto
+                doc.save(update_fields=['conteudo_extraido'])
+
+                # Vetoriza no ChromaDB para habilitar busca semântica
+                if texto and not texto.startswith('Erro') and not texto.startswith('Não foi possível'):
+                    try:
+                        from django.utils.html import strip_tags
+                        from chat_ai.llm_engine import AnagmaLLMEngine
+                        AnagmaLLMEngine().rag.vetorizar_texto(strip_tags(texto), doc.nome_arquivo)
+                        print(f"[RAG] '{doc.nome_arquivo}' vetorizado com sucesso.", flush=True)
+                    except Exception as e_rag:
+                        print(f"[RAG] Aviso: falha ao vetorizar '{doc.nome_arquivo}': {e_rag}", flush=True)
+
+                sucessos += 1
+
+                if is_ajax:
+                    docs_criados.append({
+                        'id': doc.id,
+                        'nome_arquivo': doc.nome_arquivo,
+                        'extensao': doc.extensao,
+                        'status': doc.status,
+                        'criado_em': doc.criado_em.strftime('%d/%m/%Y %H:%M'),
+                        'auditado_por': doc.auditado_por.username if doc.auditado_por else '',
+                    })
+            except Exception as e:
+                print(f"[ERRO UPLOAD BATCH] {nome_original}: {e}")
+                erros += 1
+
+        if is_ajax:
+            return JsonResponse({'status': 'ok', 'docs': docs_criados, 'sucessos': sucessos, 'erros': erros})
+
+        if sucessos > 0:
+            messages.success(request, f'{sucessos} documento(s) adicionado(s) e aprovado(s) com sucesso.')
+        if erros > 0:
+            messages.error(request, f'{erros} arquivo(s) falharam ou possuem extensão não suportada.')
+
     return redirect('admin_panel:biblioteca')
+
+
+@superuser_required
+def admin_documento_conteudo(request, doc_id):
+    """Retorna o conteúdo extraído de um documento como JSON (para carregamento sob demanda)."""
+    from .models import DocumentoBiblioteca
+    doc = get_object_or_404(DocumentoBiblioteca, pk=doc_id)
+    return JsonResponse({'content': doc.conteudo_extraido or '', 'nome': doc.nome_arquivo})
 
 
 @superuser_required
@@ -558,16 +610,26 @@ def admin_auditar_documento(request, doc_id):
         motivo = request.POST.get('motivo_rejeicao', '').strip()
 
         if acao == 'approve':
+            # Captura o conteúdo editado do editor Quill
+            conteudo_editado = request.POST.get('conteudo_editado', '').strip()
+            if conteudo_editado:
+                doc.conteudo_extraido = conteudo_editado
+            
             doc.status = 'approved'
             doc.motivo_rejeicao = ''
             doc.auditado_por = request.user
             doc.processado_em = timezone.now()
             doc.save()
+
             # Vetoriza no ChromaDB para habilitar busca semântica
             if doc.conteudo_extraido:
                 try:
+                    from django.utils.html import strip_tags
+                    # Remove tags HTML para a vetorização (RAG prefere texto limpo)
+                    texto_limpo = strip_tags(doc.conteudo_extraido)
+                    
                     from chat_ai.llm_engine import AnagmaLLMEngine
-                    AnagmaLLMEngine().rag.vetorizar_texto(doc.conteudo_extraido, doc.nome_arquivo)
+                    AnagmaLLMEngine().rag.vetorizar_texto(texto_limpo, doc.nome_arquivo)
                 except Exception as e:
                     print(f"[RAG] Erro ao vetorizar documento aprovado: {e}", flush=True)
             messages.success(request, f'Documento "{doc.nome_arquivo}" aprovado e integrado à base semântica da IA.')
@@ -592,10 +654,30 @@ def admin_deletar_documento(request, doc_id):
     if request.method == 'POST':
         doc = get_object_or_404(DocumentoBiblioteca, pk=doc_id)
         nome = doc.nome_arquivo
-        doc.arquivo.delete() # Remove o arquivo físico
+        doc.arquivo.delete()
         doc.delete()
         messages.success(request, f'Documento "{nome}" removido permanentemente.')
     return redirect('admin_panel:biblioteca')
+
+
+@superuser_required
+def admin_deletar_documentos_batch(request):
+    """Exclui múltiplos documentos em lote via AJAX."""
+    from .models import DocumentoBiblioteca
+    if request.method == 'POST':
+        ids = request.POST.getlist('doc_ids[]')
+        if not ids:
+            return JsonResponse({'status': 'error', 'message': 'Nenhum ID recebido.'}, status=400)
+        docs = DocumentoBiblioteca.objects.filter(pk__in=ids)
+        total = docs.count()
+        for doc in docs:
+            try:
+                doc.arquivo.delete()
+            except Exception:
+                pass
+        docs.delete()
+        return JsonResponse({'status': 'ok', 'deleted': total})
+    return JsonResponse({'status': 'error'}, status=405)
 
 
 # ---------------------------------------------------------------------------

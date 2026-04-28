@@ -2,30 +2,197 @@
 
 {% block title %}Biblioteca de Curadoria — Anagma IA{% endblock %}
 
+{% block messages %}{% endblock %}
+
 {% block content %}
-<div style="display:flex; justify-content:space-between; align-items:center; gap:40px; margin-bottom:32px;">
-    <div>
-        <div class="page-title text-dynamic" style="margin:0;">📚 Biblioteca de Curadoria</div>
-        <p class="text-dynamic-muted" style="margin-top:8px; margin-bottom:0; font-weight:600;">
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+
+{% if messages %}
+    {% for msg in messages %}
+        <div class="msg-flash {% if msg.tags == 'error' %}msg-flash-error{% else %}msg-flash-success{% endif %}">
+            {{ msg }}
+        </div>
+    {% endfor %}
+{% endif %}
+
+<style>
+    /* ── Quill ─────────────────────────────────────────── */
+    #editor-container {
+        flex: 1; display: flex; flex-direction: column;
+        margin-bottom: 24px; min-height: 400px;
+        border: 1px solid var(--border); border-radius: 12px;
+        overflow: hidden; background: rgba(0,0,0,0.2); position: relative;
+    }
+    .ql-toolbar.ql-snow  { border: none !important; border-bottom: 1px solid var(--border) !important; background: rgba(255,255,255,0.05); padding: 8px 12px !important; }
+    .ql-container.ql-snow { border: none !important; flex: 1; display: flex; flex-direction: column; overflow: hidden; font-family: inherit; }
+    .ql-editor             { flex: 1; overflow-y: auto; color: var(--text); font-size: 0.95rem; line-height: 1.6; padding: 20px !important; }
+    .ql-snow .ql-stroke    { stroke: #a8c7fa !important; }
+    .ql-snow .ql-fill      { fill:   #a8c7fa !important; }
+    .ql-snow .ql-picker     { color: #a8c7fa !important; }
+    .ql-snow .ql-picker-options { background-color: var(--sidebar-bg) !important; border: 1px solid var(--border) !important; color: var(--text) !important; }
+
+    /* ── Spinner editor ─────────────────────────────────── */
+    #editor-loading {
+        display: none; position: absolute; inset: 0;
+        background: rgba(0,0,0,0.45); border-radius: 12px; z-index: 10;
+        align-items: center; justify-content: center; flex-direction: column;
+        gap: 12px; color: #a8c7fa; font-size: 0.9rem; font-weight: 600;
+    }
+    #editor-loading svg { width: 40px; height: 40px; animation: spin 1.2s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Spinner botão upload ───────────────────────────── */
+    .btn-upload-spinner {
+        display: inline-block; width: 12px; height: 12px;
+        border: 2px solid rgba(0,0,0,0.3); border-top-color: #131314;
+        border-radius: 50%; animation: spin 0.7s linear infinite;
+        vertical-align: middle; margin-right: 5px;
+    }
+
+    /* ── Barra de pesquisa ──────────────────────────────── */
+    #search-wrapper {
+        position: relative; margin-bottom: 16px;
+    }
+    #search-input {
+        width: 100%; padding: 10px 16px 10px 40px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid var(--border); border-radius: 10px;
+        color: var(--text); font-size: 0.9rem; font-family: inherit;
+        outline: none; box-sizing: border-box;
+        transition: border-color 0.2s;
+    }
+    #search-input:focus { border-color: #a8c7fa; }
+    #search-input::placeholder { color: rgba(255,255,255,0.3); }
+    #search-icon {
+        position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+        opacity: 0.4; pointer-events: none;
+    }
+    #search-clear {
+        display: none; position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+        background: none; border: none; cursor: pointer; opacity: 0.5; font-size: 1rem;
+        color: var(--text);
+    }
+    #search-clear:hover { opacity: 1; }
+    #search-count {
+        font-size: 0.78rem; margin-top: 6px; margin-bottom: 0;
+        display: none;
+    }
+    tr.hidden-row { display: none; }
+
+    /* ── Flash nova linha ───────────────────────────────── */
+    @keyframes rowFlash { from { background: rgba(74,222,128,0.15); } to { background: transparent; } }
+    .row-new { animation: rowFlash 2s ease-out forwards; }
+
+    /* ── Checkbox ───────────────────────────────────────── */
+    .doc-checkbox, #chk-all {
+        width: 16px; height: 16px; cursor: pointer; accent-color: #a8c7fa;
+    }
+    tr.selected-row td { background: rgba(168,199,250,0.07); }
+
+    /* ── Barra de ação flutuante ────────────────────────── */
+    #batch-bar {
+        display: none;
+        position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+        background: var(--sidebar-bg, #1e1e2e);
+        border: 1px solid var(--border, rgba(255,255,255,0.1));
+        border-radius: 14px; padding: 12px 24px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        align-items: center; gap: 20px;
+        z-index: 9000; white-space: nowrap;
+        animation: barIn 0.2s ease-out;
+    }
+    @keyframes barIn { from { opacity:0; transform: translateX(-50%) translateY(12px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+    #batch-bar.visible { display: flex; }
+    #batch-count { font-weight: 700; font-size: 0.9rem; }
+    #btn-deselect { background: none; border: none; cursor: pointer; font-size: 0.8rem; opacity: 0.6; }
+    #btn-deselect:hover { opacity: 1; }
+
+    /* ── Layout & Cabeçalho ────────────────────────────── */
+    .bib-header { display: flex; justify-content: space-between; align-items: center; gap: 40px; margin-bottom: 32px; }
+    .bib-title { margin: 0; }
+    .bib-subtitle { margin-top: 8px; margin-bottom: 0; font-weight: 600; }
+    .bib-upload-card { padding: 12px 20px; display: flex; align-items: center; gap: 12px; margin-bottom: 0; margin-right: 120px; border-radius: 12px; }
+    .bib-upload-label { font-size: 0.85rem; font-weight: 700; }
+    .bib-upload-form { display: flex; align-items: center; gap: 8px; margin: 0; }
+    .bib-upload-input { font-size: 0.75rem; max-width: 180px; font-weight: 500; }
+    .bib-upload-btn { padding: 5px 14px; font-size: 0.75rem; font-weight: 700; color: #131314; border-radius: 8px; min-width: 120px; }
+
+    /* ── Tabelas e Listagem ────────────────────────────── */
+    .card-no-padding { padding: 0; }
+    .table-full { width: 100%; }
+    .cell-chk { width: 40px; text-align: center; }
+    .cell-center { text-align: center; }
+    .cell-bold { font-weight: 600; }
+    .cell-small { font-size: 0.75rem; }
+    .cell-date { font-size: 0.85rem; }
+    .badge-pending { background: rgba(251,191,36,0.1); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+    .audit-name { color: #4ade80; font-weight: 500; }
+    .audit-wait { font-style: italic; opacity: 0.6; }
+    .btn-delete-row { background: none; border: none; color: #f87171; cursor: pointer; font-size: 0.8rem; margin-left: 10px; }
+    .empty-state { text-align: center; padding: 40px; }
+
+    /* ── Modais ────────────────────────────────────────── */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+    .modal-overlay-darker { background: rgba(0,0,0,0.85); }
+    .modal-content-sm { padding: 32px; width: 90%; max-width: 380px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
+    .modal-content-md { padding: 32px; width: 90%; max-width: 420px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
+    .modal-content-lg { padding: 32px; width: 90%; max-width: 800px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
+    .modal-icon { font-size: 2.5rem; margin-bottom: 16px; }
+    .modal-h3 { margin: 0 0 12px; font-weight: 500; }
+    .modal-p { font-size: 0.95rem; line-height: 1.5; margin-bottom: 24px; }
+    .modal-actions { display: flex; gap: 12px; justify-content: center; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; }
+    .rejection-label { display: block; font-size: 0.85rem; margin-bottom: 8px; }
+    .rejection-textarea { width: 100%; background: transparent; border: 1px solid #d93025; border-radius: 8px; padding: 12px; font-family: inherit; outline: none; }
+</style>
+
+<!-- ── Cabeçalho ─────────────────────────────────────────── -->
+<div class="bib-header">
+    <div class="bib-title-group">
+        <div class="page-title text-dynamic bib-title">📚 Biblioteca de Curadoria</div>
+        <p class="text-dynamic-muted bib-subtitle">
             Documentos enviados via Chat para aprendizado da IA. Revise o conteúdo extraído antes de aprovar.
         </p>
     </div>
-    
-    <!-- Upload Direto Superusuário (Com Recuo de Segurança) -->
-    <div class="card" style="padding:12px 20px; display:flex; align-items:center; gap:12px; margin-bottom:0; margin-right:120px; border-radius:12px;">
-        <span class="text-dynamic" style="font-size:0.85rem; font-weight:700;">➕ Adicionar Manual:</span>
-        <form action="{% url 'admin_panel:upload_biblioteca' %}" method="post" enctype="multipart/form-data" style="display:flex; align-items:center; gap:8px; margin:0;">
+
+    <div class="card bib-upload-card">
+        <span class="text-dynamic bib-upload-label">➕ Adicionar:</span>
+        <form id="upload-form" class="bib-upload-form">
             {% csrf_token %}
-            <input type="file" name="arquivo" required class="text-dynamic-muted" style="font-size:0.75rem; max-width:180px; font-weight:500;">
-            <button type="submit" class="btn btn-primary" style="padding:5px 14px; font-size:0.75rem; font-weight:700; color:#131314; border-radius:8px;">Subir Direto</button>
+            <input id="upload-input" type="file" name="arquivo" required multiple
+                   class="text-dynamic-muted bib-upload-input"
+                   aria-label="Selecionar arquivos para upload"
+                   accept=".pdf,.png,.jpg,.jpeg,.docx,.doc,.xlsx,.xls,.txt">
+            <button id="upload-btn" type="submit" class="btn btn-primary bib-upload-btn">
+                Subir Arquivos
+            </button>
         </form>
     </div>
 </div>
 
-<div class="card" style="padding:0;">
-    <table style="width:100%;">
+<div id="upload-msg" style="display:none; margin-bottom:16px;"></div>
+
+<!-- ── Barra de pesquisa ─────────────────────────────────── -->
+<div id="search-wrapper">
+    <svg id="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <input id="search-input" type="text" placeholder="Pesquisar por nome, extensão ou status…" 
+           autocomplete="off" aria-label="Pesquisar documentos na biblioteca">
+    <button id="search-clear" title="Limpar pesquisa">✕</button>
+</div>
+<p id="search-count" class="text-dynamic-muted"></p>
+
+<!-- ── Tabela ────────────────────────────────────────────── -->
+<div class="card card-no-padding">
+    <table class="table-full">
         <thead>
             <tr>
+                <th class="cell-chk">
+                    <input type="checkbox" id="chk-all" title="Selecionar todos" aria-label="Selecionar todos os documentos">
+                </th>
                 <th class="text-dynamic-muted">Documento</th>
                 <th class="text-dynamic-muted">Status</th>
                 <th class="text-dynamic-muted">Data</th>
@@ -33,55 +200,70 @@
                 <th class="text-dynamic-muted">Ações</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="docs-tbody">
             {% for doc in documentos %}
-            <tr>
+            <tr data-id="{{ doc.id }}">
+                <td class="cell-center">
+                    <input type="checkbox" class="doc-checkbox" value="{{ doc.id }}" aria-label="Selecionar documento {{ doc.nome_arquivo }}">
+                </td>
                 <td>
-                    <div style="font-weight:600;" class="text-dynamic">{{ doc.nome_arquivo }}</div>
-                    <div style="font-size:0.75rem;" class="text-dynamic-muted">Extensão: .{{ doc.extensao }}</div>
+                    <div class="text-dynamic cell-bold">{{ doc.nome_arquivo }}</div>
+                    <div class="text-dynamic-muted cell-small">Extensão: .{{ doc.extensao }}</div>
                 </td>
                 <td>
                     {% if doc.status == 'pending' %}
-                        <span class="badge" style="background:rgba(251, 191, 36, 0.1); color:#fbbf24; border: 1px solid rgba(251, 191, 36, 0.2);">Pendente</span>
+                        <span class="badge badge-pending">Pendente</span>
                     {% elif doc.status == 'approved' %}
                         <span class="badge badge-green">Aprovado</span>
                     {% else %}
                         <span class="badge badge-red">Rejeitado</span>
                     {% endif %}
                 </td>
-                <td style="font-size:0.85rem;" class="text-dynamic-muted">{{ doc.criado_em|date:"d/m/Y H:i" }}</td>
-                <td style="font-size:0.85rem;">
+                <td class="text-dynamic-muted cell-date">{{ doc.criado_em|date:"d/m/Y H:i" }}</td>
+                <td class="cell-date">
                     {% if doc.auditado_por %}
-                        <div style="color:#4ade80; font-weight:500;">Por: {{ doc.auditado_por.username }}</div>
+                        <div class="audit-name">Por: {{ doc.auditado_por.username }}</div>
                     {% else %}
-                        <div class="text-dynamic-muted" style="font-style:italic; opacity:0.6;">Aguardando...</div>
+                        <div class="text-dynamic-muted audit-wait">Aguardando...</div>
                     {% endif %}
                 </td>
                 <td>
-                    <button class="btn btn-outline text-dynamic" onclick="openPreviewModal('{{ doc.id }}', '{{ doc.nome_arquivo|escapejs }}', `{{ doc.conteudo_extraido|escapejs }}`)">
+                    <button class="btn btn-outline text-dynamic btn-revisar"
+                            data-id="{{ doc.id }}" data-nome="{{ doc.nome_arquivo|escapejs }}">
                         Revisar Conteúdo
                     </button>
-                    <button type="button" onclick="openDeleteModal('{{ doc.id }}')" 
-                            style="background:none; border:none; color:#f87171; cursor:pointer; font-size:0.8rem; margin-left:10px;">
+                    <button type="button" class="btn-excluir btn-delete-row" data-id="{{ doc.id }}">
                         Excluir
                     </button>
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="5" style="text-align:center; padding:40px;" class="text-dynamic-muted">Nenhum documento na fila de auditoria.</td></tr>
+            <tr id="empty-row">
+                <td colspan="6" class="text-dynamic-muted empty-state">
+                    Nenhum documento na fila de auditoria.
+                </td>
+            </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
 
-{# ── Modal de Confirmação de Exclusão (Estilo Chat) ── #}
-<div id="delete-doc-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
-                               background:rgba(0,0,0,0.8); z-index:10000; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
-    <div class="card" style="padding:32px; width:90%; max-width:380px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.6);">
-        <div style="font-size:2.5rem; margin-bottom:16px;">🗑️</div>
-        <h3 style="margin:0 0 12px; font-weight:500;" class="text-dynamic">Excluir este documento?</h3>
-        <p class="text-dynamic-muted" style="font-size:0.95rem; line-height:1.5; margin-bottom:24px;">Esta ação é permanente e removerá o arquivo físico da biblioteca da IA.</p>
-        <div style="display:flex; gap:12px; justify-content:center;">
+<!-- ── Barra de ação flutuante (seleção em lote) ────────── -->
+<div id="batch-bar">
+    <span class="text-dynamic" id="batch-count">0 selecionado(s)</span>
+    <button id="btn-batch-delete" class="btn btn-danger" style="padding:8px 20px; font-size:0.85rem; font-weight:700;">
+        🗑️ Excluir selecionados
+    </button>
+    <button id="btn-deselect" class="text-dynamic-muted">✕ Limpar seleção</button>
+</div>
+
+<!-- ── Modal de confirmação exclusão individual ─────────── -->
+<div id="delete-doc-modal" class="modal-overlay">
+    <div class="card modal-content-sm">
+        <div class="modal-icon">🗑️</div>
+        <h3 class="text-dynamic modal-h3">Excluir este documento?</h3>
+        <p class="text-dynamic-muted modal-p">Esta ação é permanente e removerá o arquivo físico da biblioteca da IA.</p>
+        <div class="modal-actions">
             <button onclick="closeDeleteModal()" class="btn btn-outline text-dynamic" style="padding:10px 24px;">Não</button>
             <form id="delete-form-real" method="post" action="" style="margin:0;">
                 {% csrf_token %}
@@ -91,29 +273,56 @@
     </div>
 </div>
 
-{# ── Modal de Revisão e Auditoria ── #}
-<div id="preview-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
-                               background:rgba(0,0,0,0.85); z-index:10000; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
-    <div class="card" style="padding:32px; width:90%; max-width:800px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,0.6);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h3 id="modal-title" style="margin:0; font-weight:600;" class="text-dynamic">Revisar Documento</h3>
-            <button onclick="closePreviewModal()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;" class="text-dynamic">&times;</button>
+<!-- ── Modal de confirmação exclusão em lote ────────────── -->
+<div id="delete-batch-modal" class="modal-overlay">
+    <div class="card modal-content-md">
+        <div class="modal-icon">⚠️</div>
+        <h3 class="text-dynamic modal-h3" id="batch-modal-title">Excluir documentos selecionados?</h3>
+        <p class="text-dynamic-muted modal-p">
+            Esta ação é permanente. Todos os arquivos físicos e registros serão removidos.
+        </p>
+        <div class="modal-actions">
+            <button onclick="closeBatchModal()" class="btn btn-outline text-dynamic" style="padding:10px 24px;">Cancelar</button>
+            <button id="btn-batch-confirm" class="btn btn-danger" style="padding:10px 24px; font-weight:600;">
+                Sim, excluir todos
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal de Revisão e Auditoria ─────────────────────── -->
+<div id="preview-modal" class="modal-overlay modal-overlay-darker">
+    <div class="card modal-content-lg">
+        <div class="modal-header">
+            <h3 id="modal-title" class="text-dynamic cell-bold">Revisar Documento</h3>
+            <button onclick="closePreviewModal()" class="text-dynamic modal-close">&times;</button>
         </div>
 
-        <div style="flex:1; overflow-y:auto; background:rgba(0,0,0,0.05); border:1px solid var(--border); border-radius:10px; padding:20px; margin-bottom:24px; font-family:monospace; font-size:0.9rem; white-space:pre-wrap;" id="modal-content" class="text-dynamic">
-            <!-- Conteúdo extraído será inserido aqui -->
+        <div id="editor-container">
+            <div id="quill-editor" class="text-dynamic"></div>
+            <div id="editor-loading">
+                <svg viewBox="0 0 50 50" fill="none" stroke="#a8c7fa" stroke-width="4">
+                    <circle cx="25" cy="25" r="20" stroke-opacity="0.25"/>
+                    <path d="M25 5 a20 20 0 0 1 20 20"/>
+                </svg>
+                Carregando conteúdo…
+            </div>
         </div>
 
         <form id="audit-form" method="post" action="">
             {% csrf_token %}
             <input type="hidden" name="acao" id="audit-action" value="approve">
-            
+            <input type="hidden" name="conteudo_editado" id="conteudo_editado">
+
             <div id="rejection-box" style="display:none; margin-bottom:20px;">
-                <label class="text-dynamic-muted" style="display:block; font-size:0.85rem; margin-bottom:8px;">Motivo da Rejeição:</label>
-                <textarea name="motivo_rejeicao" style="width:100%; background:transparent; border:1px solid #d93025; border-radius:8px; padding:12px; font-family:inherit; outline:none;" rows="2" class="text-dynamic" placeholder="Ex: O documento não é do domínio contábil."></textarea>
+                <label class="text-dynamic-muted rejection-label">Motivo da Rejeição:</label>
+                <textarea name="motivo_rejeicao"
+                          class="text-dynamic rejection-textarea"
+                          rows="2"
+                          placeholder="Ex: O documento não é do domínio contábil."></textarea>
             </div>
 
-            <div style="display:flex; justify-content:flex-end; gap:12px;">
+            <div class="modal-actions" style="justify-content: flex-end;">
                 <button type="button" onclick="closePreviewModal()" class="btn btn-outline text-dynamic" style="padding:10px 24px;">Fechar</button>
                 <button type="button" onclick="submitAudit('reject')" class="btn btn-danger" style="background:transparent; padding:10px 24px;">Rejeitar</button>
                 <button type="button" onclick="submitAudit('approve')" class="btn btn-primary" style="padding:10px 24px; font-weight:600; color:#131314;">Aprovar para IA</button>
@@ -123,40 +332,294 @@
 </div>
 
 <script>
-function openDeleteModal(docId) {
-    const modal = document.getElementById('delete-doc-modal');
-    const form = document.getElementById('delete-form-real');
-    form.action = `/admin-panel/biblioteca/${docId}/deletar/`;
-    modal.style.display = 'flex';
+const CSRF = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+// ── Quill ──────────────────────────────────────────────────
+const quill = new Quill('#quill-editor', {
+    theme: 'snow',
+    modules: {
+        toolbar: [
+            [{ header: [1, 2, 3, false] }],
+            ['bold', 'italic', 'underline', 'strike'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            ['clean']
+        ]
+    }
+});
+
+// ── Pesquisa em tempo real ─────────────────────────────────
+const searchInput = document.getElementById('search-input');
+const searchClear = document.getElementById('search-clear');
+const searchCount = document.getElementById('search-count');
+
+function filtrarTabela() {
+    const termo = searchInput.value.trim().toLowerCase();
+    searchClear.style.display = termo ? 'block' : 'none';
+
+    const linhas = document.querySelectorAll('#docs-tbody tr[data-id]');
+    let visiveis = 0;
+
+    linhas.forEach(tr => {
+        const texto = tr.textContent.toLowerCase();
+        const match = !termo || texto.includes(termo);
+        tr.classList.toggle('hidden-row', !match);
+        if (match) visiveis++;
+    });
+
+    if (termo) {
+        searchCount.style.display = 'block';
+        searchCount.textContent = visiveis === 0
+            ? 'Nenhum documento encontrado.'
+            : `${visiveis} documento${visiveis !== 1 ? 's' : ''} encontrado${visiveis !== 1 ? 's' : ''}.`;
+    } else {
+        searchCount.style.display = 'none';
+    }
 }
 
+searchInput.addEventListener('input', filtrarTabela);
+searchClear.addEventListener('click', () => {
+    searchInput.value = '';
+    filtrarTabela();
+    searchInput.focus();
+});
+
+// ── Seleção em lote ────────────────────────────────────────
+const chkAll  = document.getElementById('chk-all');
+const batchBar = document.getElementById('batch-bar');
+const batchCount = document.getElementById('batch-count');
+
+function getChecked() {
+    return [...document.querySelectorAll('.doc-checkbox:checked')];
+}
+
+function atualizarBarra() {
+    const checked = getChecked();
+    const total   = document.querySelectorAll('.doc-checkbox').length;
+
+    // Highlight rows
+    document.querySelectorAll('#docs-tbody tr[data-id]').forEach(tr => {
+        const chk = tr.querySelector('.doc-checkbox');
+        tr.classList.toggle('selected-row', chk && chk.checked);
+    });
+
+    // Estado do "selecionar todos"
+    chkAll.indeterminate = checked.length > 0 && checked.length < total;
+    chkAll.checked = total > 0 && checked.length === total;
+
+    // Barra flutuante
+    if (checked.length > 0) {
+        batchCount.textContent = `${checked.length} selecionado(s)`;
+        batchBar.classList.add('visible');
+    } else {
+        batchBar.classList.remove('visible');
+    }
+}
+
+chkAll.addEventListener('change', () => {
+    document.querySelectorAll('.doc-checkbox').forEach(c => c.checked = chkAll.checked);
+    atualizarBarra();
+});
+
+document.getElementById('docs-tbody').addEventListener('change', e => {
+    if (e.target.classList.contains('doc-checkbox')) atualizarBarra();
+});
+
+document.getElementById('btn-deselect').addEventListener('click', () => {
+    document.querySelectorAll('.doc-checkbox').forEach(c => c.checked = false);
+    chkAll.checked = false;
+    atualizarBarra();
+});
+
+// ── Modal exclusão em lote ─────────────────────────────────
+document.getElementById('btn-batch-delete').addEventListener('click', () => {
+    const n = getChecked().length;
+    document.getElementById('batch-modal-title').textContent =
+        `Excluir ${n} documento${n !== 1 ? 's' : ''} selecionado${n !== 1 ? 's' : ''}?`;
+    document.getElementById('delete-batch-modal').style.display = 'flex';
+});
+
+function closeBatchModal() {
+    document.getElementById('delete-batch-modal').style.display = 'none';
+}
+
+document.getElementById('btn-batch-confirm').addEventListener('click', async () => {
+    const ids = getChecked().map(c => c.value);
+    const btn = document.getElementById('btn-batch-confirm');
+    btn.disabled = true;
+    btn.textContent = 'Excluindo…';
+
+    const body = new FormData();
+    body.append('csrfmiddlewaretoken', CSRF);
+    ids.forEach(id => body.append('doc_ids[]', id));
+
+    try {
+        const res  = await fetch("{% url 'admin_panel:deletar_documentos_batch' %}", { method: 'POST', body });
+        const data = await res.json();
+        if (data.status === 'ok') {
+            ids.forEach(id => {
+                const tr = document.querySelector(`#docs-tbody tr[data-id="${id}"]`);
+                if (tr) tr.remove();
+            });
+            // Se a tabela ficou vazia
+            if (!document.querySelector('#docs-tbody tr[data-id]')) {
+                document.getElementById('docs-tbody').innerHTML =
+                    `<tr id="empty-row"><td colspan="6" style="text-align:center; padding:40px;" class="text-dynamic-muted">Nenhum documento na fila de auditoria.</td></tr>`;
+            }
+            atualizarBarra();
+            closeBatchModal();
+            showMsg(`✅ ${data.deleted} documento(s) excluído(s).`, 'msg-flash msg-flash-success');
+        }
+    } catch {
+        showMsg('❌ Erro ao excluir documentos.', 'msg-flash msg-flash-error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sim, excluir todos';
+        closeBatchModal();
+    }
+});
+
+// ── Modal exclusão individual ──────────────────────────────
+function openDeleteModal(docId) {
+    document.getElementById('delete-form-real').action = `/admin-panel/biblioteca/${docId}/deletar/`;
+    document.getElementById('delete-doc-modal').style.display = 'flex';
+}
 function closeDeleteModal() {
     document.getElementById('delete-doc-modal').style.display = 'none';
 }
 
-function openPreviewModal(docId, title, content) {
+// ── Modal de revisão ───────────────────────────────────────
+function openPreviewModal(docId, title) {
     document.getElementById('modal-title').textContent = title;
-    document.getElementById('modal-content').textContent = content || "Nenhum texto extraído.";
     document.getElementById('audit-form').action = `/admin-panel/biblioteca/${docId}/auditar/`;
-    document.getElementById('preview-modal').style.display = 'flex';
     document.getElementById('rejection-box').style.display = 'none';
-}
 
+    quill.root.innerHTML = '';
+    const loading = document.getElementById('editor-loading');
+    loading.style.display = 'flex';
+    document.getElementById('preview-modal').style.display = 'flex';
+
+    fetch(`/admin-panel/biblioteca/${docId}/conteudo/`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        loading.style.display = 'none';
+        quill.root.innerHTML = data.content || '<em style="opacity:0.5">Nenhum texto extraído.</em>';
+    })
+    .catch(() => {
+        loading.style.display = 'none';
+        quill.root.innerHTML = '<em style="opacity:0.5; color:#f87171;">Erro ao carregar conteúdo.</em>';
+    });
+}
 function closePreviewModal() {
     document.getElementById('preview-modal').style.display = 'none';
 }
 
 function submitAudit(action) {
-    const actionInput = document.getElementById('audit-action');
     const rejectionBox = document.getElementById('rejection-box');
-    
     if (action === 'reject' && rejectionBox.style.display === 'none') {
         rejectionBox.style.display = 'block';
         return;
     }
-    
-    actionInput.value = action;
+    document.getElementById('audit-action').value = action;
+    document.getElementById('conteudo_editado').value = quill.root.innerHTML;
     document.getElementById('audit-form').submit();
+}
+
+// ── Delegação de eventos (tabela + linhas dinâmicas) ───────
+document.getElementById('docs-tbody').addEventListener('click', e => {
+    const revisar = e.target.closest('.btn-revisar');
+    const excluir = e.target.closest('.btn-excluir');
+    if (revisar) openPreviewModal(revisar.dataset.id, revisar.dataset.nome);
+    if (excluir) openDeleteModal(excluir.dataset.id);
+});
+
+// ── Upload AJAX ────────────────────────────────────────────
+document.getElementById('upload-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const input  = document.getElementById('upload-input');
+    const btn    = document.getElementById('upload-btn');
+    if (!input.files.length) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-upload-spinner"></span>Processando…';
+    document.getElementById('upload-msg').style.display = 'none';
+
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', CSRF);
+    for (const file of input.files) formData.append('arquivo', file);
+
+    try {
+        const res  = await fetch("{% url 'admin_panel:upload_biblioteca' %}", {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData,
+        });
+        const data = await res.json();
+
+        if (data.docs && data.docs.length) data.docs.forEach(addDocRow);
+
+        let msg = '', cls = '';
+        if (data.sucessos > 0) { msg += `✅ ${data.sucessos} arquivo(s) adicionado(s). `; cls = 'msg-flash msg-flash-success'; }
+        if (data.erros   > 0) { msg += `⚠️ ${data.erros} arquivo(s) falharam.`;          cls = cls || 'msg-flash msg-flash-error'; }
+        if (msg) showMsg(msg, cls);
+    } catch {
+        showMsg('❌ Erro de comunicação com o servidor.', 'msg-flash msg-flash-error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Subir Arquivos';
+        input.value = '';
+    }
+});
+
+// ── Helpers ────────────────────────────────────────────────
+function showMsg(text, cls) {
+    const box = document.getElementById('upload-msg');
+    box.className = cls; box.textContent = text; box.style.display = 'block';
+    setTimeout(() => { box.style.display = 'none'; }, 5000);
+}
+
+function escHtml(s) {
+    return String(s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function addDocRow(doc) {
+    const empty = document.getElementById('empty-row');
+    if (empty) empty.remove();
+
+    const tbody = document.getElementById('docs-tbody');
+    const tr = document.createElement('tr');
+    tr.className = 'row-new';
+    tr.dataset.id = doc.id;
+    tr.innerHTML = `
+        <td class="cell-center">
+            <input type="checkbox" class="doc-checkbox" value="${doc.id}" aria-label="Selecionar documento ${escHtml(doc.nome_arquivo)}">
+        </td>
+        <td>
+            <div class="text-dynamic cell-bold">${escHtml(doc.nome_arquivo)}</div>
+            <div class="text-dynamic-muted cell-small">Extensão: .${escHtml(doc.extensao)}</div>
+        </td>
+        <td><span class="badge badge-green">Aprovado</span></td>
+        <td class="text-dynamic-muted cell-date">${escHtml(doc.criado_em)}</td>
+        <td class="cell-date"><div class="audit-name">Por: ${escHtml(doc.auditado_por)}</div></td>
+        <td>
+            <button class="btn btn-outline text-dynamic btn-revisar"
+                    data-id="${doc.id}" data-nome="${escHtml(doc.nome_arquivo)}">
+                Revisar Conteúdo
+            </button>
+            <button type="button" class="btn-excluir btn-delete-row" data-id="${doc.id}">
+                Excluir
+            </button>
+        </td>`;
+    tbody.prepend(tr);
+
+    // Registra o novo checkbox na lógica de seleção
+    tr.querySelector('.doc-checkbox').addEventListener('change', atualizarBarra);
+
+    // Reaplica o filtro ativo (se houver pesquisa em curso)
+    filtrarTabela();
 }
 </script>
 {% endblock %}
