@@ -112,11 +112,45 @@ def _eh_ideia_contabil(titulo, conteudo):
 
 
 @login_required
+def biblioteca_catalogo(request):
+    """
+    Catálogo público de documentos aprovados na biblioteca da Digiana.
+    Suporta AJAX (X-Requested-With: XMLHttpRequest) retornando JSON para o modal SPA.
+    """
+    from .models import DocumentoBiblioteca
+    qs = (
+        DocumentoBiblioteca.objects
+        .filter(status='approved')
+        .order_by('-processado_em')
+    )
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        docs = [
+            {
+                'id': d.id,
+                'nome_arquivo': d.nome_arquivo,
+                'extensao': d.extensao,
+                'precisa_revisao': d.precisa_revisao,
+                'processado_em': d.processado_em.strftime('%d/%m/%Y') if d.processado_em else '',
+            }
+            for d in qs
+        ]
+        return JsonResponse({'documentos': docs, 'is_superuser': request.user.is_superuser})
+    return render(request, 'biblioteca/catalogo.html', {
+        'documentos': qs,
+        'is_superuser': request.user.is_superuser,
+    })
+
+
+@login_required
 def criar_ideia(request):
     if request.method == 'POST':
-        titulo = request.POST.get('titulo', '').strip()
+        titulo   = request.POST.get('titulo', '').strip()
         conteudo = request.POST.get('conteudo', '').strip()
+        is_ajax  = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
         if not titulo or not conteudo:
+            if is_ajax:
+                return JsonResponse({'status': 'error', 'message': 'Preencha título e conteúdo.'}, status=400)
             messages.error(request, 'Preencha título e conteúdo.')
             return render(request, 'core/criar_ideia.html')
 
@@ -124,9 +158,12 @@ def criar_ideia(request):
             autor=request.user,
             titulo=titulo,
             conteudo=conteudo,
-            ativa=False, # Usuários comuns agora passam por auditoria
+            ativa=False,
         )
-        messages.success(request, 'Sua ideia foi enviada para análise técnica e estará disponível em breve.')
+        msg = 'Sua ideia foi enviada para análise técnica e estará disponível em breve.'
+        if is_ajax:
+            return JsonResponse({'status': 'success', 'message': msg})
+        messages.success(request, msg)
         return redirect('chat:home')
 
     return render(request, 'core/criar_ideia.html')
@@ -496,40 +533,52 @@ def admin_biblioteca(request):
     """
     from .models import DocumentoBiblioteca
     documentos = DocumentoBiblioteca.objects.all().select_related('auditado_por')
-    return render(request, 'admin_panel/biblioteca.html', {'documentos': documentos})
+    documentos_com_alerta = documentos.filter(precisa_revisao=True).exists()
+    
+    return render(request, 'admin_panel/biblioteca.html', {
+        'documentos': documentos,
+        'documentos_com_alerta': documentos_com_alerta
+    })
 
 
 @superuser_required
 def admin_upload_biblioteca(request):
     """
     Permite ao Superusuário subir diversos documentos simultaneamente (já aprovados).
-    Suporta requisições AJAX: retorna JSON com os documentos criados para inserção
-    instantânea na tabela, sem reload de página.
+    Usa StreamingHttpResponse para feedback em tempo real no frontend via Fetch/Streams.
     """
     from .models import DocumentoBiblioteca
     from chat_ai.document_processor import AnagmaDocumentProcessor
+    from django.http import StreamingHttpResponse
 
-    if request.method == 'POST':
-        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
-        files = request.FILES.getlist('arquivo')
+    if request.method != 'POST':
+        return redirect('admin_panel:biblioteca')
 
-        if not files:
-            if is_ajax:
-                return JsonResponse({'status': 'error', 'message': 'Nenhum arquivo selecionado.'}, status=400)
-            messages.warning(request, 'Nenhum arquivo selecionado.')
-            return redirect('admin_panel:biblioteca')
+    files = request.FILES.getlist('arquivo')
+    if not files:
+        return JsonResponse({'status': 'error', 'message': 'Nenhum arquivo selecionado.'}, status=400)
 
+    def event_stream():
         extensoes_permitidas = ['pdf', 'png', 'jpg', 'jpeg', 'docx', 'doc', 'xlsx', 'xls', 'txt']
-        docs_criados = []
         sucessos = 0
         erros = 0
+        total = len(files)
 
-        for uploaded_file in files:
+        yield json.dumps({'event': 'init', 'total': total}) + "\n"
+
+        for i, uploaded_file in enumerate(files):
             nome_original = uploaded_file.name
             ext = nome_original.split('.')[-1].lower() if '.' in nome_original else ''
+            
+            yield json.dumps({'event': 'file_start', 'filename': nome_original, 'index': i + 1}) + "\n"
 
             if ext not in extensoes_permitidas:
                 erros += 1
+                yield json.dumps({
+                    'event': 'file_error', 
+                    'filename': nome_original, 
+                    'message': 'Extensão não suportada.'
+                }) + "\n"
                 continue
 
             try:
@@ -548,46 +597,71 @@ def admin_upload_biblioteca(request):
                     file_bytes = doc.arquivo.read()
                 finally:
                     doc.arquivo.close()
-                print(f"[UPLOAD] '{nome_original}' — bytes lidos do storage: {len(file_bytes)}", flush=True)
-                texto = AnagmaDocumentProcessor.extrair_texto(_io.BytesIO(file_bytes), ext)
 
+                texto, meta = AnagmaDocumentProcessor.extrair_texto(_io.BytesIO(file_bytes), ext)
                 doc.conteudo_extraido = texto
                 doc.save(update_fields=['conteudo_extraido'])
 
-                # Vetoriza no ChromaDB para habilitar busca semântica
-                if texto and not texto.startswith('Erro') and not texto.startswith('Não foi possível'):
+                # Vetoriza no ChromaDB
+                if texto and not texto.startswith('Erro'):
                     try:
                         from django.utils.html import strip_tags
                         from chat_ai.llm_engine import AnagmaLLMEngine
                         AnagmaLLMEngine().rag.vetorizar_texto(strip_tags(texto), doc.nome_arquivo)
-                        print(f"[RAG] '{doc.nome_arquivo}' vetorizado com sucesso.", flush=True)
                     except Exception as e_rag:
-                        print(f"[RAG] Aviso: falha ao vetorizar '{doc.nome_arquivo}': {e_rag}", flush=True)
+                        print(f"[RAG] Erro: {e_rag}")
+
+                # Define mensagem amigável
+                msg_amigavel = "Documento integrado com alta precisão."
+                status_ui = "success"
+                precisa_revisao = False
+                
+                if meta.get('fallback'):
+                    status_ui = "warning"
+                    precisa_revisao = True
+                    msg_amigavel = (
+                        "Estrutura complexa detectada. Adicionado via motor de reserva. "
+                        "Recomenda-se salvar como **.docx padrão** ou **.txt** se houver falhas no chat."
+                    )
+                elif not meta.get('sucesso'):
+                    status_ui = "error"
+                    precisa_revisao = True
+                    msg_amigavel = "Não foi possível extrair o texto. Tente converter para PDF ou TXT."
+
+                if precisa_revisao:
+                    doc.precisa_revisao = True
+                    doc.save(update_fields=['precisa_revisao'])
 
                 sucessos += 1
-
-                if is_ajax:
-                    docs_criados.append({
+                yield json.dumps({
+                    'event': 'file_done',
+                    'filename': nome_original,
+                    'status': status_ui,
+                    'message': msg_amigavel,
+                    'doc_data': {
                         'id': doc.id,
                         'nome_arquivo': doc.nome_arquivo,
                         'extensao': doc.extensao,
                         'status': doc.status,
-                        'criado_em': doc.criado_em.strftime('%d/%m/%Y %H:%M'),
+                        'precisa_revisao': doc.precisa_revisao,
+                        'criado_em': timezone.localtime(doc.criado_em).strftime('%d/%m/%Y %H:%M'),
                         'auditado_por': doc.auditado_por.username if doc.auditado_por else '',
-                    })
+                    }
+                }) + "\n"
+
             except Exception as e:
-                print(f"[ERRO UPLOAD BATCH] {nome_original}: {e}")
                 erros += 1
+                yield json.dumps({
+                    'event': 'file_error', 
+                    'filename': nome_original, 
+                    'message': f'Erro interno: {str(e)}'
+                }) + "\n"
 
-        if is_ajax:
-            return JsonResponse({'status': 'ok', 'docs': docs_criados, 'sucessos': sucessos, 'erros': erros})
+        yield json.dumps({'event': 'finish', 'sucessos': sucessos, 'erros': erros}) + "\n"
 
-        if sucessos > 0:
-            messages.success(request, f'{sucessos} documento(s) adicionado(s) e aprovado(s) com sucesso.')
-        if erros > 0:
-            messages.error(request, f'{erros} arquivo(s) falharam ou possuem extensão não suportada.')
-
-    return redirect('admin_panel:biblioteca')
+    response = StreamingHttpResponse(event_stream(), content_type='application/x-ndjson')
+    response['X-Accel-Buffering'] = 'no'
+    return response
 
 
 @superuser_required

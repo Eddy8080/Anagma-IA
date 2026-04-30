@@ -84,7 +84,7 @@ class AnagmaRAGEngine:
         return self._vetorizar_documentos([doc])
 
     @staticmethod
-    def _extrair_trecho_relevante(texto, palavras_query, max_chars=1500):
+    def _extrair_trecho_relevante(texto, palavras_query, max_chars=8000):
         """Extrai o trecho do texto mais próximo das palavras da query."""
         if not texto:
             return ''
@@ -94,7 +94,8 @@ class AnagmaRAGEngine:
             idx = texto_l.find(p.lower())
             if 0 <= idx < melhor_pos:
                 melhor_pos = idx
-        inicio = max(0, melhor_pos - 300)
+        # Centraliza o trecho: pega um pouco antes da palavra-chave e muito depois (tabela)
+        inicio = max(0, melhor_pos - 400)
         fim = min(len(texto), inicio + max_chars)
         trecho = texto[inicio:fim].strip()
         if inicio > 0:
@@ -115,10 +116,14 @@ class AnagmaRAGEngine:
         fontes_vetoriais = set()  # evita duplicatas entre Layer 1 e Layer 2
 
         # --- PRÉ-PROCESSAMENTO ---
+        # Mantemos uma versão da query que preserva melhor nomes de arquivos para a busca por keyword
+        query_para_nome = query.lower().replace('(', ' ').replace(')', ' ').replace('[', ' ').replace(']', ' ')
         query_limpa = re.sub(r'[.,?!:;()\[\]"\']', ' ', query.lower())
         from .vocabulario import TERMOS_CONTABEIS, STOPWORDS_RAG
 
         palavras_query = [p for p in query_limpa.split() if p not in STOPWORDS_RAG and len(p) > 2]
+        # Palavras para busca em nome de arquivo (podem ser mais curtas e específicas)
+        palavras_nome = [p for p in query_para_nome.split() if len(p) > 2]
 
         termos_tecnicos = []
         for t in TERMOS_CONTABEIS:
@@ -135,10 +140,10 @@ class AnagmaRAGEngine:
             # Peso para palavras da query
             for p in palavras_query:
                 if p in texto_l: score += 1
-            # Bônus se a palavra da query estiver no nome do arquivo (Indicação forte de assunto)
+            # Bônus agressivo se a palavra da query estiver no nome do arquivo
             fonte_l = fonte.lower()
-            for p in palavras_query:
-                if p in fonte_l: score += 3
+            for p in palavras_nome:
+                if p in fonte_l: score += 4
             return score
 
         # --- LAYER 1: Busca Semântica (ChromaDB) ---
@@ -148,17 +153,20 @@ class AnagmaRAGEngine:
             for doc in docs_vetoriais:
                 fonte = doc.metadata.get('source', 'Documento Interno')
                 fontes_vetoriais.add(fonte)
-                
+
                 score = calcular_relevancia(doc.page_content, fonte)
-                
-                # THRESHOLD DE SEGURANÇA (Rigor Contábil):
-                # Só considera "Hit da Biblioteca" se houver uma correlação forte (Score >= 5).
-                # Se o score for baixo, o documento é descartado para evitar induzir a IA ao erro.
-                if score >= 5:
-                    contexto_final.append(f"DOCUMENTO APROVADO ({fonte}):\n{doc.page_content}")
-                    has_db_hits = True
+
+                # Se for planilha, aumentamos drasticamente a relevância e o tamanho do bloco
+                if fonte.lower().endswith(('.xls', '.xlsx')):
+                    score += 5
+                    bloco_texto = f"DOCUMENTO EXCEL INTEGRAL ({fonte}):\n{doc.page_content}"
                 else:
-                    # Log interno para depuração, mas não enviamos para o LLM.
+                    bloco_texto = f"DOCUMENTO APROVADO ({fonte}):\n{doc.page_content}"
+
+                # THRESHOLD DE SEGURANÇA (Rigor Contábil):
+                if score >= 5:
+                    contexto_final.append(bloco_texto)
+                else:
                     print(f"[RAG] Documento {fonte} descartado por baixa relevância (Score: {score}).", flush=True)
         except Exception as e:
             print(f"[RAG Chroma] Erro: {e}", flush=True)
@@ -170,6 +178,59 @@ class AnagmaRAGEngine:
             from django.db.models import Q
 
             if palavras_query:
+                # --- Via Expressa por Nome de Arquivo (todos os tipos) ---
+                # Quando o usuário cita palavras que batem com o nome de um arquivo aprovado,
+                # esse arquivo tem prioridade máxima sobre a busca semântica.
+                # Evita colisão semântica (RAG entrega o arquivo errado) e alucinação por
+                # âncora de domínio (modelo inventa conteúdo baseado no nome do arquivo).
+                # XLS/XLSX → conteúdo integral; outros → trecho relevante (janela de 8000 chars).
+                melhor_doc = None
+                melhor_score_nome = 0
+                for doc_candidato in DocumentoBiblioteca.objects.filter(status='approved'):
+                    if doc_candidato.nome_arquivo in fontes_vetoriais:
+                        continue
+                    nome_limpo = doc_candidato.nome_arquivo.lower()
+                    matches = [p for p in palavras_query if p in nome_limpo and len(p) > 3]
+                    score_nome = len(matches) * 2 + sum(
+                        1 for p in palavras_query if len(p) > 8 and p in nome_limpo
+                    )
+                    hit_forte = (
+                        len(matches) >= 2
+                        or any(p in nome_limpo for p in palavras_query if len(p) > 8)
+                    )
+                    if hit_forte and score_nome > melhor_score_nome:
+                        melhor_score_nome = score_nome
+                        melhor_doc = doc_candidato
+
+                if melhor_doc:
+                    ext_doc = melhor_doc.extensao.lower()
+                    conteudo_doc = melhor_doc.conteudo_extraido or ''
+                    fontes_vetoriais.add(melhor_doc.nome_arquivo)
+                    has_db_hits = True
+                    if ext_doc in ('xls', 'xlsx'):
+                        # Excel → label específico: Modo Terminal (tabelas + abas)
+                        contexto_final.append(
+                            f"ARQUIVO EXCEL INTEGRAL DA CURADORIA ({melhor_doc.nome_arquivo}):\n"
+                            f"{conteudo_doc}"
+                        )
+                    elif len(conteudo_doc) > 4000:
+                        # Documento longo não-Excel (PDF, DOCX, etc.) → label próprio: Modo Transcrição
+                        contexto_final.append(
+                            f"DOCUMENTO INTEGRAL DA CURADORIA ({melhor_doc.nome_arquivo}):\n"
+                            f"{conteudo_doc}"
+                        )
+                    else:
+                        trecho = self._extrair_trecho_relevante(conteudo_doc, palavras_query)
+                        if trecho:
+                            contexto_final.append(
+                                f"DOCUMENTO APROVADO ({melhor_doc.nome_arquivo}):\n{trecho}"
+                            )
+                    print(
+                        f"[RAG Via Expressa] '{melhor_doc.nome_arquivo}' "
+                        f"(score_nome={melhor_score_nome}, chars={len(conteudo_doc)})",
+                        flush=True
+                    )
+
                 # RLHF (Correções de Curadoria)
                 q_rlhf = Q()
                 for p in palavras_query[:3]:

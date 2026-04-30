@@ -20,13 +20,14 @@
     /* ── Quill ─────────────────────────────────────────── */
     #editor-container {
         flex: 1; display: flex; flex-direction: column;
-        margin-bottom: 24px; min-height: 400px;
+        margin-bottom: 24px; min-height: 200px;
+        max-height: calc(90vh - 260px);
         border: 1px solid var(--border); border-radius: 12px;
         overflow: hidden; background: rgba(0,0,0,0.2); position: relative;
     }
     .ql-toolbar.ql-snow  { border: none !important; border-bottom: 1px solid var(--border) !important; background: rgba(255,255,255,0.05); padding: 8px 12px !important; }
-    .ql-container.ql-snow { border: none !important; flex: 1; display: flex; flex-direction: column; overflow: hidden; font-family: inherit; }
-    .ql-editor             { flex: 1; overflow-y: auto; color: var(--text); font-size: 0.95rem; line-height: 1.6; padding: 20px !important; }
+    .ql-container.ql-snow { border: none !important; overflow: hidden; font-family: inherit; }
+    .ql-editor             { height: calc(90vh - 320px) !important; min-height: 180px; overflow-y: auto !important; color: var(--text); font-size: 0.95rem; line-height: 1.6; padding: 20px !important; }
     .ql-snow .ql-stroke    { stroke: #a8c7fa !important; }
     .ql-snow .ql-fill      { fill:   #a8c7fa !important; }
     .ql-snow .ql-picker     { color: #a8c7fa !important; }
@@ -129,6 +130,15 @@
     .badge-pending { background: rgba(251,191,36,0.1); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
     .audit-name { color: #4ade80; font-weight: 500; }
     .audit-wait { font-style: italic; opacity: 0.6; }
+    .attention-icon {
+        color: #fbbf24;
+        cursor: help;
+        margin-left: 6px;
+        font-size: 1rem;
+        vertical-align: middle;
+        display: inline-flex;
+        align-items: center;
+    }
     .btn-delete-row { background: none; border: none; color: #f87171; cursor: pointer; font-size: 0.8rem; margin-left: 10px; }
     .empty-state { text-align: center; padding: 40px; }
 
@@ -137,7 +147,7 @@
     .modal-overlay-darker { background: rgba(0,0,0,0.85); }
     .modal-content-sm { padding: 32px; width: 90%; max-width: 380px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
     .modal-content-md { padding: 32px; width: 90%; max-width: 420px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
-    .modal-content-lg { padding: 32px; width: 90%; max-width: 800px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
+    .modal-content-lg { padding: 32px; width: 90%; max-width: 800px; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
     .modal-icon { font-size: 2.5rem; margin-bottom: 16px; }
     .modal-h3 { margin: 0 0 12px; font-weight: 500; }
     .modal-p { font-size: 0.95rem; line-height: 1.5; margin-bottom: 24px; }
@@ -146,6 +156,71 @@
     .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; }
     .rejection-label { display: block; font-size: 0.85rem; margin-bottom: 8px; }
     .rejection-textarea { width: 100%; background: transparent; border: 1px solid #d93025; border-radius: 8px; padding: 12px; font-family: inherit; outline: none; }
+
+    /* Estilos de Tabela no Editor (Visualização) */
+    .rendered-content table {
+        width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.9rem;
+        background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+        display: block; overflow-x: auto;
+    }
+    .rendered-content th { background: rgba(168,199,250,0.1); color: #a8c7fa; padding: 10px; border: 1px solid var(--border); text-align: left; }
+    .rendered-content td { padding: 8px 10px; border: 1px solid var(--border); color: var(--text); }
+    .rendered-content tr:nth-child(even) { background: rgba(255,255,255,0.03); }
+    .rendered-content strong { color: #a8c7fa; }
+    
+    .view-toggle-btns { display: flex; gap: 8px; margin-bottom: 12px; }
+    .btn-toggle {
+        background: #232426; border: 1px solid #3c4043; color: #888;
+        padding: 6px 14px; border-radius: 8px; font-size: 0.8rem; cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-toggle.active { background: #3c4043; color: #fff; border-color: #a8c7fa; }
+
+    /* ── Modal de Progresso de Upload ──────────────────── */
+    #upload-progress-modal {
+        display: none; position: fixed; inset: 0;
+        background: rgba(0,0,0,0.4); backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        z-index: 20000; align-items: center; justify-content: center;
+    }
+    .progress-card {
+        width: 90%; max-width: 500px; padding: 28px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        border: 1px solid var(--border);
+    }
+    .progress-header { margin-bottom: 20px; text-align: center; }
+    .progress-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 6px; display: block; }
+    .progress-container {
+        height: 10px; background: rgba(255,255,255,0.05);
+        border-radius: 10px; overflow: hidden; margin-bottom: 20px;
+        border: 1px solid var(--border);
+    }
+    #progress-bar {
+        height: 100%; width: 0%; background: linear-gradient(90deg, #a8c7fa, #7baaf7);
+        transition: width 0.3s ease;
+    }
+    .progress-list {
+        max-height: 240px; overflow-y: auto; padding-right: 8px;
+        display: flex; flex-direction: column; gap: 10px;
+    }
+    .progress-item {
+        display: flex; gap: 12px; font-size: 0.88rem; padding: 10px;
+        background: rgba(255,255,255,0.02); border-radius: 8px;
+        border: 1px solid transparent; transition: all 0.2s;
+    }
+    .progress-item.success { border-color: rgba(74,222,128,0.2); background: rgba(74,222,128,0.03); }
+    .progress-item.warning { border-color: rgba(251,191,36,0.2); background: rgba(251,191,36,0.03); }
+    .progress-item.error   { border-color: rgba(248,113,113,0.2); background: rgba(248,113,113,0.03); }
+
+    .item-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .item-info { flex: 1; min-width: 0; }
+    .item-name { font-weight: 700; display: block; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-msg  { font-size: 0.78rem; opacity: 0.8; line-height: 1.4; }
+    
+    /* Custom Scrollbar para a lista */
+    .progress-list::-webkit-scrollbar { width: 4px; }
+    .progress-list::-webkit-scrollbar-track { background: transparent; }
+    .progress-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 </style>
 
 <!-- ── Cabeçalho ─────────────────────────────────────────── -->
@@ -172,7 +247,43 @@
     </div>
 </div>
 
+<!-- ── Modal de Progresso de Upload (SSE) ───────────────── -->
+<div id="upload-progress-modal">
+    <div class="card progress-card">
+        <div class="progress-header">
+            <span class="text-dynamic progress-title">Processando Biblioteca</span>
+            <p id="progress-status" class="text-dynamic-muted" style="font-size: 0.85rem; margin: 0;">
+                Iniciando transferência...
+            </p>
+        </div>
+        
+        <div class="progress-container">
+            <div id="progress-bar"></div>
+        </div>
+
+        <div id="progress-list" class="progress-list text-dynamic">
+            <!-- Itens inseridos dinamicamente -->
+        </div>
+
+        <div id="progress-actions" class="modal-actions" style="margin-top: 24px; display: none;">
+            <button id="btn-close-progress" class="btn btn-primary" style="width: 100%; font-weight: 700; color: #131314;">
+                Concluir e Voltar
+            </button>
+        </div>
+    </div>
+</div>
+
 <div id="upload-msg" style="display:none; margin-bottom:16px;"></div>
+
+<!-- ── Alerta de Política de Curadoria ───────────────────── -->
+<div id="alert-curadoria-global" class="alert-curadoria" style="margin-bottom: 24px; padding: 16px; border-radius: 12px; border: 1px solid rgba(251,191,36,0.25); background: rgba(251,191,36,0.05); display: {% if documentos_com_alerta %}flex{% else %}none{% endif %}; align-items: center; gap: 16px; animation: fadeIn 0.5s ease;">
+    <span style="font-size: 1.8rem; filter: drop-shadow(0 0 8px rgba(251,191,36,0.4));">⚠️</span>
+    <div class="text-dynamic" style="font-size: 0.88rem; line-height: 1.5;">
+        <strong style="color: #fbbf24; display: block; margin-bottom: 2px; font-size: 0.95rem;">Aviso de Integridade da Curadoria</strong>
+        Detectamos arquivos que podem exigir atenção para garantir a precisão da IA. 
+        Caso identifique ruído ou erro na extração, <strong>exclua o item e adicione-o novamente após os ajustes necessários.</strong>
+    </div>
+</div>
 
 <!-- ── Barra de pesquisa ─────────────────────────────────── -->
 <div id="search-wrapper">
@@ -207,7 +318,12 @@
                     <input type="checkbox" class="doc-checkbox" value="{{ doc.id }}" aria-label="Selecionar documento {{ doc.nome_arquivo }}">
                 </td>
                 <td>
-                    <div class="text-dynamic cell-bold">{{ doc.nome_arquivo }}</div>
+                    <div class="text-dynamic cell-bold">
+                        {{ doc.nome_arquivo }}
+                        {% if doc.precisa_revisao %}
+                            <span class="attention-icon" title="Atenção: Embora carregado, este arquivo pode precisar de revisão (excluir e reenviar após ajustes).">⚠️</span>
+                        {% endif %}
+                    </div>
                     <div class="text-dynamic-muted cell-small">Extensão: .{{ doc.extensao }}</div>
                 </td>
                 <td>
@@ -273,6 +389,37 @@
     </div>
 </div>
 
+<script>
+// Intercepta exclusão individual para ser via AJAX e permitir atualizar UI dinamicamente
+document.getElementById('delete-form-real').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const url = form.action;
+    const docId = url.split('/').filter(p => p && !isNaN(p)).pop();
+    const tr = document.querySelector(`#docs-tbody tr[data-id="${docId}"]`);
+
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (res.ok) {
+            if (tr) tr.remove();
+            if (!document.querySelector('#docs-tbody tr[data-id]')) {
+                document.getElementById('docs-tbody').innerHTML =
+                    `<tr id="empty-row"><td colspan="6" style="text-align:center; padding:40px;" class="text-dynamic-muted">Nenhum documento na fila de auditoria.</td></tr>`;
+            }
+            atualizarBarra();
+            closeDeleteModal();
+            verificarAlertasGlobais(); // Esconde o banner se o último arquivo com alerta for excluído
+            showMsg('✅ Documento removido permanentemente.', 'msg-flash msg-flash-success');
+        }
+    } catch {
+        showMsg('❌ Erro ao excluir documento.', 'msg-flash msg-flash-error');
+    }
+});
+</script>
+
 <!-- ── Modal de confirmação exclusão em lote ────────────── -->
 <div id="delete-batch-modal" class="modal-overlay">
     <div class="card modal-content-md">
@@ -298,8 +445,15 @@
             <button onclick="closePreviewModal()" class="text-dynamic modal-close">&times;</button>
         </div>
 
+        <div class="view-toggle-btns">
+            <button type="button" id="btn-show-code" class="btn-toggle active">📝 Código (Markdown)</button>
+            <button type="button" id="btn-show-visual" class="btn-toggle" style="display:none;">📊 Visualização</button>
+        </div>
+
         <div id="editor-container">
             <div id="quill-editor" class="text-dynamic"></div>
+            <div id="rendered-preview" class="text-dynamic rendered-content" style="display:none; padding:20px; overflow-y:auto; flex:1;"></div>
+            
             <div id="editor-loading">
                 <svg viewBox="0 0 50 50" fill="none" stroke="#a8c7fa" stroke-width="4">
                     <circle cx="25" cy="25" r="20" stroke-opacity="0.25"/>
@@ -346,6 +500,45 @@ const quill = new Quill('#quill-editor', {
         ]
     }
 });
+
+// ── Alternar Visualização no Modal ────────────────────────
+const btnShowCode = document.getElementById('btn-show-code');
+const btnShowVisual = document.getElementById('btn-show-visual');
+const renderedPreview = document.getElementById('rendered-preview');
+const quillEditor = document.getElementById('quill-editor');
+const quillToolbar = document.querySelector('.ql-toolbar');
+
+function toggleView(mode) {
+    if (mode === 'visual') {
+        const markdown = quill.getText();
+        if (window.marked) {
+            // Configurações para garantir renderização de tabelas (GFM)
+            marked.setOptions({
+                gfm: true,
+                breaks: true,
+                headerIds: false,
+                mangle: false
+            });
+            renderedPreview.innerHTML = marked.parse(markdown);
+        } else {
+            renderedPreview.textContent = markdown;
+        }
+        quillEditor.style.display = 'none';
+        if (quillToolbar) quillToolbar.style.display = 'none';
+        renderedPreview.style.display = 'block';
+        btnShowVisual.classList.add('active');
+        btnShowCode.classList.remove('active');
+    } else {
+        quillEditor.style.display = 'block';
+        if (quillToolbar) quillToolbar.style.display = 'block';
+        renderedPreview.style.display = 'none';
+        btnShowCode.classList.add('active');
+        btnShowVisual.classList.remove('active');
+    }
+}
+
+if (btnShowCode) btnShowCode.addEventListener('click', () => toggleView('code'));
+if (btnShowVisual) btnShowVisual.addEventListener('click', () => toggleView('visual'));
 
 // ── Pesquisa em tempo real ─────────────────────────────────
 const searchInput = document.getElementById('search-input');
@@ -467,6 +660,7 @@ document.getElementById('btn-batch-confirm').addEventListener('click', async () 
             }
             atualizarBarra();
             closeBatchModal();
+            verificarAlertasGlobais(); // Esconde o banner se todos os alertas sumirem
             showMsg(`✅ ${data.deleted} documento(s) excluído(s).`, 'msg-flash msg-flash-success');
         }
     } catch {
@@ -493,6 +687,10 @@ function openPreviewModal(docId, title) {
     document.getElementById('audit-form').action = `/admin-panel/biblioteca/${docId}/auditar/`;
     document.getElementById('rejection-box').style.display = 'none';
 
+    // Reseta para visão de código e oculta botão de tabela até saber se o doc tem tabelas
+    toggleView('code');
+    btnShowVisual.style.display = 'none';
+
     quill.root.innerHTML = '';
     const loading = document.getElementById('editor-loading');
     loading.style.display = 'flex';
@@ -505,10 +703,17 @@ function openPreviewModal(docId, title) {
     .then(data => {
         loading.style.display = 'none';
         quill.root.innerHTML = data.content || '<em style="opacity:0.5">Nenhum texto extraído.</em>';
+
+        // Mostra o botão "Visualização (Tabela)" apenas se o conteúdo tiver tabelas markdown
+        // Heurística: presença de pipe seguido de traços (| --- |) indica tabela real
+        const rawText = data.content || '';
+        const hasTable = rawText.includes('|') && (rawText.includes('---') || rawText.includes('| ---') || rawText.includes('|---'));
+        btnShowVisual.style.display = hasTable ? 'inline-block' : 'none';
     })
     .catch(() => {
         loading.style.display = 'none';
         quill.root.innerHTML = '<em style="opacity:0.5; color:#f87171;">Erro ao carregar conteúdo.</em>';
+        btnShowVisual.style.display = 'none';
     });
 }
 function closePreviewModal() {
@@ -534,42 +739,120 @@ document.getElementById('docs-tbody').addEventListener('click', e => {
     if (excluir) openDeleteModal(excluir.dataset.id);
 });
 
-// ── Upload AJAX ────────────────────────────────────────────
+// ── Controle Dinâmico do Banner de Alerta ──────────────────
+function verificarAlertasGlobais() {
+    const banner = document.getElementById('alert-curadoria-global');
+    if (!banner) return;
+    
+    // Verifica se existe algum ícone de atenção na tabela
+    const temAlerta = document.querySelector('.attention-icon') !== null;
+    banner.style.display = temAlerta ? 'flex' : 'none';
+}
+
+// ── Upload AJAX com Streaming (Progresso Real) ──────────────
 document.getElementById('upload-form').addEventListener('submit', async e => {
     e.preventDefault();
-    const input  = document.getElementById('upload-input');
-    const btn    = document.getElementById('upload-btn');
+    const input = document.getElementById('upload-input');
+    const modal = document.getElementById('upload-progress-modal');
+    const list  = document.getElementById('progress-list');
+    const bar   = document.getElementById('progress-bar');
+    const statusText = document.getElementById('progress-status');
+    const actions = document.getElementById('progress-actions');
+    const btnClose = document.getElementById('btn-close-progress');
+
     if (!input.files.length) return;
 
-    btn.disabled = true;
-    btn.innerHTML = '<span class="btn-upload-spinner"></span>Processando…';
-    document.getElementById('upload-msg').style.display = 'none';
+    // Reset UI
+    list.innerHTML = '';
+    bar.style.width = '0%';
+    statusText.textContent = 'Iniciando transferência...';
+    actions.style.display = 'none';
+    modal.style.display = 'flex';
 
     const formData = new FormData();
     formData.append('csrfmiddlewaretoken', CSRF);
     for (const file of input.files) formData.append('arquivo', file);
 
     try {
-        const res  = await fetch("{% url 'admin_panel:upload_biblioteca' %}", {
+        const response = await fetch("{% url 'admin_panel:upload_biblioteca' %}", {
             method: 'POST',
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
             body: formData,
         });
-        const data = await res.json();
 
-        if (data.docs && data.docs.length) data.docs.forEach(addDocRow);
+        if (!response.ok) throw new Error('Falha no upload');
 
-        let msg = '', cls = '';
-        if (data.sucessos > 0) { msg += `✅ ${data.sucessos} arquivo(s) adicionado(s). `; cls = 'msg-flash msg-flash-success'; }
-        if (data.erros   > 0) { msg += `⚠️ ${data.erros} arquivo(s) falharam.`;          cls = cls || 'msg-flash msg-flash-error'; }
-        if (msg) showMsg(msg, cls);
-    } catch {
-        showMsg('❌ Erro de comunicação com o servidor.', 'msg-flash msg-flash-error');
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // Mantém o que sobrou (chunk incompleto)
+
+            for (const line of lines) {
+                if (!line.trim()) continue;
+                try {
+                    const data = JSON.parse(line);
+                    
+                    if (data.event === 'init') {
+                        statusText.textContent = `Enviando ${data.total} arquivo(s)...`;
+                    } 
+                    else if (data.event === 'file_start') {
+                        const item = document.createElement('div');
+                        item.className = 'progress-item';
+                        item.id = `up-file-${data.index}`;
+                        item.innerHTML = `
+                            <div class="item-icon">⏳</div>
+                            <div class="item-info">
+                                <span class="item-name">${escHtml(data.filename)}</span>
+                                <span class="item-msg">Processando extração de alta fidelidade...</span>
+                            </div>
+                        `;
+                        list.prepend(item);
+                        statusText.textContent = `Processando: ${data.index} de ${input.files.length}`;
+                    }
+                    else if (data.event === 'file_done' || data.event === 'file_error') {
+                        const isError = data.event === 'file_error';
+                        const item = document.querySelector(`.progress-item:first-child`); // O mais recente
+                        
+                        if (item) {
+                            item.className = `progress-item ${data.status || 'error'}`;
+                            const icon = data.status === 'success' ? '✅' : (data.status === 'warning' ? '⚠️' : '❌');
+                            item.querySelector('.item-icon').textContent = icon;
+                            item.querySelector('.item-msg').textContent = data.message;
+                        }
+
+                        if (!isError && data.doc_data) addDocRow(data.doc_data);
+
+                        // Atualiza barra
+                        const progress = (list.children.length / input.files.length) * 100;
+                        bar.style.width = `${progress}%`;
+                    }
+                    else if (data.event === 'finish') {
+                        statusText.textContent = `Concluído: ${data.sucessos} sucessos, ${data.erros} falhas.`;
+                        bar.style.width = '100%';
+                        actions.style.display = 'flex';
+                        verificarAlertasGlobais(); // Verifica se precisa mostrar o banner
+                    }
+                } catch (e) {
+                    console.error("Erro ao processar chunk JSON", e, line);
+                }
+            }
+        }
+    } catch (err) {
+        statusText.textContent = '❌ Erro de comunicação com o servidor.';
+        console.error(err);
+        actions.style.display = 'flex';
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = 'Subir Arquivos';
         input.value = '';
     }
+
+    btnClose.onclick = () => { modal.style.display = 'none'; };
 });
 
 // ── Helpers ────────────────────────────────────────────────
@@ -593,12 +876,21 @@ function addDocRow(doc) {
     const tr = document.createElement('tr');
     tr.className = 'row-new';
     tr.dataset.id = doc.id;
+    
+    // Ícone de atenção condicional
+    const attentionIcon = doc.precisa_revisao 
+        ? `<span class="attention-icon" title="Atenção: Embora carregado, este arquivo pode precisar de revisão (excluir e reenviar após ajustes).">⚠️</span>`
+        : '';
+
     tr.innerHTML = `
         <td class="cell-center">
             <input type="checkbox" class="doc-checkbox" value="${doc.id}" aria-label="Selecionar documento ${escHtml(doc.nome_arquivo)}">
         </td>
         <td>
-            <div class="text-dynamic cell-bold">${escHtml(doc.nome_arquivo)}</div>
+            <div class="text-dynamic cell-bold">
+                ${escHtml(doc.nome_arquivo)}
+                ${attentionIcon}
+            </div>
             <div class="text-dynamic-muted cell-small">Extensão: .${escHtml(doc.extensao)}</div>
         </td>
         <td><span class="badge badge-green">Aprovado</span></td>

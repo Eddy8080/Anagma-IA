@@ -1,25 +1,49 @@
-import fitz  # PyMuPDF
-from PIL import Image
-import io
 import os
 import datetime
+import io
+import tempfile
+import contextlib
+import sys
+from PIL import Image
+
+# Motor de extração de alta fidelidade
+try:
+    from docling.document_converter import DocumentConverter
+    DOCLING_AVAILABLE = True
+except ImportError:
+    DOCLING_AVAILABLE = False
+    print("[ALERTA] Docling não instalado. Usando motores legados.")
 
 print("\n" + "#"*60)
-print(f"DEBUG: MOTOR V3 CARREGADO EM: {datetime.datetime.now()}")
+print(f"DEBUG: MOTOR UNIVERSAL DOCLING CARREGADO EM: {datetime.datetime.now()}")
 print("#"*60 + "\n")
 
 class AnagmaDocumentProcessor:
     """
-    Motor de extração de texto e OCR para a Anagma IA.
-    Suporta PDF, DOCX, DOC, XLSX, XLS, TXT, PNG, JPG.
+    Motor de extração Universal de alta fidelidade para a Anagma IA.
+    Utiliza IBM Docling como motor principal para PDF, DOCX e XLSX.
+    Mantém fallbacks para formatos legados e imagens.
     """
 
     MAX_PAGES = 10
     _ocr_reader = None
+    _doc_converter = None
+
+    @classmethod
+    def _get_doc_converter(cls):
+        """Inicializa o conversor Docling (Lazy Loading)"""
+        if cls._doc_converter is None and DOCLING_AVAILABLE:
+            try:
+                # O Docling baixará os modelos na primeira execução se não estiverem no cache
+                cls._doc_converter = DocumentConverter()
+                print("[DOCLING] Motor de alta fidelidade inicializado.")
+            except Exception as e:
+                print(f"[DOCLING] Erro ao inicializar: {e}")
+        return cls._doc_converter
 
     @classmethod
     def _get_ocr_reader(cls):
-        """Inicializa o EasyOCR apenas quando necessário (lazy loading)"""
+        """Inicializa o EasyOCR para imagens puras"""
         if cls._ocr_reader is None:
             try:
                 import easyocr
@@ -32,329 +56,253 @@ class AnagmaDocumentProcessor:
     @staticmethod
     def extrair_texto(file_obj, extensao):
         """
-        Detecta o tipo de arquivo e extrai o texto com logs de depuração.
+        Ponto de entrada único para extração de texto.
+        Retorna tupla: (texto_extraido, metadados)
         """
         ext = extensao.lower().replace('.', '').strip()
-        print(f"[DEBUG] Extraindo texto. Extensão detectada: {ext}")
+        print(f"[DEBUG] Extração Universal. Extensão: {ext}")
         
+        meta = {
+            'motor': 'desconhecido',
+            'fallback': False,
+            'sucesso': False,
+            'aviso': None
+        }
+
         try:
-            if ext == 'pdf':
-                return AnagmaDocumentProcessor._processar_pdf(file_obj)
-            elif ext in ['png', 'jpg', 'jpeg']:
-                return AnagmaDocumentProcessor._processar_imagem(file_obj)
-            elif ext == 'docx':
-                return AnagmaDocumentProcessor._processar_docx(file_obj)
+            # 1. Tenta Docling para formatos modernos (PDF, DOCX, XLSX, PPTX)
+            if DOCLING_AVAILABLE and ext in ['pdf', 'docx', 'xlsx', 'pptx']:
+                resultado = AnagmaDocumentProcessor._processar_via_docling(file_obj, ext)
+                if resultado:
+                    meta.update({'motor': 'docling', 'sucesso': True})
+                    return resultado, meta
+                
+                # Docling falhou ou retornou vazio — reposiciona e cai nos fallbacks
+                if hasattr(file_obj, 'seek'):
+                    file_obj.seek(0)
+                meta['fallback'] = True
+                print(f"[FALLBACK] Docling vazio para .{ext} — usando extrator legado.", flush=True)
+
+            # 2. Fallbacks para outros formatos (também alcançados se Docling falhou)
+            meta['motor'] = 'legado'
+            if ext in ['png', 'jpg', 'jpeg']:
+                res = AnagmaDocumentProcessor._processar_imagem(file_obj)
+                meta['sucesso'] = bool(res and not res.startswith('Erro'))
+                return res, meta
             elif ext == 'doc':
-                return AnagmaDocumentProcessor._processar_doc_legado(file_obj)
-            elif ext in ['xlsx', 'xls']:
-                return AnagmaDocumentProcessor._processar_excel(file_obj, ext)
+                res = AnagmaDocumentProcessor._processar_doc_legado(file_obj)
+                meta['sucesso'] = bool(res and not res.startswith('Erro'))
+                return res, meta
+            elif ext == 'xls':
+                res = AnagmaDocumentProcessor._processar_excel_legado(file_obj)
+                meta['sucesso'] = bool(res and not res.startswith('Erro'))
+                return res, meta
             elif ext == 'txt':
-                return AnagmaDocumentProcessor._processar_txt(file_obj)
-            
-            print(f"[DEBUG] Alerta: Extensão '{ext}' não possui processador mapeado.")
-            return ""
+                res = AnagmaDocumentProcessor._processar_txt(file_obj)
+                meta['sucesso'] = True
+                return res, meta
+
+            # 3. Fallbacks legados para PDF / DOCX / XLSX quando Docling não extraiu
+            res = ""
+            if ext == 'pdf': res = AnagmaDocumentProcessor._processar_pdf_legacy(file_obj)
+            elif ext == 'docx': res = AnagmaDocumentProcessor._processar_docx_legacy(file_obj)
+            elif ext == 'xlsx': res = AnagmaDocumentProcessor._processar_excel_legacy(file_obj, 'xlsx')
+
+            if res:
+                meta['sucesso'] = True
+                return res, meta
+
+            print(f"[DEBUG] Alerta: Extensão '{ext}' não possui processador.")
+            return "", meta
         except Exception as e:
-            print(f"[DEBUG] Erro catastrófico no roteamento de extração: {e}")
-            return f"Erro interno ao processar arquivo: {str(e)}"
+            print(f"[DEBUG] Erro crítico na extração: {e}")
+            meta['sucesso'] = False
+            return f"Erro ao processar arquivo: {str(e)}", meta
+
+    @staticmethod
+    def _processar_via_docling(file_obj, ext):
+        """Extração de alta fidelidade usando Docling."""
+        print(f"[DOCLING] Processando {ext}...")
+        converter = AnagmaDocumentProcessor._get_doc_converter()
+        if not converter:
+            # Fallback automático se o Docling falhar na inicialização
+            if ext == 'pdf': return AnagmaDocumentProcessor._processar_pdf_legacy(file_obj)
+            if ext == 'docx': return AnagmaDocumentProcessor._processar_docx_legacy(file_obj)
+            return ""
+
+        try:
+            if hasattr(file_obj, 'seek'):
+                file_obj.seek(0)
+            
+            # Salvamos em arquivo temporário pois o Docling prefere caminhos de disco
+            with tempfile.NamedTemporaryFile(suffix=f'.{ext}', delete=False) as tmp:
+                tmp.write(file_obj.read())
+                tmp_path = tmp.name
+
+            try:
+                # Silenciamos o Docling para evitar tracebacks técnicos no console do usuário
+                with open(os.devnull, 'w') as fnull:
+                    with contextlib.redirect_stderr(fnull), contextlib.redirect_stdout(fnull):
+                        result = converter.convert(tmp_path, max_num_pages=AnagmaDocumentProcessor.MAX_PAGES)
+                        markdown = result.document.export_to_markdown()
+                
+                print(f"[DOCLING] Sucesso. Tamanho: {len(markdown)} chars.")
+                return markdown
+            finally:
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+        except Exception:
+            # Erro capturado silenciosamente para ativar o fallback sem sujar o console
+            return ""
 
     @staticmethod
     def _processar_doc_legado(file_obj):
-        print(f"[DEBUG] Iniciando processamento de DOC legado...")
-        if hasattr(file_obj, 'seek'):
-            file_obj.seek(0)
-        content = file_obj.read()
-
-        # Estratégia 1: win32com via Microsoft Word (Windows)
+        """Mantido para compatibilidade com arquivos .doc antigos."""
         try:
             import win32com.client
-            import tempfile
-            import os as _os
+            if hasattr(file_obj, 'seek'): file_obj.seek(0)
+            content = file_obj.read()
             with tempfile.NamedTemporaryFile(suffix='.doc', delete=False) as tmp:
                 tmp.write(content)
                 tmp_path = tmp.name
             try:
                 word = win32com.client.Dispatch("Word.Application")
                 word.Visible = False
-                word_doc = word.Documents.Open(_os.path.abspath(tmp_path))
+                word_doc = word.Documents.Open(os.path.abspath(tmp_path))
                 texto = word_doc.Range().Text
                 word_doc.Close(False)
                 word.Quit()
-                print(f"[DEBUG] DOC processado via Word COM. Tamanho: {len(texto)}")
                 return texto
             finally:
-                try:
-                    _os.unlink(tmp_path)
-                except Exception:
-                    pass
-        except ImportError:
-            print("[DEBUG] win32com não disponível. Tentando unstructured...")
-        except Exception as e_com:
-            print(f"[DEBUG] win32com falhou: {e_com}. Tentando unstructured...")
-
-        # Estratégia 2: unstructured (requer LibreOffice no sistema)
-        try:
-            from unstructured.partition.doc import partition_doc
-            buffer = io.BytesIO(content)
-            elements = partition_doc(file=buffer)
-            texto = "\n\n".join([str(el) for el in elements if str(el).strip()])
-            print(f"[DEBUG] DOC processado via unstructured. Tamanho: {len(texto)}")
-            return texto
-        except Exception as e:
-            print(f"[DEBUG] Erro no DOC legado (unstructured): {e}")
-            return (
-                f"Não foi possível extrair texto do arquivo .doc: {str(e)}. "
-                "Instale o Microsoft Word ou o LibreOffice, ou converta o arquivo para .docx antes de subir."
-            )
+                if os.path.exists(tmp_path): os.unlink(tmp_path)
+        except:
+            return "Erro ao processar .doc legado. Converta para .docx."
 
     @staticmethod
-    def _processar_docx(file_obj):
-        print(f"[DEBUG] Iniciando processamento de DOCX...")
-        try:
-            import docx as python_docx
-            if hasattr(file_obj, 'seek'):
-                file_obj.seek(0)
+    def _detectar_linha_cabecalho(raw):
+        """
+        Detecta a primeira linha que parece ser um cabeçalho real:
+        - Deve ter pelo menos metade das colunas preenchidas (evita linhas de título merged).
+        - A maioria dos valores preenchidos deve ser string (não numérico).
+        """
+        import pandas as pd
+        n_cols = len(raw.columns)
+        min_cols = max(2, n_cols // 2)
 
-            content = file_obj.read()
-            if not content:
-                print("[DEBUG] Erro: Arquivo DOCX vazio.")
-                return "Erro: O arquivo DOCX parece estar vazio."
-
-            buffer = io.BytesIO(content)
-            try:
-                doc = python_docx.Document(buffer)
-            except Exception as zip_err:
-                # Arquivo pode ser um .doc binário renomeado para .docx
-                print(f"[DEBUG] DOCX falhou como ZIP (possível .doc binário): {zip_err}")
-                return AnagmaDocumentProcessor._processar_doc_legado(io.BytesIO(content))
-
-            # Parágrafos normais
-            partes = [para.text for para in doc.paragraphs if para.text.strip()]
-
-            # Tabelas em formato markdown completo (cabeçalho + separador + dados)
-            for table in doc.tables:
-                linhas = []
-                for row in table.rows:
-                    celulas = [cell.text.strip().replace('\n', ' ') for cell in row.cells]
-                    linhas.append(celulas)
-                if not linhas:
-                    continue
-                n_cols = max(len(r) for r in linhas)
-                # Normaliza colunas
-                linhas = [r + [''] * (n_cols - len(r)) for r in linhas]
-                md_header = '| ' + ' | '.join(linhas[0]) + ' |'
-                md_sep    = '| ' + ' | '.join(['---'] * n_cols) + ' |'
-                md_rows   = ['| ' + ' | '.join(r) + ' |' for r in linhas[1:]]
-                partes.append('\n'.join([md_header, md_sep] + md_rows))
-
-            texto = "\n".join(partes)
-            print(f"[DEBUG] DOCX processado. Tamanho do texto: {len(texto)}")
-            return texto
-        except Exception as e:
-            print(f"[DEBUG] Erro no DOCX: {e}")
-            return f"Erro ao processar DOCX: {str(e)}"
+        for i in range(min(15, len(raw))):
+            row = raw.iloc[i]
+            vals = [v for v in row if pd.notna(v) and str(v).strip() not in ('', 'nan')]
+            if len(vals) < min_cols:
+                continue  # linha esparsa (título merged ou linha vazia)
+            strings = [v for v in vals if isinstance(v, str) and str(v).strip()]
+            if strings and len(strings) / len(vals) >= 0.5:
+                return i
+        return 0
 
     @staticmethod
-    def _processar_excel(file_obj, ext):
-        print(f"[DEBUG] Iniciando processamento de EXCEL ({ext})...")
-        if hasattr(file_obj, 'seek'):
-            file_obj.seek(0)
-        content = file_obj.read()
-        buffer = io.BytesIO(content)
+    def _limpar_dataframe(df):
+        """Remove linhas completamente vazias, formata datas e substitui NaN por string vazia."""
+        import pandas as pd
+        df = df.dropna(how='all')
+        for col in df.columns:
+            if pd.api.types.is_datetime64_any_dtype(df[col]):
+                df[col] = df[col].dt.strftime('%d/%m/%Y')
+        return df.fillna('')
 
-        # Estratégia 1: pandas (mais completo, preserva tipos e formatação)
+    @staticmethod
+    def _df_para_markdown(raw, sheet_name):
+        """
+        Converte um DataFrame bruto (lido com header=None) em bloco markdown com cabeçalho
+        auto-detectado, NaN limpos e datas formatadas.
+        """
+        import pandas as pd
+        raw = raw.reset_index(drop=True)
+        h = AnagmaDocumentProcessor._detectar_linha_cabecalho(raw)
+        headers = [
+            str(v).strip() if pd.notna(v) and str(v).strip() not in ('', 'nan') else f'Col_{i}'
+            for i, v in enumerate(raw.iloc[h])
+        ]
+        df = raw.iloc[h + 1:].copy()
+        df.columns = headers
+        df = AnagmaDocumentProcessor._limpar_dataframe(df)
+        if df.empty:
+            return f"## Aba: {sheet_name}\n_(sem dados)_"
+        return f"## Aba: {sheet_name}\n{df.to_markdown(index=False)}"
+
+    @staticmethod
+    def _processar_excel_legado(file_obj):
+        """Tratamento para .xls (Excel 97-2003) com cabeçalho auto-detectado e sem nan."""
         try:
             import pandas as pd
-            engine = 'openpyxl' if ext == 'xlsx' else 'xlrd'
-            print(f"[DEBUG] Usando motor pandas: {engine}")
-            df_dict = pd.read_excel(buffer, sheet_name=None, engine=engine)
-            texto_final = []
-            for sheet_name, df in df_dict.items():
-                texto_final.append(f"## Aba: {sheet_name}\n")
-                try:
-                    texto_final.append(df.to_markdown(index=False))
-                except Exception:
-                    texto_final.append(df.to_string(index=False))
-            texto = "\n\n".join(texto_final)
-            print(f"[DEBUG] EXCEL processado via pandas. Tamanho: {len(texto)}")
-            return texto
-        except Exception as e_pd:
-            print(f"[DEBUG] pandas falhou ({e_pd}). Tentando openpyxl direto...")
-
-        # Estratégia 2: openpyxl direto (apenas xlsx)
-        if ext == 'xlsx':
-            try:
-                from openpyxl import load_workbook
-                buffer.seek(0)
-                wb = load_workbook(buffer, read_only=True, data_only=True)
-                texto_final = []
-                for sheet_name in wb.sheetnames:
-                    ws = wb[sheet_name]
-                    texto_final.append(f"--- ABA: {sheet_name} ---")
-                    for row in ws.iter_rows(values_only=True):
-                        linha = "\t".join([str(v) if v is not None else "" for v in row])
-                        if linha.strip():
-                            texto_final.append(linha)
-                wb.close()
-                texto = "\n".join(texto_final)
-                print(f"[DEBUG] XLSX processado via openpyxl direto. Tamanho: {len(texto)}")
-                return texto
-            except Exception as e_opx:
-                print(f"[DEBUG] openpyxl direto falhou: {e_opx}")
-                return f"Erro ao processar XLSX: {str(e_opx)}"
-
-        # Estratégia 3: win32com via Microsoft Excel (apenas xls, Windows)
-        try:
-            import win32com.client
-            import tempfile
-            import os as _os
-            buffer.seek(0)
-            with tempfile.NamedTemporaryFile(suffix='.xls', delete=False) as tmp:
-                tmp.write(buffer.read())
-                tmp_path = tmp.name
-            try:
-                excel = win32com.client.Dispatch("Excel.Application")
-                excel.Visible = False
-                excel.DisplayAlerts = False
-                wb = excel.Workbooks.Open(_os.path.abspath(tmp_path))
-                texto_final = []
-                for sheet in wb.Worksheets:
-                    texto_final.append(f"--- ABA: {sheet.Name} ---")
-                    used = sheet.UsedRange
-                    for row in used.Rows:
-                        celulas = []
-                        for cell in row.Columns:
-                            v = cell.Value
-                            if v is not None:
-                                celulas.append(str(v))
-                        if any(c.strip() for c in celulas):
-                            texto_final.append("\t".join(celulas))
-                wb.Close(False)
-                excel.Quit()
-                texto = "\n".join(texto_final)
-                print(f"[DEBUG] XLS processado via Excel COM. Tamanho: {len(texto)}")
-                return texto
-            finally:
-                try:
-                    _os.unlink(tmp_path)
-                except Exception:
-                    pass
-        except ImportError:
-            pass
-        except Exception as e_com:
-            print(f"[DEBUG] Excel COM falhou: {e_com}")
-
-        return "Erro ao processar XLS: instale o Microsoft Excel ou converta para .xlsx antes de subir."
-
-    @staticmethod
-    def _processar_txt(file_obj):
-        try:
-            if hasattr(file_obj, 'seek'):
-                file_obj.seek(0)
-            content = file_obj.read()
-            if isinstance(content, bytes):
-                return content.decode('utf-8', errors='ignore')
-            return content
+            if hasattr(file_obj, 'seek'): file_obj.seek(0)
+            raw_dict = pd.read_excel(
+                io.BytesIO(file_obj.read()), sheet_name=None,
+                engine='xlrd', header=None
+            )
+            res = [
+                AnagmaDocumentProcessor._df_para_markdown(raw, name)
+                for name, raw in raw_dict.items()
+            ]
+            return "\n\n".join(res)
         except Exception as e:
-            return f"Erro ao processar TXT: {str(e)}"
-
-    @staticmethod
-    def _processar_pdf(file_obj):
-        print(f"[DEBUG] Iniciando processamento de PDF...")
-        texto_final = []
-        try:
-            if hasattr(file_obj, 'seek'):
-                file_obj.seek(0)
-
-            content = file_obj.read()
-
-            if not content:
-                print("[DEBUG] Erro no PDF: arquivo vazio (0 bytes lidos).")
-                return "Erro: O arquivo PDF está vazio ou não foi enviado corretamente."
-
-            print(f"[DEBUG] PDF recebido: {len(content)} bytes.")
-
-            doc = fitz.open(stream=content, filetype="pdf")
-
-            # Rejeita PDF com senha
-            if doc.is_encrypted:
-                doc.close()
-                print("[DEBUG] Erro no PDF: arquivo protegido por senha.")
-                return "Erro: O PDF está protegido por senha. Remova a proteção antes de enviar."
-
-            num_paginas = min(len(doc), AnagmaDocumentProcessor.MAX_PAGES)
-            print(f"[DEBUG] PDF aberto: {len(doc)} páginas totais, processando {num_paginas}.")
-
-            for i in range(num_paginas):
-                page = doc.load_page(i)
-
-                # Modo markdown (tabelas detectadas geometricamente)
-                # Alguns PDFs disparam AssertionError neste modo — fallback para texto simples
-                texto = ""
-                try:
-                    texto = page.get_text("markdown").strip()
-                except Exception:
-                    pass
-
-                if not texto:
-                    try:
-                        texto = page.get_text("text").strip()
-                    except Exception:
-                        pass
-
-                if not texto:
-                    # Fallback OCR para páginas escaneadas (sem texto extraível)
-                    pix = page.get_pixmap()
-                    img_bytes = pix.tobytes("png")
-                    reader = AnagmaDocumentProcessor._get_ocr_reader()
-                    if reader:
-                        resultados = reader.readtext(img_bytes, detail=0)
-                        texto = " ".join(resultados)
-
-                if texto:
-                    texto_final.append(f"## Página {i+1}\n\n{texto}")
-
-            doc.close()
-            final = "\n\n".join(texto_final)
-            print(f"[DEBUG] PDF processado com sucesso. Tamanho: {len(final)} chars.")
-            return final
-
-        except Exception as e:
-            tipo = type(e).__name__
-            detalhe = repr(e)
-            print(f"[DEBUG] Erro no PDF: tipo={tipo} | detalhe={detalhe}")
-
-            # Fallback: tenta pdfplumber como segunda opção
-            try:
-                import pdfplumber
-                if hasattr(file_obj, 'seek'):
-                    file_obj.seek(0)
-                content_fb = file_obj.read() if not content else content
-                with pdfplumber.open(io.BytesIO(content_fb)) as pdf_fb:
-                    paginas = []
-                    for i, pg in enumerate(pdf_fb.pages[:AnagmaDocumentProcessor.MAX_PAGES]):
-                        t = pg.extract_text() or ''
-                        if t.strip():
-                            paginas.append(f"## Página {i+1}\n\n{t.strip()}")
-                    if paginas:
-                        final_fb = "\n\n".join(paginas)
-                        print(f"[DEBUG] PDF recuperado via pdfplumber. Tamanho: {len(final_fb)} chars.")
-                        return final_fb
-            except Exception as e_fb:
-                print(f"[DEBUG] Fallback pdfplumber também falhou: {repr(e_fb)}")
-
-            return f"Erro ao processar PDF ({tipo}): {detalhe}. Tente converter o arquivo ou remova proteções."
+            return f"Erro ao processar .xls: {e}"
 
     @staticmethod
     def _processar_imagem(file_obj):
         try:
-            if hasattr(file_obj, 'seek'):
-                file_obj.seek(0)
-            
+            if hasattr(file_obj, 'seek'): file_obj.seek(0)
             img_bytes = file_obj.read()
             reader = AnagmaDocumentProcessor._get_ocr_reader()
             if reader:
-                resultados = reader.readtext(img_bytes, detail=0)
-                return " ".join(resultados).strip()
-            return "Erro: Motor de OCR EasyOCR não disponível."
+                return " ".join(reader.readtext(img_bytes, detail=0)).strip()
+            return "OCR indisponível."
         except Exception as e:
-            return f"Erro ao processar imagem: {str(e)}"
+            return f"Erro na imagem: {e}"
+
+    @staticmethod
+    def _processar_txt(file_obj):
+        try:
+            if hasattr(file_obj, 'seek'): file_obj.seek(0)
+            content = file_obj.read()
+            return content.decode('utf-8', errors='ignore') if isinstance(content, bytes) else content
+        except:
+            return ""
+
+    # --- FALLBACKS LEGACY (Apenas se Docling falhar) ---
+
+    @staticmethod
+    def _processar_pdf_legacy(file_obj):
+        import fitz
+        try:
+            if hasattr(file_obj, 'seek'): file_obj.seek(0)
+            doc = fitz.open(stream=file_obj.read(), filetype="pdf")
+            texto = ""
+            for i in range(min(len(doc), 10)):
+                texto += f"## Página {i+1}\n\n" + doc.load_page(i).get_text() + "\n\n"
+            doc.close()
+            return texto
+        except: return ""
+
+    @staticmethod
+    def _processar_docx_legacy(file_obj):
+        import docx
+        try:
+            if hasattr(file_obj, 'seek'): file_obj.seek(0)
+            doc = docx.Document(io.BytesIO(file_obj.read()))
+            return "\n".join([p.text for p in doc.paragraphs])
+        except: return ""
+
+    @staticmethod
+    def _processar_excel_legacy(file_obj, ext):
+        """Fallback legado para XLSX quando Docling falha — cabeçalho auto-detectado e sem nan."""
+        import pandas as pd
+        try:
+            if hasattr(file_obj, 'seek'): file_obj.seek(0)
+            raw_dict = pd.read_excel(io.BytesIO(file_obj.read()), sheet_name=None, header=None)
+            res = [
+                AnagmaDocumentProcessor._df_para_markdown(raw, name)
+                for name, raw in raw_dict.items()
+            ]
+            return "\n\n".join(res)
+        except Exception:
+            return ""

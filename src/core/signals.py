@@ -69,7 +69,11 @@ def vetorizar_ideia_ativa(sender, instance, created, **kwargs):
     if not created and ativa_anterior is True:
         return
 
-    texto = f"Título: {instance.titulo}\n{strip_tags(instance.conteudo)}"
+    # Formatação Markdown estruturada para consistência com o motor Docling
+    texto = (
+        f"# ORIENTAÇÃO INTERNA (Anagma): {instance.titulo}\n\n"
+        f"**Procedimento / Regra Interna:**\n{strip_tags(instance.conteudo)}"
+    )
     _vetorizar_em_thread(texto, f"Ideia:{instance.id}:{instance.titulo[:60]}")
 
 

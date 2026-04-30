@@ -31,9 +31,11 @@ def vetorizar_correcao_rlhf(sender, instance, created, **kwargs):
         try:
             rag = _obter_rag()
             titulo = instance.titulo_melhoria or f"RLHF-{instance.id}"
+            # Formatação Markdown estruturada para consistência com o motor Docling
             texto = (
-                f"Pergunta: {instance.user_query}\n"
-                f"Resposta ideal: {instance.suggested_improvement}"
+                f"# CORREÇÃO DE CURADORIA (Padrão Ouro): {titulo}\n\n"
+                f"**Cenário / Pergunta:** {instance.user_query}\n\n"
+                f"**Resposta Correta (Obrigatório seguir):**\n{instance.suggested_improvement}"
             )
             rag.vetorizar_texto(texto, f"RLHF:{titulo}")
             # update() em vez de save() para não re-disparar este signal

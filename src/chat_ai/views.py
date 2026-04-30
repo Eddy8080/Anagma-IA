@@ -12,6 +12,7 @@ from .llm_engine import AnagmaLLMEngine
 from .document_processor import AnagmaDocumentProcessor
 from core.models import DocumentoBiblioteca
 import json
+import re
 
 _llm_engine = None
 
@@ -19,8 +20,9 @@ _llm_engine = None
 @require_POST
 def upload_document(request):
     """
-    Recebe um arquivo, extrai texto via OCR e salva na Biblioteca para auditoria.
-    Retorna a resposta padrão da IA confirmando o recebimento.
+    Recebe um arquivo, extrai texto e salva na Biblioteca.
+    Superusuário: aprovação e vetorização imediatas — disponível no RAG na mesma requisição.
+    Usuário comum: status 'pending', aguarda auditoria do superusuário.
     """
     if 'file' not in request.FILES:
         return JsonResponse({'status': 'error', 'message': 'Nenhum arquivo enviado'}, status=400)
@@ -29,31 +31,48 @@ def upload_document(request):
     session_id = request.POST.get('session_id')
     nome_original = uploaded_file.name
     ext = nome_original.split('.')[-1].lower() if '.' in nome_original else ''
+    is_superuser = request.user.is_superuser
 
-    if ext not in ['pdf', 'png', 'jpg', 'jpeg']:
+    extensoes_usuario = ['pdf', 'png', 'jpg', 'jpeg']
+    extensoes_superuser = ['pdf', 'png', 'jpg', 'jpeg', 'docx', 'doc', 'xlsx', 'xls', 'txt']
+    extensoes_permitidas = extensoes_superuser if is_superuser else extensoes_usuario
+
+    if ext not in extensoes_permitidas:
         return JsonResponse({'status': 'error', 'message': 'Extensão não suportada'}, status=400)
 
     try:
-        # 1. Salva na Biblioteca (Mantendo a Governança de Autoria)
+        # 1. Salva na Biblioteca
         doc_bib = DocumentoBiblioteca.objects.create(
             nome_arquivo=nome_original,
             arquivo=uploaded_file,
             extensao=ext,
-            status='pending',
-            enviado_por=request.user
+            status='approved' if is_superuser else 'pending',
+            enviado_por=request.user,
+            auditado_por=request.user if is_superuser else None,
+            processado_em=timezone.now() if is_superuser else None,
         )
 
-        # 2. Extrai texto (com limite de 10 páginas embutido no processador)
+        # 2. Extrai texto
         doc_bib.arquivo.open('rb')
         try:
-            texto_extraido = AnagmaDocumentProcessor.extrair_texto(doc_bib.arquivo, ext)
+            texto_extraido, meta_extracao = AnagmaDocumentProcessor.extrair_texto(doc_bib.arquivo, ext)
         finally:
             doc_bib.arquivo.close()
         doc_bib.conteudo_extraido = texto_extraido
         doc_bib.processado_em = timezone.now()
         doc_bib.save(update_fields=['conteudo_extraido', 'processado_em'])
 
-        # 3. Gerenciar Sessão de Chat
+        # 3. Superusuário: vetoriza imediatamente no ChromaDB
+        if is_superuser and texto_extraido and not texto_extraido.startswith('Erro'):
+            try:
+                from django.utils.html import strip_tags
+                llm_engine = get_llm_engine()
+                llm_engine.rag.vetorizar_texto(strip_tags(texto_extraido), nome_original)
+                print(f"[UPLOAD CHAT] '{nome_original}' vetorizado imediatamente pelo superusuário.", flush=True)
+            except Exception as e_rag:
+                print(f"[UPLOAD CHAT] Aviso: falha ao vetorizar '{nome_original}': {e_rag}", flush=True)
+
+        # 4. Gerenciar Sessão de Chat
         if session_id:
             try:
                 session = ChatSession.objects.get(id=session_id, user=request.user)
@@ -62,18 +81,26 @@ def upload_document(request):
         else:
             session = ChatSession.objects.create(user=request.user, titulo=f"Anexo: {nome_original}")
 
-        # 4. Registra no Chat (Mensagem do Usuário)
+        # 5. Registra no Chat (Mensagem do Usuário)
         ChatMessage.objects.create(session=session, role='user', content=f"[Anexo enviado: {nome_original}]")
 
-        # 5. Resposta Padrão da IA (UX)
+        # 6. Resposta diferenciada por perfil
         trecho = (texto_extraido[:300].replace('\n', ' ') if texto_extraido else "Conteúdo técnico em análise")
-        ai_response = (
-            f"Recebi o documento **{nome_original}**. "
-            f"Identifiquei preliminarmente que ele contém informações sobre: *{trecho}...* "
-            f"\n\nO conteúdo já foi encaminhado para a nossa **Biblioteca de Curadoria** e está em **processo de auditoria** "
-            f"pelos superusuários para garantir a precisão técnica antes de ser integrado definitivamente ao meu aprendizado contábil."
-            f"\n\nEnquanto isso, no que mais posso ajudar você hoje?"
-        )
+        if is_superuser:
+            ai_response = (
+                f"Documento **{nome_original}** recebido e integrado diretamente à Biblioteca de Curadoria. "
+                f"Identifiquei que ele contém informações sobre: *{trecho}...*"
+                f"\n\n✅ O conteúdo já está **ativo na memória da Digiana** e disponível para consultas nesta sessão."
+                f"\n\nPode perguntar sobre o documento agora mesmo."
+            )
+        else:
+            ai_response = (
+                f"Recebi o documento **{nome_original}**. "
+                f"Identifiquei preliminarmente que ele contém informações sobre: *{trecho}...* "
+                f"\n\nO conteúdo foi encaminhado para a **Biblioteca de Curadoria** e está em **processo de auditoria** "
+                f"pelos superusuários para garantir a precisão técnica antes de ser integrado ao meu aprendizado contábil."
+                f"\n\nEnquanto isso, no que mais posso ajudar você hoje?"
+            )
 
         ai_msg = ChatMessage.objects.create(session=session, role='assistant', content=ai_response)
         session.save()
@@ -88,8 +115,7 @@ def upload_document(request):
         })
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        print(f"[ERRO UPLOAD CHAT] {e}")
         return JsonResponse({'status': 'error', 'message': str(e)}, status=200)
 
 
@@ -119,116 +145,241 @@ def _get_ideias_ativas():
     return ideias
 
 
+_PADROES_CONTINUACAO = re.compile(
+    r'\b(continue|continua[r]?|exiba?\s+o?\s*(restante|resto|mais)|'
+    r'mostr[ae]\s+o?\s*(restante|resto|mais)|a\s+partir\s+de|'
+    r'pr[oó]xima?\s+(parte|se[cç][aã]o|aba))\b',
+    re.IGNORECASE
+)
+
+
+def _detectar_excel_continuacao(session, user_prompt):
+    """
+    Retorna o nome do arquivo Excel se a mensagem for continuação de exibição de planilha.
+    Dupla verificação: (1) padrão de continuação no texto + (2) última resposta da IA tem '## Aba:'.
+    """
+    if not _PADROES_CONTINUACAO.search(user_prompt):
+        return None
+    ultima_ia = session.messages.filter(role='assistant').order_by('-timestamp').first()
+    if not ultima_ia or '## Aba:' not in ultima_ia.content:
+        return None
+    from django.db.models import Q
+    xlsx_aprovados = DocumentoBiblioteca.objects.filter(
+        Q(status='approved') & (Q(nome_arquivo__icontains='.xls') | Q(nome_arquivo__icontains='.xlsx'))
+    )
+    for msg_u in session.messages.filter(role='user').order_by('-timestamp')[:8]:
+        palavras = [p for p in msg_u.content.lower().split() if len(p) > 3]
+        for doc_x in xlsx_aprovados:
+            if any(p in doc_x.nome_arquivo.lower() for p in palavras):
+                return doc_x.nome_arquivo
+    return None
+
+
+def _verificar_truncamento_excel(search_query, full_response, user=None):
+    """
+    Detecta exibição parcial de planilha comparando abas no arquivo vs. na resposta.
+    Retorna mensagem de aviso ou None. Link direcionado por papel do usuário.
+    """
+    if '## Aba:' not in full_response:
+        return None
+    try:
+        from django.db.models import Q
+        palavras = [p for p in search_query.lower().split() if len(p) > 3]
+        xlsx_aprovados = DocumentoBiblioteca.objects.filter(
+            Q(status='approved') & (Q(nome_arquivo__icontains='.xls') | Q(nome_arquivo__icontains='.xlsx'))
+        )
+        doc_alvo = None
+        for doc_x in xlsx_aprovados:
+            if doc_x.nome_arquivo.lower() == search_query.lower() or \
+               any(p in doc_x.nome_arquivo.lower() for p in palavras):
+                doc_alvo = doc_x
+                break
+        if not doc_alvo or not doc_alvo.conteudo_extraido:
+            return None
+        abas_arquivo = doc_alvo.conteudo_extraido.count('## Aba:')
+        abas_resposta = full_response.count('## Aba:')
+        if abas_arquivo > abas_resposta:
+            link = '/admin-panel/biblioteca/' if (user and user.is_superuser) else '/biblioteca/'
+            label = 'Painel Admin → Biblioteca' if (user and user.is_superuser) else 'Biblioteca'
+            return (
+                f"\n\n---\n"
+                f"> ⚠️ **Exibição parcial** — o arquivo possui {abas_arquivo} aba(s) e "
+                f"{abas_resposta} foi(foram) exibida(s). Limite de geração atingido. "
+                f"Acesse **[{label}]({link})** para ver o conteúdo extraído completo."
+            )
+    except Exception:
+        pass
+    return None
+
+
 def _manual_usuario(nome):
     return (
-        f"Olá, **{nome}**! Aqui está o guia de uso da Digiana:\n\n"
+        f"# 📖 Guia da Digiana\n\n"
+        f"Olá, **{nome}**! Tudo que você precisa saber para usar a Digiana com eficiência.\n\n"
         "---\n\n"
-        "## Como usar a Digiana\n\n"
-        "**Faça perguntas contábeis e fiscais** em linguagem natural. Exemplos:\n"
-        "- *Qual a alíquota do DAS para MEI em 2024?*\n"
-        "- *Quais são as obrigações acessórias do Simples Nacional?*\n"
-        "- *Como funciona o PGDAS?*\n\n"
+        "## ⚡ Começo rápido\n\n"
+        "Basta digitar — perguntas em linguagem natural funcionam diretamente:\n\n"
+        "> *\"Qual a alíquota do DAS para MEI em 2024?\"*\n"
+        "> *\"Quais são as obrigações acessórias do Simples Nacional?\"*\n"
+        "> *\"Como funciona o PGDAS-D?\"*\n"
+        "> *\"Qual o prazo de entrega da ECD?\"*\n\n"
+        "**Dica:** quanto mais específica a pergunta, mais precisa a resposta. "
+        "Inclua ano, regime tributário ou artigo quando souber.\n\n"
         "---\n\n"
-        "## Entendendo as respostas\n\n"
-        "As respostas seguem um formato padrão:\n\n"
-        "**Verificação:** trecho literal do documento da biblioteca que responde à pergunta — "
-        "ou aviso de que o documento não contém o dado específico.\n\n"
-        "**Resposta:** baseada exclusivamente no que foi declarado na Verificação. "
-        "Se a biblioteca não tiver o dado, a Digiana informa a fonte oficial (Receita Federal, Portal do Simples, etc.) "
-        "sem inventar valores ou alíquotas.\n\n"
+        "## 📋 Como as respostas funcionam\n\n"
+        "Toda resposta chega em **duas partes fixas**:\n\n"
+        "| Bloco | O que contém |\n"
+        "|---|---|\n"
+        "| **Verificação** | Trecho literal copiado do documento da biblioteca que responde sua pergunta |\n"
+        "| **Resposta** | Interpretação baseada *exclusivamente* na Verificação acima |\n\n"
+        "Se a biblioteca não tiver o dado, a Digiana informa explicitamente e indica "
+        "a **fonte oficial** (Receita Federal, Portal do Simples Nacional) — "
+        "**nunca inventa valores, alíquotas ou artigos**.\n\n"
         "---\n\n"
-        "## Como enviar documentos\n\n"
-        "Clique no ícone de **anexo (📎)** no chat e envie PDFs, imagens ou documentos (.docx, .xlsx, .txt).\n"
-        "O documento é encaminhado para a **Biblioteca de Curadoria** e fica em análise técnica "
-        "antes de ser integrado ao conhecimento da Digiana.\n\n"
-        "**Boas práticas ao enviar documentos:**\n"
-        "- **Leia antes de subir** — se o arquivo tem muito texto narrativo e poucos dados estruturados, "
-        "considere extrair só a parte relevante num `.txt` antes de enviar.\n"
-        "- **Um assunto por arquivo** — documentos que misturam vários temas aumentam o ruído na busca.\n"
-        "- **Valide após o upload** — faça uma pergunta no chat que aquele documento deveria responder "
-        "e verifique se a **Verificação** transcreve o trecho correto. Se vier vazia, o documento precisa ser revisado.\n\n"
+        "## 📚 Biblioteca\n\n"
+        "Clique em **📚 Biblioteca** na barra lateral para abrir o catálogo de documentos aprovados.\n\n"
+        "- **Busca instantânea** — filtre pelo nome do arquivo sem recarregar a página\n"
+        "- **💬 Perguntar** — clique no botão ao lado de qualquer documento e o nome é "
+        "preenchido automaticamente no campo de chat para você refinar a pergunta\n\n"
         "---\n\n"
-        "## Como registrar uma ideia\n\n"
-        "Use o menu **Registrar Ideia** para compartilhar orientações, procedimentos internos "
-        "ou correções de processo. Sua ideia passa por aprovação antes de ser ativada.\n\n"
+        "## 📎 Enviar documentos\n\n"
+        "Clique no **ícone de anexo (📎)** no chat para enviar PDFs, planilhas ou imagens. "
+        "O arquivo entra na fila de análise técnica antes de ser integrado à biblioteca.\n\n"
+        "**Boas práticas:**\n\n"
+        "1. **Leia antes de subir** — arquivo muito narrativo? Extraia só a parte relevante num `.txt`\n"
+        "2. **Um assunto por arquivo** — documentos misturados aumentam o ruído nas buscas\n"
+        "3. **Valide depois** — pergunte algo que o documento deveria responder e confirme "
+        "que a **Verificação** transcreve o trecho correto\n"
+        "4. **Se ainda falhar** → use o 👎 para sinalizar ao time técnico\n\n"
         "---\n\n"
-        "## Como dar feedback\n\n"
-        "Use os ícones de **👍 / 👎** em cada resposta da Digiana.\n"
-        "- **👍 Curtiu:** a resposta foi útil e precisa.\n"
-        "- **👎 Não curtiu:** a resposta estava incorreta ou imprecisa — "
-        "o time técnico analisa e registra uma correção permanente.\n\n"
+        "## 💡 Nova Ideia\n\n"
+        "Clique em **💡 Nova Ideia** na barra lateral para abrir o formulário inline "
+        "(sem sair da página de chat).\n\n"
+        "Use para registrar orientações internas, procedimentos ou correções de processo. "
+        "Sua ideia passa por aprovação antes de ser ativada e começa a influenciar as respostas.\n\n"
         "---\n\n"
-        "## O que a Digiana **não** responde\n\n"
-        "- Política, esportes, culinária, turismo, entretenimento.\n"
-        "- Consultas jurídicas ou decisões que exijam responsabilidade técnica de contador.\n"
-        "- Valores ou alíquotas que não estejam na biblioteca — nesses casos ela indica a fonte oficial.\n\n"
+        "## 👍👎 Feedback\n\n"
+        "| Ícone | Quando usar | O que acontece |\n"
+        "|---|---|---|\n"
+        "| 👍 | Resposta útil e precisa | Registra satisfação |\n"
+        "| 👎 | Resposta incorreta ou imprecisa | Time técnico analisa e grava correção permanente |\n\n"
+        "O 👎 é a ferramenta mais poderosa para melhorar a Digiana — use sempre que ela errar.\n\n"
         "---\n\n"
-        "*Digite sua pergunta contábil para começar.*"
+        "## 🔧 Comandos do chat\n\n"
+        "| Comando | O que faz |\n"
+        "|---|---|\n"
+        "| `/manual` | Exibe este guia novamente |\n"
+        "| `/lista` | Mostra seus documentos e ideias enviados com o status de cada um |\n\n"
+        "---\n\n"
+        "## 🚫 Fora do escopo\n\n"
+        "- Política, esportes, culinária, turismo, entretenimento\n"
+        "- Consultas que exijam responsabilidade técnica formal de contador\n"
+        "- Dados não disponíveis na biblioteca *(a Digiana indica a fonte oficial, não inventa)*\n\n"
+        "---\n\n"
+        "*Pronto — é só perguntar. Use `/manual` a qualquer momento para voltar aqui.*"
     )
 
 
 def _manual_superusuario(nome):
     return (
-        f"Olá, **{nome}**! Você tem acesso ao manual completo — uso e administração.\n\n"
+        f"# 📖 Guia Completo da Digiana\n\n"
+        f"Olá, **{nome}**! Manual de uso, administração e melhores práticas.\n\n"
         "---\n\n"
-        "## Guia do Usuário\n\n"
-        "**Faça perguntas contábeis e fiscais** em linguagem natural. Exemplos:\n"
-        "- *Qual a alíquota do DAS para MEI em 2024?*\n"
-        "- *Quais são as obrigações acessórias do Simples Nacional?*\n\n"
-        "**Formato das respostas:**\n"
-        "- **Verificação:** transcrição literal do trecho do documento que responde à pergunta.\n"
-        "- **Resposta:** baseada exclusivamente na Verificação — sem inventar dados.\n\n"
-        "**Feedback:** use 👍 / 👎 em cada resposta. O 👎 alimenta o processo de correção RLHF.\n\n"
-        "**Envio de documentos:** ícone 📎 no chat → vai para a Biblioteca como pendente.\n\n"
-        "**Boas práticas ao enviar documentos:**\n"
-        "- **Leia antes de subir** — se o arquivo tem muito texto narrativo e poucos dados estruturados, "
-        "considere extrair só a parte relevante num `.txt` antes de enviar.\n"
-        "- **Um assunto por arquivo** — documentos que misturam vários temas aumentam o ruído na busca semântica.\n"
-        "- **Valide após o upload** — faça uma pergunta no chat que aquele documento deveria responder "
-        "e verifique se a **Verificação** transcreve o trecho correto. Se vier vazia ou genérica, "
-        "o documento precisa ser revisado ou dividido no painel.\n"
-        "- **Se ainda alucinar** — registre a correção via 👎 no painel de feedback para fechar o ciclo RLHF.\n\n"
+        "## ⚡ Uso rápido\n\n"
+        "Perguntas contábeis e fiscais em linguagem natural — seja específico:\n\n"
+        "> *\"Qual a alíquota do DAS para MEI em 2024?\"*\n"
+        "> *\"Quais são as obrigações acessórias do Simples Nacional?\"*\n"
+        "> *\"Qual o prazo de entrega da ECD para o exercício 2024?\"*\n\n"
+        "**Respostas sempre no formato:**\n\n"
+        "| Bloco | Conteúdo |\n"
+        "|---|---|\n"
+        "| **Verificação** | Trecho literal do documento que responde a pergunta |\n"
+        "| **Resposta** | Baseada *exclusivamente* na Verificação — nunca inventa dados |\n\n"
+        "**Feedback** → 👍 confirma precisão · 👎 abre ciclo de correção RLHF\n\n"
+        "**Documentos** → ícone 📎 no chat envia para a Biblioteca como pendente de auditoria\n\n"
+        "**Boas práticas ao enviar documentos:**\n\n"
+        "1. **Leia antes de subir** — arquivo narrativo? Extraia só a parte relevante num `.txt`\n"
+        "2. **Um assunto por arquivo** — documentos misturados aumentam o ruído semântico\n"
+        "3. **Valide depois** — pergunte algo que o documento deveria responder e confirme "
+        "que a **Verificação** transcreve o trecho certo; se vier vazia, revise ou divida no painel\n"
+        "4. **Se ainda alucinar** → registre via 👎 para fechar o ciclo RLHF\n\n"
+        "**Comandos do chat:**\n\n"
+        "| Comando | O que faz |\n"
+        "|---|---|\n"
+        "| `/manual` | Exibe este guia novamente |\n"
+        "| `/lista` | Mostra documentos e ideias enviados com status de cada um |\n\n"
         "---\n\n"
-        "## Como a Digiana aprende — 3 Pilares\n\n"
-        "**1. Biblioteca de Curadoria**\n"
-        "Documentos (PDF, DOCX, XLSX, imagens) enviados e aprovados são vetorizados no ChromaDB. "
-        "A busca semântica recupera os trechos mais relevantes para cada pergunta. "
-        "Documentos com tabelas de alíquotas, calendários de obrigações e legislação consolidada "
-        "têm o maior impacto na precisão das respostas.\n\n"
-        "**2. Banco de Ideias**\n"
-        "Orientações e procedimentos internos da equipe. São injetadas como contexto nas perguntas "
-        "relacionadas. Ideias ativas aparecem imediatamente; as pendentes aguardam aprovação.\n\n"
-        "**3. RLHF — Correção Baseada em Feedback**\n"
-        "Quando um 👎 é registrado, você pode abrir a mensagem no painel de feedback e gravar "
-        "a resposta ideal. Essa correção é vetorizada no ChromaDB com o par pergunta/resposta-ideal "
-        "e passa a ser injetada como contexto em perguntas similares futuras — de forma permanente, "
-        "sem alterar os pesos do modelo.\n\n"
+        "## 📚 Biblioteca (modal SPA)\n\n"
+        "Clique em **📚 Biblioteca** na barra lateral — abre sem recarregar a página.\n\n"
+        "- **Busca instantânea** — filtre pelo nome do arquivo em tempo real\n"
+        "- **💬 Perguntar** — preenche automaticamente o campo de chat com o nome do documento\n"
+        "- **⚙️ Administrar** — atalho direto para o painel de gestão da biblioteca\n\n"
         "---\n\n"
-        "## Painel Administrativo — `/painel/`\n\n"
-        "**Dashboard**\n"
-        "Métricas em tempo real: usuários online, sessões do dia, total de curtidas/não curtidas.\n\n"
-        "**Biblioteca** → `/painel/biblioteca/`\n"
-        "- Upload em lote de documentos (já aprovados e vetorizados automaticamente).\n"
-        "- Auditoria de documentos pendentes enviados pelos usuários: visualize o conteúdo extraído, "
-        "edite se necessário, e aprove (vetoriza) ou rejeite com motivo.\n\n"
-        "**Ideias** → `/painel/ideias/`\n"
-        "- Gerencie orientações da equipe: criar, editar, ativar/desativar, excluir.\n"
-        "- Ideias criadas por superusuários já nascem ativas.\n\n"
-        "**Feedback (RLHF)** → `/painel/feedback/dislike/`\n"
-        "- Veja quais usuários registraram não curtidas e quantas.\n"
-        "- Acesse as mensagens específicas e grave a correção ideal.\n"
-        "- Cada correção gravada é vetorizada e se torna aprendizado permanente da Digiana.\n\n"
-        "**Usuários** → `/painel/usuarios/`\n"
-        "- Criar usuários (e-mail @anagma.com.br ativa automaticamente).\n"
-        "- Alterar status (Ativo / Inativo / Pausado) e nível de acesso.\n"
-        "- Redefinir senha (usuário é obrigado a trocar no próximo acesso).\n"
-        "- Excluir preservando histórico (para treinamento) ou purga total.\n\n"
-        "**Insights** → `/painel/insights/`\n"
-        "- Gráfico de interações por hora (hoje) e por dia (últimos 7 dias).\n\n"
-        "**Modelos** → `/painel/modelos/`\n"
-        "- Alternar entre modelo Leve e Completo sem reiniciar o servidor.\n\n"
+        "## 💡 Nova Ideia (modal inline)\n\n"
+        "Clique em **💡 Nova Ideia** na barra lateral — formulário abre sem sair do chat.\n"
+        "Ideias de superusuários são ativadas automaticamente. "
+        "Ideias de usuários comuns passam por aprovação.\n\n"
         "---\n\n"
-        "*Dica: quanto mais documentos específicos e estruturados na biblioteca, menor a chance de alucinação.*"
+        "## 🧠 Como a Digiana aprende — 3 Pilares\n\n"
+        "**📚 1. Biblioteca de Curadoria**\n"
+        "Documentos aprovados (PDF, DOCX, XLSX, imagens) são vetorizados no ChromaDB com embeddings multilíngues.\n"
+        "A busca semântica recupera os trechos mais relevantes para cada pergunta.\n\n"
+        "Maior impacto: **tabelas de alíquotas com datas**, **calendários de obrigações**, "
+        "**legislação consolidada com artigos numerados**, **encargos por faixa**.\n\n"
+        "Evite: PDFs longos e narrativos sem dados estruturados, documentos duplicados ou desatualizados.\n\n"
+        "**💡 2. Banco de Ideias**\n"
+        "Orientações e procedimentos internos injetados como contexto nas perguntas relacionadas.\n"
+        "São recuperados por **busca por palavra-chave**: o título e conteúdo precisam "
+        "conter os termos que os usuários vão digitar.\n\n"
+        "**🔁 3. RLHF — Aprendizado por Correção**\n"
+        "Um 👎 abre o ciclo: você grava a resposta ideal no painel → ela é vetorizada "
+        "com o par pergunta/resposta-ideal → passa a corrigir respostas similares futuras "
+        "**de forma permanente, sem alterar pesos do modelo**.\n\n"
+        "---\n\n"
+        "## ⚙️ Painel Administrativo\n\n"
+        "### 📊 Dashboard — `/admin-panel/`\n"
+        "Métricas em tempo real via SSE (sem recarregar):\n"
+        "- Usuários online, sessões abertas no dia, total de 👍 e 👎\n"
+        "- Atalhos rápidos para todas as seções do painel\n\n"
+        "### 📚 Biblioteca — `/admin-panel/biblioteca/`\n"
+        "**Upload direto (superusuário):**\n"
+        "- Envie PDF, DOCX, XLSX ou imagens — aprovado e vetorizado no ChromaDB no mesmo ato\n"
+        "- Suporte a upload em lote (múltiplos arquivos simultâneos)\n\n"
+        "**Auditoria de pendentes (enviados pelos usuários via 📎):**\n"
+        "- Visualize e edite o texto extraído antes de aprovar\n"
+        "- **Aprovar** → vetoriza e entra imediatamente nas respostas\n"
+        "- **Rejeitar** → registre o motivo; histórico preservado\n\n"
+        "### 💡 Ideias — `/admin-panel/ideias/`\n"
+        "- **Criar** → nasce ativa automaticamente\n"
+        "- **Ativar/Desativar** → controla se entra no contexto das respostas\n"
+        "- **Editar** → conteúdo atualizado entra nas próximas perguntas relacionadas\n"
+        "- **Excluir** → remove do banco e do vector store\n\n"
+        "### 🔁 Feedback RLHF — `/admin-panel/feedback/dislike/`\n"
+        "- Lista de 👎 agrupada por usuário e quantidade\n"
+        "- Abra cada item: veja pergunta original + resposta incorreta da IA\n"
+        "- **Grave a resposta ideal** → vetorizada com o par pergunta/resposta\n"
+        "- Perguntas similares futuras recebem a correção como contexto — **permanente**\n\n"
+        "*Priorize: IA inventou valores, alíquotas ou artigos inexistentes.*\n\n"
+        "### 👥 Usuários — `/admin-panel/usuarios/`\n"
+        "- **Criar** → e-mail `@anagma.com.br` ativa acesso automaticamente\n"
+        "- **Status:** Ativo · Inativo · Pausado *(mantém histórico, bloqueia login)*\n"
+        "- **Nível:** usuário comum ou superusuário\n"
+        "- **Redefinir senha** → troca obrigatória no próximo acesso\n"
+        "- **Excluir com histórico** → preserva conversas para treinamento futuro\n"
+        "- **Purga total** → remove usuário e todos os dados permanentemente\n\n"
+        "### 📈 Insights — `/admin-panel/insights/`\n"
+        "- Interações **por hora** (hoje) e **por dia** (últimos 7 dias)\n"
+        "- Identifica horários de pico e dimensiona disponibilidade do servidor\n\n"
+        "### 🤖 Modelos — `/admin-panel/modelos/`\n"
+        "- **Modelo Leve** (GGUF Q4_K_M) — menor RAM, resposta mais rápida\n"
+        "- **Modelo Completo** (Safetensors) — maior precisão, maior consumo\n"
+        "- Troca sem reiniciar o servidor; status em tempo real: `PRONTO` · `CARREGANDO` · `ERRO`\n\n"
+        "### 🧑 Perfil Anagma — `/admin-panel/perfil/`\n"
+        "Texto institucional injetado como contexto em todas as respostas da Digiana.\n"
+        "Use para definir o tom, escopo e identidade da IA.\n\n"
+        "---\n\n"
+        "*Regra de ouro: quanto mais documentos específicos e estruturados na biblioteca, "
+        "menor a chance de alucinação. Use `/manual` a qualquer momento para voltar aqui.*"
     )
 
 
@@ -325,6 +476,13 @@ def chat_stream(request):
         user_name = request.user.nome_completo or request.user.username
         saudacao = _get_saudacao()
 
+        # Solução B — Interceptor de continuação de Excel
+        search_query = user_prompt
+        excel_continuacao = _detectar_excel_continuacao(session, user_prompt)
+        if excel_continuacao:
+            search_query = excel_continuacao
+            print(f"[EXCEL CONTINUAÇÃO] Rebuscando arquivo: {excel_continuacao}", flush=True)
+
         full_response = ""
 
         for token in llm_engine.gerar_resposta_stream(
@@ -332,17 +490,25 @@ def chat_stream(request):
             chat_history=chat_history,
             user_name=user_name,
             saudacao=saudacao,
-            search_query=user_prompt,
+            search_query=search_query,
             user=request.user
         ):
             full_response += token
-            # Protocolo SSE: cada pedaço de dado deve começar com "data: " e terminar com "\n\n"
-            yield f"data: {token}\n\n"
+            safe_token = token.replace('\n', '\ndata: ')
+            yield f"data: {safe_token}\n\n"
 
-        # Salva a resposta completa no banco ao final
+        # Solução C — Aviso de exibição parcial de planilha
+        aviso = _verificar_truncamento_excel(search_query, full_response, request.user)
+        if aviso:
+            full_response += aviso
+            safe_aviso = aviso.replace('\n', '\ndata: ')
+            yield f"data: {safe_aviso}\n\n"
+
+        # Salva a resposta completa no banco ao final e devolve o ID via SSE
         if full_response:
-            ChatMessage.objects.create(session=session, role='assistant', content=full_response)
+            ai_msg = ChatMessage.objects.create(session=session, role='assistant', content=full_response)
             session.save()
+            yield f"event: message_id\ndata: {ai_msg.id}\n\n"
 
     response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
     response['Cache-Control'] = 'no-cache'
@@ -404,14 +570,18 @@ def send_message(request):
 
     try:
         llm_engine = get_llm_engine()
-        # A busca deve focar apenas no prompt atual para ser precisa.
-        # Adicionar o título da sessão pode causar ruído e impedir que o RAG encontre documentos exatos.
+        # Solução B — Interceptor de continuação de Excel (caminho não-streaming)
+        search_query = user_prompt
+        excel_continuacao = _detectar_excel_continuacao(session, user_prompt)
+        if excel_continuacao:
+            search_query = excel_continuacao
+            print(f"[EXCEL CONTINUAÇÃO] Rebuscando arquivo: {excel_continuacao}", flush=True)
         ai_response = llm_engine.gerar_resposta(
             user_query=user_prompt,
             chat_history=chat_history,
             user_name=user_name,
             saudacao=saudacao,
-            search_query=user_prompt,
+            search_query=search_query,
             user=request.user
         )
     except Exception:
@@ -494,6 +664,38 @@ def pin_session(request, session_id):
     session.pinned = not session.pinned
     session.save(update_fields=['pinned'])
     return JsonResponse({'status': 'success', 'pinned': session.pinned})
+
+
+@login_required
+def get_session_messages(request, session_id):
+    """Retorna as mensagens de uma sessão em JSON para navegação SPA."""
+    session = get_object_or_404(ChatSession, id=session_id, user=request.user, deleted_at__isnull=True)
+    messages_data = []
+    for m in session.messages.order_by('timestamp'):
+        status_anexo = None
+        nome_arquivo = None
+        if m.content.startswith('[Anexo enviado:') and ']' in m.content:
+            try:
+                nome_arquivo = m.content.split('[Anexo enviado: ')[1].split(']')[0]
+                doc = DocumentoBiblioteca.objects.filter(nome_arquivo=nome_arquivo).first()
+                if doc: status_anexo = doc.status
+            except: pass
+
+        messages_data.append({
+            'id': m.id,
+            'role': m.role,
+            'content': m.content,
+            'time': timezone.localtime(m.timestamp).strftime('%H:%M'),
+            'feedback': m.feedback,
+            'status_anexo': status_anexo,
+            'nome_arquivo': nome_arquivo
+        })
+    return JsonResponse({
+        'status': 'success',
+        'session_id': session.id,
+        'session_title': session.titulo,
+        'messages': messages_data
+    })
 
 
 @login_required

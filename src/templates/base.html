@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="{% static 'css/theme.css' %}">
     <script src="{% static 'js/theme.js' %}"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
             --bg-color: #131314;
@@ -250,12 +251,164 @@
             margin-bottom: 4px;
         }
         #stop-btn:hover { background-color: #b2261e; }
+
+        /* ── Sidebar bottom ── */
+        .sidebar-bottom {
+            margin-top: auto;
+            padding-top: 16px;
+            border-top: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .logout-form { text-align: center; }
+        .logout-btn {
+            background: none;
+            border: none;
+            color: #555;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: color 0.15s;
+        }
+        .logout-btn:hover { color: #888; }
+
+        /* ── File input / preview ── */
+        #file-input  { display: none; }
+        #file-preview {
+            margin-top: 8px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        /* ── Modal Nova Ideia ── */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.65);
+            z-index: 9000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .modal-box {
+            background: #1e1f20;
+            border: 1px solid #3c4043;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 520px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 20px 12px;
+            border-bottom: 1px solid #2c2d30;
+        }
+        .modal-title { margin: 0; font-size: 1.1rem; font-weight: 600; color: #e3e3e3; }
+        .modal-close-btn {
+            background: none;
+            border: none;
+            color: #666;
+            font-size: 1rem;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: background 0.15s, color 0.15s;
+            line-height: 1;
+        }
+        .modal-close-btn:hover { background: #2a2b2e; color: #e3e3e3; }
+        .modal-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+        .modal-field { display: flex; flex-direction: column; gap: 5px; }
+        .modal-label { font-size: 0.82rem; color: #888; }
+        .modal-input, .modal-textarea {
+            background: #131314;
+            border: 1px solid #3c4043;
+            border-radius: 10px;
+            color: #e3e3e3;
+            font-family: inherit;
+            font-size: 0.95rem;
+            padding: 10px 12px;
+            outline: none;
+            transition: border-color 0.15s;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .modal-input:focus, .modal-textarea:focus { border-color: #4285f4; }
+        .modal-input::placeholder, .modal-textarea::placeholder { color: #555; }
+        .modal-textarea { resize: vertical; min-height: 110px; line-height: 1.5; }
+        .modal-msg {
+            font-size: 0.85rem;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid transparent;
+        }
+        .modal-msg.success { background: rgba(52,168,83,0.12); border-color: rgba(52,168,83,0.3); color: #34a853; }
+        .modal-msg.error   { background: rgba(217,48,37,0.12); border-color: rgba(217,48,37,0.3); color: #f28b82; }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 12px 20px 18px;
+            border-top: 1px solid #2c2d30;
+        }
+        .modal-btn-cancel {
+            background: none;
+            border: 1px solid #3c4043;
+            color: #888;
+            border-radius: 10px;
+            padding: 8px 18px;
+            font-size: 0.88rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .modal-btn-cancel:hover { background: #2a2b2e; color: #e3e3e3; }
+        .modal-btn-submit {
+            background: #4285f4;
+            border: none;
+            color: white;
+            border-radius: 10px;
+            padding: 8px 18px;
+            font-size: 0.88rem;
+            font-family: inherit;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.15s, opacity 0.15s;
+        }
+        .modal-btn-submit:hover { background: #3367d6; }
+        .modal-btn-submit:disabled { opacity: 0.5; cursor: default; }
+
+        /* ── Modal Biblioteca ── */
+        .bib-card-modal {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            background: #131314;
+            border: 1px solid #2c2d30;
+            border-radius: 10px;
+            transition: border-color 0.15s;
+        }
+        .bib-card-modal:hover { border-color: #4285f4; }
+        #modal-bib-lista {
+            padding: 0 20px 8px;
+            max-height: 380px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
     <label class="theme-switch-label" title="Alternar tema">
-        <input type="checkbox" class="theme-toggle-input" id="theme-toggle">
+        <input type="checkbox" class="theme-toggle-input" id="theme-toggle" aria-label="Alternar tema claro/escuro">
         <svg viewBox="0 0 220 250" xmlns="http://www.w3.org/2000/svg">
             <defs>
                 <filter id="glow-filter" x="-50%" y="-50%" width="200%" height="200%">
@@ -303,17 +456,15 @@
         <div class="history-list">
             {% block sidebar_history %}{% endblock %}
         </div>
-        <div style="margin-top:auto; padding-top:16px; border-top:1px solid #333; display:flex; flex-direction:column; gap:8px;">
-            <a href="{% url 'criar_ideia' %}" class="btn-nova-ideia">💡 Nova Ideia</a>
+        <div class="sidebar-bottom">
+            <a href="{% url 'criar_ideia' %}" class="btn-nova-ideia" onclick="abrirModalIdeia(event)">💡 Nova Ideia</a>
+            <a href="{% url 'biblioteca' %}" class="btn-nova-ideia" onclick="abrirModalBiblioteca(event)">📚 Biblioteca</a>
             {% if user.is_superuser or user.is_staff %}
             <a href="/admin-panel/" class="btn-painel-admin" id="admin-panel-link">⚙️ Painel Admin</a>
             {% endif %}
-            <form action="{% url 'logout' %}" method="post" style="text-align:center;">
+            <form action="{% url 'logout' %}" method="post" class="logout-form">
                 {% csrf_token %}
-                <button type="submit" style="background:none; border:none; color:#555; font-size:0.82rem; cursor:pointer; transition:color 0.15s;"
-                        onmouseover="this.style.color='#888'" onmouseout="this.style.color='#555'">
-                    Sair da conta
-                </button>
+                <button type="submit" class="logout-btn">Sair da conta</button>
             </form>
         </div>
     </div>
@@ -323,7 +474,7 @@
 
         <div class="prompt-wrapper">
             <div class="prompt-container">
-                <input type="file" id="file-input" style="display:none;" multiple>
+                <input type="file" id="file-input" multiple>
                 <button class="icon-btn" id="attach-btn" title="Anexar arquivos" type="button">📎</button>
                 <textarea id="chat-input" class="prompt-input" rows="1"
                           placeholder="Pergunte qualquer coisa à Anagma IA…"
@@ -331,7 +482,69 @@
                 <button class="icon-btn" id="stop-btn" title="Interromper (Esc)" type="button">■</button>
                 <button class="icon-btn" id="send-btn" title="Enviar (Enter)" type="button">➔</button>
             </div>
-            <div id="file-preview" style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;"></div>
+            <div id="file-preview"></div>
+        </div>
+    </div>
+
+    <!-- Modal Biblioteca -->
+    <div id="modal-biblioteca" class="modal-overlay" role="dialog" aria-modal="true"
+         aria-labelledby="modal-bib-titulo-label" style="display:none;">
+        <div class="modal-box" style="max-width:850px;">
+            <div class="modal-header">
+                <h2 id="modal-bib-titulo-label" class="modal-title">📚 Biblioteca da Digiana</h2>
+                <button class="modal-close-btn" onclick="fecharModalBiblioteca()" aria-label="Fechar modal">✕</button>
+            </div>
+            <div style="padding:12px 20px 8px;">
+                <input id="modal-bib-search" type="text" class="modal-input"
+                       placeholder="Filtrar por nome do arquivo…" autocomplete="off">
+            </div>
+            <div id="modal-bib-loading" style="padding:32px 20px; text-align:center; color:#666; font-size:0.9rem;">
+                Carregando…
+            </div>
+            <div id="modal-bib-lista" style="display:none;"></div>
+            <div id="modal-bib-vazio" style="display:none; padding:32px 20px; text-align:center; color:#555; font-size:0.9rem;">
+                <div style="font-size:2rem; margin-bottom:8px;">📭</div>
+                Nenhum documento encontrado.
+            </div>
+            <div style="padding:10px 20px 16px; border-top:1px solid #2c2d30; display:flex; justify-content:space-between; align-items:center;">
+                <p id="modal-bib-count" style="margin:0; font-size:0.82rem; color:#666;"></p>
+                {% if user.is_superuser or user.is_staff %}
+                <a href="/admin-panel/biblioteca/"
+                   style="font-size:0.82rem; color:#a8c7fa; text-decoration:none;">⚙️ Administrar</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Nova Ideia -->
+    <div id="modal-ideia" class="modal-overlay" role="dialog" aria-modal="true"
+         aria-labelledby="modal-ideia-titulo-label" style="display:none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2 id="modal-ideia-titulo-label" class="modal-title">💡 Nova Ideia</h2>
+                <button class="modal-close-btn" onclick="fecharModalIdeia()" aria-label="Fechar modal">✕</button>
+            </div>
+            <form id="form-nova-ideia" action="{% url 'criar_ideia' %}" method="post">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="modal-field">
+                        <label for="modal-titulo-input" class="modal-label">Título</label>
+                        <input id="modal-titulo-input" name="titulo" type="text" class="modal-input"
+                               placeholder="Dê um nome à sua ideia…" maxlength="200" autocomplete="off">
+                    </div>
+                    <div class="modal-field">
+                        <label for="modal-conteudo-input" class="modal-label">Conteúdo</label>
+                        <textarea id="modal-conteudo-input" name="conteudo" class="modal-textarea"
+                                  rows="6" placeholder="Descreva sua ideia em detalhes…" maxlength="5000"></textarea>
+                    </div>
+                    <div id="modal-ideia-msg" class="modal-msg" style="display:none;"></div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn-cancel" onclick="fecharModalIdeia()">Cancelar</button>
+                    <button type="button" class="modal-btn-submit" id="modal-ideia-submit"
+                            onclick="enviarModalIdeia()">Enviar Ideia</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -344,6 +557,232 @@
                 this.style.height = Math.min(this.scrollHeight, 200) + 'px';
             });
         }
+
+        // Modal Nova Ideia
+        (function () {
+            const overlay = document.getElementById('modal-ideia');
+            if (!overlay) return;
+
+            function abrirModalIdeia(e) {
+                if (e) e.preventDefault();
+                document.getElementById('modal-titulo-input').value = '';
+                document.getElementById('modal-conteudo-input').value = '';
+                _msgModal('', '');
+                overlay.style.display = 'flex';
+                setTimeout(function () { document.getElementById('modal-titulo-input').focus(); }, 80);
+            }
+
+            function fecharModalIdeia() {
+                overlay.style.display = 'none';
+            }
+
+            async function enviarModalIdeia() {
+                const titulo   = document.getElementById('modal-titulo-input').value.trim();
+                const conteudo = document.getElementById('modal-conteudo-input').value.trim();
+                if (!titulo || !conteudo) {
+                    _msgModal('error', 'Preencha o título e o conteúdo da ideia.');
+                    return;
+                }
+                const btn  = document.getElementById('modal-ideia-submit');
+                btn.disabled    = true;
+                btn.textContent = 'Enviando…';
+                const form = document.getElementById('form-nova-ideia');
+                const csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
+                try {
+                    const res  = await fetch(form.action, {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: new URLSearchParams({ csrfmiddlewaretoken: csrf, titulo, conteudo })
+                    });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        _msgModal('success', data.message);
+                        setTimeout(fecharModalIdeia, 1800);
+                    } else {
+                        _msgModal('error', data.message || 'Erro ao enviar ideia.');
+                    }
+                } catch (_) {
+                    _msgModal('error', 'Erro de conexão. Tente novamente.');
+                } finally {
+                    btn.disabled    = false;
+                    btn.textContent = 'Enviar Ideia';
+                }
+            }
+
+            function _msgModal(tipo, texto) {
+                const el = document.getElementById('modal-ideia-msg');
+                if (!tipo || !texto) { el.style.display = 'none'; el.className = 'modal-msg'; return; }
+                el.className    = 'modal-msg ' + tipo;
+                el.textContent  = texto;
+                el.style.display = 'block';
+            }
+
+            overlay.addEventListener('click', function (e) { if (e.target === overlay) fecharModalIdeia(); });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && overlay.style.display !== 'none') fecharModalIdeia();
+            });
+
+            window.abrirModalIdeia  = abrirModalIdeia;
+            window.fecharModalIdeia = fecharModalIdeia;
+            window.enviarModalIdeia = enviarModalIdeia;
+        })();
+
+        // Modal Biblioteca (SPA — sem reload)
+        (function () {
+            const overlay = document.getElementById('modal-biblioteca');
+            if (!overlay) return;
+
+            let _carregado = false;
+
+            async function abrirModalBiblioteca(e) {
+                if (e) e.preventDefault();
+                overlay.style.display = 'flex';
+                if (!_carregado) await _carregar();
+                const srch = document.getElementById('modal-bib-search');
+                if (srch) { srch.value = ''; _filtrar(''); srch.focus(); }
+            }
+
+            function fecharModalBiblioteca() {
+                overlay.style.display = 'none';
+            }
+
+            async function _carregar() {
+                try {
+                    const res  = await fetch('{% url "biblioteca" %}', {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    const data = await res.json();
+                    _renderDocs(data.documentos || []);
+                    _carregado = true;
+                } catch (_) {
+                    document.getElementById('modal-bib-loading').textContent = 'Erro ao carregar. Tente novamente.';
+                }
+            }
+
+            function _icone(ext) {
+                if (ext === 'pdf') return '📄';
+                if (ext === 'xls' || ext === 'xlsx') return '📊';
+                if (['png','jpg','jpeg'].indexOf(ext) !== -1) return '🖼️';
+                if (ext === 'doc' || ext === 'docx') return '📝';
+                return '📁';
+            }
+
+            function _esc(s) {
+                return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            }
+
+            function _renderDocs(docs) {
+                const lista   = document.getElementById('modal-bib-lista');
+                const loading = document.getElementById('modal-bib-loading');
+                const vazio   = document.getElementById('modal-bib-vazio');
+                const count   = document.getElementById('modal-bib-count');
+
+                loading.style.display = 'none';
+                lista.innerHTML = '';
+
+                if (!docs.length) {
+                    vazio.style.display = 'block';
+                    lista.style.display = 'none';
+                    count.textContent = '0 documentos indexados';
+                    return;
+                }
+
+                lista.style.display = 'flex';
+                vazio.style.display = 'none';
+                count.textContent = docs.length + ' documento' + (docs.length !== 1 ? 's' : '') +
+                                    ' indexado' + (docs.length !== 1 ? 's' : '');
+
+                docs.forEach(function (doc) {
+                    const card = document.createElement('div');
+                    card.className = 'bib-card-modal';
+                    card.dataset.nome = doc.nome_arquivo.toLowerCase();
+
+                    const icon = document.createElement('span');
+                    icon.style.cssText = 'font-size:1.2rem;flex-shrink:0;';
+                    icon.textContent = _icone(doc.extensao);
+
+                    const info = document.createElement('div');
+                    info.style.cssText = 'flex:1;min-width:0;';
+
+                    const nomeEl = document.createElement('div');
+                    nomeEl.style.cssText = 'font-size:0.9rem;color:#e3e3e3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; display:flex; align-items:center; gap:6px;';
+                    nomeEl.textContent = doc.nome_arquivo;
+
+                    if (doc.precisa_revisao) {
+                        const alert = document.createElement('span');
+                        alert.style.cssText = 'color:#fbbf24; cursor:help; font-size:1rem;';
+                        alert.title = 'Atenção: Este documento possui uma estrutura complexa que pode impactar a precisão das respostas.';
+                        alert.textContent = '⚠️';
+                        nomeEl.appendChild(alert);
+                    }
+
+                    const meta = document.createElement('div');
+                    meta.style.cssText = 'font-size:0.75rem;color:#666;margin-top:2px;';
+                    meta.appendChild(document.createTextNode('Indexado em ' + doc.processado_em + ' · '));
+                    const extSpan = document.createElement('span');
+                    extSpan.style.cssText = 'text-transform:uppercase;font-size:0.68rem;background:#2a2b2e;border:1px solid #3c4043;padding:1px 5px;border-radius:3px;color:#888;';
+                    extSpan.textContent = doc.extensao;
+                    meta.appendChild(extSpan);
+
+                    info.appendChild(nomeEl);
+                    info.appendChild(meta);
+
+                    const btn = document.createElement('button');
+                    btn.className = 'modal-btn-cancel';
+                    btn.style.cssText = 'flex-shrink:0;font-size:0.8rem;padding:5px 12px;';
+                    btn.textContent = '💬 Perguntar';
+                    btn.addEventListener('click', function () { perguntarSobreModal(doc.nome_arquivo); });
+
+                    card.appendChild(icon);
+                    card.appendChild(info);
+                    card.appendChild(btn);
+                    lista.appendChild(card);
+                });
+            }
+
+            function _filtrar(q) {
+                const lista = document.getElementById('modal-bib-lista');
+                const vazio = document.getElementById('modal-bib-vazio');
+                const count = document.getElementById('modal-bib-count');
+                let vis = 0;
+                lista.querySelectorAll('.bib-card-modal').forEach(function (card) {
+                    const match = !q || card.dataset.nome.includes(q);
+                    card.style.display = match ? 'flex' : 'none';
+                    if (match) vis++;
+                });
+                count.textContent = vis + ' documento' + (vis !== 1 ? 's' : '') + ' indexado' + (vis !== 1 ? 's' : '');
+                vazio.style.display = (q && vis === 0) ? 'block' : 'none';
+            }
+
+            function perguntarSobreModal(nome) {
+                const input = document.getElementById('chat-input');
+                if (input) {
+                    input.value = nome;
+                    input.style.height = 'auto';
+                    input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+                    input.focus();
+                    fecharModalBiblioteca();
+                } else {
+                    localStorage.setItem('digiana_prefill_query', nome);
+                    window.location.href = '/chat/';
+                }
+            }
+
+            const srch = document.getElementById('modal-bib-search');
+            if (srch) srch.addEventListener('input', function () { _filtrar(this.value.toLowerCase().trim()); });
+
+            overlay.addEventListener('click', function (e) { if (e.target === overlay) fecharModalBiblioteca(); });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && overlay.style.display !== 'none') fecharModalBiblioteca();
+            });
+
+            window.abrirModalBiblioteca  = abrirModalBiblioteca;
+            window.fecharModalBiblioteca = fecharModalBiblioteca;
+            window.perguntarSobreModal   = perguntarSobreModal;
+        })();
     </script>
     {% block extra_js %}{% endblock %}
 </body>

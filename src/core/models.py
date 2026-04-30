@@ -89,6 +89,7 @@ class DocumentoBiblioteca(models.Model):
     resumo_ia = models.TextField(blank=True, help_text="Resumo inicial gerado pela IA para triagem")
     
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    precisa_revisao = models.BooleanField(default=False, help_text="Sinaliza se a extração de texto teve problemas ou foi feita via motor de reserva.")
     
     criado_em = models.DateTimeField(auto_now_add=True)
     processado_em = models.DateTimeField(null=True, blank=True)

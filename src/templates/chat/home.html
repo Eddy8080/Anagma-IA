@@ -29,20 +29,110 @@
     max-width: 82%;
     font-size: 1.02rem;
     line-height: 1.65;
-    white-space: pre-wrap;
     word-break: break-word;
-    text-align: justify;
 }
 .user-bubble {
     background: #2a2b2e;
     color: #fff;
     border-bottom-right-radius: 4px;
+    white-space: pre-wrap;
+    text-align: justify;
 }
 .ai-bubble {
     background: transparent;
     color: #e3e3e3;
     padding-left: 0;
-    max-width: 92%;
+    max-width: 95%; /* Aumentado para acomodar tabelas */
+}
+
+/* ── Estilo de Tabela Markdown (Excel Style) ── */
+.message-text table {
+    display: block;
+    width: 100%;
+    overflow-x: auto !important; /* Barra de rolagem horizontal ativa */
+    overflow-y: hidden;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 0.92rem;
+    background: #1e1f20;
+    border: 1px solid #3c4043;
+    border-radius: 8px;
+    max-width: 100%;
+}
+/* Força as colunas a manterem seu tamanho original, gerando o scroll horizontal */
+.message-text table thead, .message-text table tbody {
+    min-width: max-content;
+    display: block;
+}
+.message-text th {
+    background: #2a2b2e;
+    color: var(--accent-color);
+    font-weight: 600;
+    text-align: left;
+    padding: 10px 14px;
+    border: 1px solid #3c4043;
+    white-space: nowrap;
+}
+.message-text td {
+    padding: 8px 14px;
+    border: 1px solid #3c4043;
+    color: #d1d1d1;
+    white-space: nowrap;
+}
+
+/* Customização da Barra de Rolagem (Estilo Anagma) */
+.message-text table::-webkit-scrollbar, 
+#table-modal-content::-webkit-scrollbar {
+    height: 10px; /* Largura da barra horizontal */
+    width: 10px;  /* Largura da barra vertical */
+}
+.message-text table::-webkit-scrollbar-track,
+#table-modal-content::-webkit-scrollbar-track {
+    background: #131314;
+    border-radius: 10px;
+}
+.message-text table::-webkit-scrollbar-thumb,
+#table-modal-content::-webkit-scrollbar-thumb {
+    background: #3c4043;
+    border-radius: 10px;
+    border: 2px solid #131314;
+}
+.message-text table::-webkit-scrollbar-thumb:hover,
+#table-modal-content::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-color);
+}
+
+/* Modal de Tabela - Ajuste de Rolagem Full */
+#table-modal-content {
+    flex: 1;
+    overflow: auto !important; 
+    padding: 20px;
+    background: #131314;
+    display: block;
+}
+#table-modal-content table {
+    display: table !important; 
+    width: auto;
+    min-width: 100%; /* Ocupa tudo, mas expande se as colunas forem maiores */
+    border-collapse: collapse;
+}
+.message-text tr:nth-child(even) {
+    background: #191a1c;
+}
+.message-text tr:hover {
+    background: #252628;
+}
+
+/* Ajustes gerais de Markdown */
+.message-text p { margin-bottom: 12px; }
+.message-text p:last-child { margin-bottom: 0; }
+.message-text strong { color: var(--accent-color); font-weight: 600; }
+.message-text code {
+    background: #2a2b2e;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.9em;
 }
 .ai-label {
     color: var(--accent-color);
@@ -327,6 +417,24 @@
         </div>
     </div>
     <div id="messages-container" style="display:none; flex-direction:column; gap:20px; width:100%;"></div>
+
+    {# ── Modal de Visualização de Tabela (Full Screen) ── #}
+    <div id="table-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
+                                   background:rgba(0,0,0,0.85); z-index:11000; align-items:center; justify-content:center; backdrop-filter:blur(8px);">
+        <div class="card" style="width:95%; max-width:1200px; max-height:90vh; display:flex; flex-direction:column; padding:24px; border:1px solid #3c4043; box-shadow: 0 20px 60px rgba(0,0,0,0.7);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid #333; padding-bottom:12px;">
+                <h3 style="margin:0; color:#a8c7fa; display:flex; align-items:center; gap:10px;">📊 Visualização da Tabela (Modo Excel)</h3>
+                <button id="close-table-modal" style="background:none; border:none; color:#888; font-size:1.8rem; cursor:pointer; line-height:1;">&times;</button>
+            </div>
+            <div id="table-modal-content" class="message-text" style="flex:1; overflow:auto; padding:10px;">
+                <!-- Tabela renderizada entra aqui -->
+            </div>
+            <div style="margin-top:20px; text-align:right;">
+                <button id="close-table-modal-btn" class="btn-toggle active" style="padding:8px 24px;">Fechar Visualização</button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <div id="copy-toast">Copiado!</div>
@@ -395,43 +503,43 @@
           <p style="text-align:left; margin-bottom:10px;">Faça perguntas contábeis diretamente. Exemplos:</p>
           <div class="tour-example">"Qual a alíquota do DAS para MEI em 2024?"</div>
           <div class="tour-example">"Quais obrigações acessórias do Simples Nacional?"</div>
-          <div class="tour-example">"Como funciona o PGDAS-D?"</div>
-          <div class="tour-tip">💡 Seja específico — quanto mais detalhada a pergunta, mais precisa a resposta.</div>
+          <div class="tour-example">"Qual o prazo de entrega da ECD para 2024?"</div>
+          <div class="tour-tip">💡 Seja específico — inclua ano, regime tributário ou número do artigo quando souber. Quanto mais detalhada a pergunta, mais precisa a resposta.</div>
         </div>
       </div>
 
-      {# Slide 3 — Documentos e feedback #}
-      <div class="tour-slide">
-        <div class="tour-slide-icon">📎</div>
-        <div class="tour-slide-title">Enriqueça o conhecimento</div>
-        <div class="tour-slide-body">
-          <div class="tour-item"><span class="tour-item-ic">📎</span><span>Envie PDFs, planilhas ou documentos pelo ícone de anexo — eles entram na fila de curadoria.</span></div>
-          <div class="tour-item"><span class="tour-item-ic">💡</span><span>Registre ideias e orientações internas pelo menu <strong>Nova Ideia</strong>.</span></div>
-          <div class="tour-item"><span class="tour-item-ic">👍</span><span>Curta respostas corretas para reforçar o padrão.</span></div>
-          <div class="tour-item"><span class="tour-item-ic">👎</span><span>Não curta respostas incorretas — o time técnico analisa e registra a correção permanente.</span></div>
-        </div>
-      </div>
-
-      {# Slide 4 — Boas práticas ao enviar documentos #}
-      <div class="tour-slide">
-        <div class="tour-slide-icon">📋</div>
-        <div class="tour-slide-title">Como enviar documentos com qualidade</div>
-        <div class="tour-slide-body">
-          <div class="tour-item"><span class="tour-item-ic">👁️</span><span><strong>Leia antes de subir</strong> — se o arquivo tem muito texto narrativo e poucos dados estruturados, extraia só a parte relevante num <code>.txt</code> antes de enviar.</span></div>
-          <div class="tour-item"><span class="tour-item-ic">🗂️</span><span><strong>Um assunto por arquivo</strong> — documentos que misturam vários temas aumentam o ruído na busca e reduzem a precisão das respostas.</span></div>
-          <div class="tour-item"><span class="tour-item-ic">✅</span><span><strong>Valide após o upload</strong> — faça uma pergunta no chat que aquele documento deveria responder e verifique se a <strong>Verificação</strong> transcreve o trecho correto.</span></div>
-          <div class="tour-item"><span class="tour-item-ic">👎</span><span><strong>Se ainda alucinar</strong> — use o 👎 na resposta incorreta. O time registra a correção e ela vira aprendizado permanente.</span></div>
-        </div>
-      </div>
-
-      {# Slide 5 — Formato das respostas #}
+      {# Slide 3 — Formato das respostas #}
       <div class="tour-slide">
         <div class="tour-slide-icon">🔍</div>
         <div class="tour-slide-title">Entenda as respostas</div>
         <div class="tour-slide-body">
-          <p style="text-align:left; margin-bottom:12px;">Toda resposta segue dois blocos fixos:</p>
-          <div class="tour-verif"><strong>Verificação:</strong> transcrição literal do trecho do documento que responde à pergunta — ou aviso explícito de que o dado não está na biblioteca.</div>
-          <div class="tour-verif" style="border-color:#4285f4; background:rgba(66,133,244,0.06); color:#9ac0f5;"><strong>Resposta:</strong> baseada exclusivamente na Verificação acima. Se a biblioteca não tiver o dado, a Digiana indica a fonte oficial — sem inventar valores.</div>
+          <p style="text-align:left; margin-bottom:12px;">Toda resposta segue <strong>dois blocos fixos</strong>:</p>
+          <div class="tour-verif"><strong>Verificação:</strong> trecho copiado literalmente do documento da biblioteca que responde à sua pergunta — ou aviso explícito de que o dado não está disponível.</div>
+          <div class="tour-verif" style="border-color:#4285f4; background:rgba(66,133,244,0.06); color:#9ac0f5; margin-top:8px;"><strong>Resposta:</strong> baseada <em>exclusivamente</em> na Verificação acima. Se a biblioteca não tiver o dado, a Digiana indica a fonte oficial — <strong>nunca inventa valores ou alíquotas</strong>.</div>
+          <div class="tour-tip" style="margin-top:10px;">📋 Use <code>/lista</code> no chat para ver todos os seus documentos e ideias enviados com o status de cada um.</div>
+        </div>
+      </div>
+
+      {# Slide 4 — Biblioteca e Nova Ideia #}
+      <div class="tour-slide">
+        <div class="tour-slide-icon">📚</div>
+        <div class="tour-slide-title">Biblioteca e Nova Ideia</div>
+        <div class="tour-slide-body">
+          <div class="tour-item"><span class="tour-item-ic">📚</span><span><strong>Biblioteca</strong> — clique na barra lateral para abrir o catálogo sem recarregar a página. Pesquise por nome e clique em <strong>💬 Perguntar</strong> para pré-preencher o chat com o documento escolhido.</span></div>
+          <div class="tour-item"><span class="tour-item-ic">💡</span><span><strong>Nova Ideia</strong> — abre um formulário inline (sem sair do chat) para registrar orientações, procedimentos internos ou correções de processo. Sua ideia passa por aprovação antes de influenciar as respostas.</span></div>
+          <div class="tour-tip">🔧 Use <code>/manual</code> a qualquer momento para abrir este guia novamente no chat.</div>
+        </div>
+      </div>
+
+      {# Slide 5 — Documentos e feedback #}
+      <div class="tour-slide">
+        <div class="tour-slide-icon">📎</div>
+        <div class="tour-slide-title">Documentos e Integridade</div>
+        <div class="tour-slide-body">
+          <div class="tour-item"><span class="tour-item-ic">⚠️</span><span><strong>Pontos de Atenção</strong> — O ícone ⚠️ na biblioteca indica arquivos com extração complexa. Eles podem gerar respostas imprecisas enquanto não forem revisados.</span></div>
+          <div class="tour-item"><span class="tour-item-ic">📝</span><span><strong>Configuração Ideal</strong> — Evite tabelas aninhadas em DOCX. Prefira <strong>PDFs de texto (não imagem)</strong> ou arquivos <strong>.txt</strong> para dados críticos.</span></div>
+          <div class="tour-item"><span class="tour-item-ic">🗂️</span><span><strong>Um assunto por arquivo</strong> — Documentos que misturam temas aumentam o ruído. Mantenha os arquivos focados em um único tópico contábil.</span></div>
+          <div class="tour-item"><span class="tour-item-ic">👎</span><span><strong>Feedback</strong> — Se a resposta estiver errada, use o 👎. O time técnico analisa e grava a correção como aprendizado permanente.</span></div>
         </div>
       </div>
 
@@ -598,6 +706,80 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // ── Configuração de Markdown (marked.js) ────────────────
+    if (window.marked) {
+        marked.setOptions({
+            breaks: true,
+            gfm: true,
+            headerIds: false,
+            mangle: false
+        });
+    }
+
+    // Remove cercas de código que o LLM usa incorretamente ao transcrever Excel
+    function stripCodeFences(text) {
+        return text
+            .replace(/^```(?:markdown|md|plaintext|text)?\s*\n([\s\S]*?)\n?```\s*$/gm, '$1')
+            .replace(/^```\s*\n([\s\S]*?)\n?```\s*$/gm, '$1')
+            .trim();
+    }
+
+    // Normaliza separadores inválidos gerados pelo LLM ou por tabulate/Docling.
+    // GFM exige pelo menos um '-' em cada célula do separador.
+    // Ex inválido: |:|:----| → corrige para | :-- | :---- |
+    function normalizeSeparators(text) {
+        const lines = text.split('\n');
+        return lines.map(line => {
+            const t = line.trim();
+            // Linha de separador: apenas |, -, :, espaço
+            if (!/^\|[\s\-:|]+\|$/.test(t)) return line;
+            // Divide nas células internas (sem os pipes externos)
+            const cells = t.slice(1, -1).split('|');
+            const normalized = cells.map(cell => {
+                const c = cell.trim();
+                // Já válido: contém pelo menos um traço (---, :---, ---:, :---:)
+                if (/^:?-+:?$/.test(c)) return ` ${c} `;
+                // Inválido (vazio, só ':' ou espaços) → gera separador padrão preservando alinhamento
+                return c.startsWith(':') ? ' :-- ' : ' --- ';
+            });
+            return '|' + normalized.join('|') + '|';
+        }).join('\n');
+    }
+
+    // Injeta separador APENAS após a primeira linha de um novo bloco de tabela,
+    // nunca após linhas de dados nem após separadores existentes.
+    function repairMarkdownTables(text) {
+        if (!text.includes('|')) return text;
+
+        const isTableRow  = s => { const t = s.trim(); return t.startsWith('|') && t.endsWith('|'); };
+        const isSeparator = s => /^\|[\s\-:]+(\|[\s\-:]+)*\|$/.test(s.trim());
+
+        const lines = text.split('\n');
+        const out   = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            out.push(lines[i]);
+            const cur = lines[i].trim();
+
+            // Só age em linhas de tabela que não sejam separadores
+            if (!isTableRow(cur) || isSeparator(cur)) continue;
+
+            // Só injeta se esta é a PRIMEIRA linha do bloco (anterior não é tabela)
+            const prev = i > 0 ? lines[i - 1].trim() : '';
+            if (isTableRow(prev)) continue;
+
+            // Não injeta se a próxima linha já é separador
+            const next = i < lines.length - 1 ? lines[i + 1].trim() : '';
+            if (isSeparator(next)) continue;
+
+            // Injeta separador proporcional ao número de colunas
+            const cols = (cur.match(/\|/g) || []).length - 1;
+            if (cols > 0) out.push('|' + ' --- |'.repeat(cols));
+        }
+
+        return out.join('\n');
+    }
+
     // ── Construção de mensagem ───────────────────────────────
     function buildMessage(role, content, time, scroll, msgId = null, initialFeedback = null, statusAnexo = null) {
         if (greeting.style.display !== 'none') {
@@ -631,7 +813,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const txt = document.createElement('div');
         txt.className = 'message-text';
-        txt.textContent = content;
+        
+        // Renderiza Markdown para IA, texto puro para Usuário
+        if (role === 'assistant' && window.marked) {
+            const cleaned = repairMarkdownTables(normalizeSeparators(stripCodeFences(content)));
+            txt.innerHTML = marked.parse(cleaned);
+        } else {
+            txt.textContent = content;
+        }
+        
         bubble.appendChild(txt);
 
         // Se houver status de anexo, renderiza a badge
@@ -681,23 +871,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             toolbar.appendChild(btn);
 
-            // Botões de feedback (somente se tiver ID da mensagem)
+            // Botões de feedback e tabela (somente se tiver ID da mensagem - fim do streaming ou histórico)
             if (msgId) {
-                const likeBtn = document.createElement('button');
-                likeBtn.className = 'feedback-btn' + (initialFeedback === 'like' ? ' active-like' : '');
-                likeBtn.title = 'Curtir resposta';
-                likeBtn.innerHTML = '👍';
-
-                const dislikeBtn = document.createElement('button');
-                dislikeBtn.className = 'feedback-btn' + (initialFeedback === 'dislike' ? ' active-dislike' : '');
-                dislikeBtn.title = 'Não curtir resposta';
-                dislikeBtn.innerHTML = '👎';
-
-                likeBtn.addEventListener('click',    () => doFeedback(msgId, 'like',    likeBtn, dislikeBtn));
-                dislikeBtn.addEventListener('click', () => doFeedback(msgId, 'dislike', likeBtn, dislikeBtn));
-
-                toolbar.appendChild(likeBtn);
-                toolbar.appendChild(dislikeBtn);
+                addFeedbackButtons(row, msgId);
             }
 
             row.appendChild(toolbar);
@@ -893,9 +1069,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await res.json();
                 loader.remove();
                 if (data.status === 'success') {
-                    if (!currentSessionId) { currentSessionId = data.session_id; }
-                    buildMessage('assistant', data.response, data.time, true);
-                    setTimeout(() => window.location.reload(), 800);
+                    if (!currentSessionId) {
+                        currentSessionId = data.session_id;
+                        window.history.replaceState(null, '', `/chat/s/${data.session_id}/`);
+                        addToSidebar(data.session_id, data.session_title || selectedFile.name.substring(0, 50));
+                        if (pendingItem) { pendingItem.remove(); pendingItem = null; }
+                    }
+                    buildMessage('assistant', data.response, data.time, true, data.message_id || null);
                 }
             } catch (err) { console.error(err); loader.remove(); }
             setLoading(false);
@@ -922,19 +1102,38 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        activeEventSource.addEventListener('message_id', (e) => {
+            const msgId = parseInt(e.data, 10);
+            if (aiMsgObj && msgId) {
+                // Renderização final: remove cercas, normaliza separadores e repara tabelas
+                if (window.marked) {
+                    const cleaned = repairMarkdownTables(normalizeSeparators(stripCodeFences(fullResponse)));
+                    aiMsgObj.textElement.innerHTML = marked.parse(cleaned);
+                }
+                addFeedbackButtons(aiMsgObj.row, msgId);
+            }
+        });
+
         activeEventSource.onmessage = (e) => {
             if (loader) { loader.remove(); }
-            
+
             // Cria a bolha da IA na primeira recepção de token
             if (!aiMsgObj) {
                 aiMsgObj = buildMessage('assistant', "", now, true);
             }
-            
-            // Adiciona o token (espaços e quebras de linha são preservados pelo EventSource)
+
+            // Acumula token e renderiza markdown parcial sem repair
+            // (repair só é aplicado na renderização final, evento message_id)
             const token = e.data;
             fullResponse += token;
-            aiMsgObj.textElement.textContent = fullResponse;
-            scrollToBottom(true); // Scroll instantâneo durante streaming
+
+            if (window.marked) {
+                aiMsgObj.textElement.innerHTML = marked.parse(fullResponse);
+            } else {
+                aiMsgObj.textElement.textContent = fullResponse;
+            }
+
+            scrollToBottom(true);
         };
 
         activeEventSource.onerror = (e) => {
@@ -1053,6 +1252,52 @@ document.addEventListener('DOMContentLoaded', () => {
         input.addEventListener('blur', save);
     }
 
+    function addFeedbackButtons(row, msgId) {
+        const toolbar = row.querySelector('.message-toolbar');
+        const txt = row.querySelector('.message-text');
+        if (!toolbar) return;
+
+        // 1. Adiciona Botão Ver Tabela (se houver tabela e o botão ainda não existir)
+        if (txt.querySelector('table') && !toolbar.querySelector('.btn-table-view')) {
+            const tableBtn = document.createElement('button');
+            tableBtn.className = 'copy-btn btn-table-view';
+            tableBtn.style.color = '#a8c7fa';
+            tableBtn.innerHTML = '📊 Ver Tabela';
+            tableBtn.addEventListener('click', () => {
+                const tableModal = document.getElementById('table-modal');
+                const modalContent = document.getElementById('table-modal-content');
+                modalContent.innerHTML = '';
+                // Clona as tabelas e remove o limite de altura para visualização completa
+                txt.querySelectorAll('table').forEach(tbl => {
+                    const clone = tbl.cloneNode(true);
+                    clone.style.display = 'table'; // Força comportamento de tabela real
+                    modalContent.appendChild(clone);
+                });
+                tableModal.style.display = 'flex';
+            });
+            toolbar.appendChild(tableBtn);
+        }
+
+        // 2. Adiciona Botões de Like/Dislike (se ainda não existirem)
+        if (!toolbar.querySelector('.feedback-btn')) {
+            const likeBtn = document.createElement('button');
+            likeBtn.className = 'feedback-btn';
+            likeBtn.title = 'Curtir resposta';
+            likeBtn.innerHTML = '👍';
+
+            const dislikeBtn = document.createElement('button');
+            dislikeBtn.className = 'feedback-btn';
+            dislikeBtn.title = 'Não curtir resposta';
+            dislikeBtn.innerHTML = '👎';
+
+            likeBtn.addEventListener('click',    () => doFeedback(msgId, 'like',    likeBtn, dislikeBtn));
+            dislikeBtn.addEventListener('click', () => doFeedback(msgId, 'dislike', likeBtn, dislikeBtn));
+
+            toolbar.appendChild(likeBtn);
+            toolbar.appendChild(dislikeBtn);
+        }
+    }
+
     async function doFeedback(msgId, type, likeBtn, dislikeBtn) {
         try {
             const r = await fetch(`/chat/msg/${msgId}/feedback/`, {
@@ -1095,15 +1340,27 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const d = await r.json();
             if (d.status !== 'success') return;
-            // Reload para reorganizar grupos corretamente
-            window.location.reload();
+            
+            // Em vez de reload, marcamos que precisa de reload para a próxima vez 
+            // ou apenas mudamos o ícone e movemos o item se quiser ser 100% SPA.
+            // Para garantir consistência total com a lógica de grupos do Django,
+            // vamos apenas avisar que a mudança foi feita ou recarregar apenas se for crítico.
+            // Por enquanto, apenas mudamos o ícone para evitar o reload que incomoda o usuário.
+            btn.innerHTML = d.pinned ? '📍' : '📌';
+            btn.title = d.pinned ? 'Desafixar' : 'Fixar';
+            
+            // Opcional: mover para o grupo "Fixadas" (lógica complexa de DOM, simplificada aqui)
+            if (d.pinned) {
+                 item.classList.add('pinned');
+            } else {
+                 item.classList.remove('pinned');
+            }
         } catch (err) {
             console.error('Erro ao fixar sessão:', err);
         }
     }
 
     async function doDelete(sessionId, item) {
-        // Define o que fazer se o usuário confirmar
         deleteCallback = async () => {
             try {
                 const r = await fetch(`/chat/s/${sessionId}/delete/`, {
@@ -1114,29 +1371,65 @@ document.addEventListener('DOMContentLoaded', () => {
                 const d = await r.json();
                 if (d.status !== 'success') return;
 
-                if (String(currentSessionId) === String(sessionId)) {
-                    window.location.href = '/chat/';
-                    return;
-                }
-
                 const grupo = item.closest('.history-group');
                 item.remove();
 
-                if (grupo && !grupo.querySelector('.history-item')) {
+                if (grupo && !grupo.querySelectorAll('.history-item').length) {
                     grupo.remove();
-                    if (!historyList.querySelector('.history-group')) {
-                        historyList.innerHTML =
-                            '<p id="empty-history" style="font-size:0.8rem;color:#555;text-align:center;margin-top:24px;">Nenhum histórico ainda.</p>';
-                    }
+                }
+
+                if (String(currentSessionId) === String(sessionId)) {
+                    // Simula clique em "Nova Conversa" para resetar sem reload
+                    document.querySelector('.new-chat-btn').click();
                 }
             } catch (err) {
                 console.error('Erro ao excluir sessão:', err);
             }
         };
-        
-        // Abre o modal em vez do confirm nativo
         confirmModal.style.display = 'flex';
     }
+
+    // ── Navegação SPA (Troca de chat sem reload) ───────────
+    historyList.addEventListener('click', async (e) => {
+        const link = e.target.closest('.session-link');
+        if (!link) return;
+        
+        e.preventDefault();
+        const url = link.getAttribute('href');
+        const sessionId = url.split('/s/')[1].split('/')[0];
+        
+        if (String(currentSessionId) === String(sessionId)) return;
+
+        try {
+            const r = await fetch(`/chat/s/${sessionId}/messages/`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const data = await r.json();
+
+            // Limpa janela
+            msgContainer.innerHTML = '';
+            greeting.style.display = 'none';
+            msgContainer.style.display = 'flex';
+            currentSessionId = sessionId;
+
+            // Atualiza URL e active na sidebar
+            window.history.pushState({ sessionId }, '', url);
+            historyList.querySelectorAll('.history-item.active').forEach(el => el.classList.remove('active'));
+            link.closest('.history-item').classList.add('active');
+
+            // Renderiza mensagens
+            data.messages.forEach(m => {
+                buildMessage(m.role, m.content, m.time, false, m.id, m.feedback, m.status_anexo);
+            });
+            scrollToBottom();
+            chatInput.focus();
+
+        } catch (err) {
+            console.error('Erro ao carregar sessão:', err);
+            window.location.href = url; // Fallback para reload se falhar
+        }
+    });
 
     // ── Nova Conversa sem reload ─────────────────────────────
     const newChatBtn = document.querySelector('.new-chat-btn');
@@ -1226,6 +1519,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     chatInput?.focus();
+
+    // ── Fechar Modal de Tabela ───────────────────────────────
+    const tableModal = document.getElementById('table-modal');
+    const closeX = document.getElementById('close-table-modal');
+    const closeBtn = document.getElementById('close-table-modal-btn');
+
+    const hideTableModal = () => { if (tableModal) tableModal.style.display = 'none'; };
+    if (closeX) closeX.addEventListener('click', hideTableModal);
+    if (closeBtn) closeBtn.addEventListener('click', hideTableModal);
+    window.addEventListener('click', (e) => { if (e.target === tableModal) hideTableModal(); });
 });
 </script>
 
@@ -1261,20 +1564,46 @@ document.addEventListener('DOMContentLoaded', () => {
         nextBtn.textContent = current === slides.length - 1 ? 'Começar ✓' : 'Próximo →';
     }
 
+    // Função para fechar o tour e salvar no localStorage
     function fechar() {
-        if (checkbox.checked) localStorage.setItem(TOUR_KEY, '1');
+        if (checkbox && checkbox.checked) {
+            localStorage.setItem(TOUR_KEY, '1');
+        }
         overlay.style.animation = 'tour-fade-out 0.3s ease forwards';
-        setTimeout(function() { overlay.classList.add('tour-hidden'); }, 300);
+        setTimeout(function() { 
+            overlay.classList.add('tour-hidden'); 
+        }, 300);
     }
 
-    prevBtn.addEventListener('click', function() { if (current > 0) goTo(current - 1); });
-    nextBtn.addEventListener('click', function() {
+    // Eventos dos botões
+    if (prevBtn) prevBtn.addEventListener('click', function() { if (current > 0) goTo(current - 1); });
+    if (nextBtn) nextBtn.addEventListener('click', function() {
         if (current < slides.length - 1) goTo(current + 1);
         else fechar();
     });
 
-    // Exibe o tour
-    overlay.classList.remove('tour-hidden');
+    // Inicialização da visibilidade
+    if (localStorage.getItem(TOUR_KEY) === '1') {
+        overlay.classList.add('tour-hidden');
+    } else {
+        overlay.classList.remove('tour-hidden');
+        goTo(0); // Garante que comece no primeiro slide
+    }
+})();
+
+// Prefill vindo da Biblioteca (botão "💬 Perguntar")
+(function() {
+    const prefill = localStorage.getItem('digiana_prefill_query');
+    if (prefill) {
+        localStorage.removeItem('digiana_prefill_query');
+        const input = document.getElementById('chat-input');
+        if (input) {
+            input.value = prefill;
+            input.style.height = 'auto';
+            input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+            input.focus();
+        }
+    }
 })();
 </script>
 {% endblock %}

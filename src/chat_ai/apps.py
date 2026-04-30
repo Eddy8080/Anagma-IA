@@ -13,7 +13,7 @@ class ChatAiConfig(AppConfig):
         comandos_sem_modelo = {
             'migrate', 'makemigrations', 'collectstatic',
             'shell', 'createsuperuser', 'check', 'test', 'dbshell',
-            'revectorizar_biblioteca',
+            'revectorizar_biblioteca', 'reextrair_biblioteca',
         }
         if len(sys.argv) > 1 and sys.argv[1] in comandos_sem_modelo:
             return

@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Biblioteca — Anagma IA{% endblock %}
+
+{% block extra_css %}
+<style>
+.biblioteca-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 24px 24px;
+    display: flex;
+    flex-direction: column;
+}
+.bib-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    background: #1e1f20;
+    border: 1px solid #2c2d30;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    transition: border-color 0.15s;
+}
+.bib-card:hover { border-color: #4285f4; }
+.bib-nome {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.95rem;
+    color: #e3e3e3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.bib-meta {
+    font-size: 0.78rem;
+    color: #666;
+    margin-top: 3px;
+}
+.bib-ext {
+    display: inline-block;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    background: #2a2b2e;
+    border: 1px solid #3c4043;
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: #888;
+    letter-spacing: 0.05em;
+}
+.bib-btn {
+    flex-shrink: 0;
+    background: none;
+    border: 1px solid #3c4043;
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: #a8c7fa;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+    font-family: inherit;
+}
+.bib-btn:hover { background: rgba(168,199,250,0.08); border-color: #a8c7fa; }
+.bib-search {
+    width: 100%;
+    background: #1e1f20;
+    border: 1px solid #3c4043;
+    border-radius: 12px;
+    padding: 10px 16px;
+    color: #e3e3e3;
+    font-size: 0.95rem;
+    outline: none;
+    box-sizing: border-box;
+    font-family: inherit;
+    transition: border-color 0.15s;
+}
+.bib-search:focus { border-color: #4285f4; }
+.bib-search::placeholder { color: #555; }
+/* Oculta a barra de prompt, pois esta não é uma tela de chat */
+.prompt-wrapper { display: none !important; }
+.main-content { overflow-y: hidden; }
+</style>
+{% endblock %}
+
+{% block sidebar_history %}
+<div style="padding:10px 10px 4px;font-size:0.71rem;color:#555;text-transform:uppercase;letter-spacing:0.07em;">
+    Documentos da Biblioteca
+</div>
+<div style="padding:0 4px;font-size:0.82rem;color:#666;">
+    Documentos aprovados e indexados na Digiana. Use o botão 💬 para perguntar diretamente sobre um arquivo.
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="biblioteca-wrapper" style="max-width:860px;margin:0 auto;width:100%;">
+
+    <!-- Cabeçalho -->
+    <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:28px;">
+        <span style="font-size:2rem;line-height:1;">📚</span>
+        <div style="flex:1;">
+            <h1 style="margin:0 0 4px;font-size:1.45rem;font-weight:600;color:#e3e3e3;">Biblioteca da Digiana</h1>
+            <p style="margin:0;font-size:0.88rem;color:#888;">
+                Documentos aprovados e indexados. Clique em <strong style="color:#a8c7fa;">💬 Perguntar</strong> para ir direto ao chat com o documento referenciado.
+            </p>
+        </div>
+        {% if is_superuser %}
+        <a href="/admin-panel/biblioteca/"
+           style="flex-shrink:0;font-size:0.83rem;color:#a8c7fa;text-decoration:none;
+                  background:#1e1f20;border:1px solid #3c4043;border-radius:8px;
+                  padding:7px 14px;transition:border-color 0.15s;"
+           onmouseover="this.style.borderColor='#a8c7fa'" onmouseout="this.style.borderColor='#3c4043'">
+            ⚙️ Administrar
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Busca -->
+    <div style="margin-bottom:14px;">
+        <input id="bib-search" type="text" class="bib-search" placeholder="Filtrar por nome do arquivo…" autocomplete="off">
+    </div>
+
+    <!-- Contador -->
+    <p id="bib-count" style="font-size:0.82rem;color:#666;margin:0 0 14px;">
+        {% with total=documentos|length %}
+            {{ total }} documento{% if total != 1 %}s{% endif %} indexado{% if total != 1 %}s{% endif %}
+        {% endwith %}
+    </p>
+
+    <!-- Lista -->
+    <div id="bib-lista">
+        {% if documentos %}
+            {% for doc in documentos %}
+            <div class="bib-card" data-nome="{{ doc.nome_arquivo|lower }}">
+                <span style="font-size:1.35rem;flex-shrink:0;">
+                    {% if doc.extensao == 'pdf' %}📄
+                    {% elif doc.extensao == 'xls' or doc.extensao == 'xlsx' %}📊
+                    {% elif doc.extensao == 'png' or doc.extensao == 'jpg' or doc.extensao == 'jpeg' %}🖼️
+                    {% elif doc.extensao == 'doc' or doc.extensao == 'docx' %}📝
+                    {% else %}📁{% endif %}
+                </span>
+                <div style="flex:1;min-width:0;">
+                    <div class="bib-nome">
+                        {{ doc.nome_arquivo }}
+                        {% if doc.precisa_revisao %}
+                            <span style="color:#fbbf24; cursor:help; margin-left:6px; font-size:1.1rem;" 
+                                  title="Atenção: Este documento possui uma estrutura complexa que pode impactar a precisão das respostas. A curadoria já foi notificada.">⚠️</span>
+                        {% endif %}
+                    </div>
+                    <div class="bib-meta">
+                        Indexado em {{ doc.processado_em|date:"d/m/Y" }}
+                        &nbsp;·&nbsp;
+                        <span class="bib-ext">{{ doc.extensao }}</span>
+                    </div>
+                </div>
+                <button class="bib-btn"
+                        onclick="perguntarSobre('{{ doc.nome_arquivo|escapejs }}')"
+                        title="Abrir chat com este documento referenciado">
+                    💬 Perguntar
+                </button>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div style="text-align:center;padding:72px 0;color:#555;">
+                <div style="font-size:2.5rem;margin-bottom:12px;">📭</div>
+                <p style="margin:0;font-size:1rem;">Nenhum documento aprovado na biblioteca ainda.</p>
+                {% if is_superuser %}
+                <a href="/admin-panel/biblioteca/" style="display:inline-block;margin-top:16px;color:#a8c7fa;font-size:0.88rem;">
+                    Ir para o Painel Admin para adicionar documentos →
+                </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+    <div id="bib-vazio" style="display:none;text-align:center;padding:40px 0;color:#555;font-size:0.92rem;">
+        Nenhum documento encontrado para "<span id="bib-termo"></span>".
+    </div>
+
+</div>
+
+<script>
+(function() {
+    const searchInput = document.getElementById('bib-search');
+    const cards       = document.querySelectorAll('.bib-card');
+    const countEl     = document.getElementById('bib-count');
+    const vaziEl      = document.getElementById('bib-vazio');
+    const termoEl     = document.getElementById('bib-termo');
+    const total       = cards.length;
+
+    searchInput.addEventListener('input', function() {
+        const q = this.value.toLowerCase().trim();
+        let visible = 0;
+        cards.forEach(function(card) {
+            const match = !q || card.dataset.nome.includes(q);
+            card.style.display = match ? 'flex' : 'none';
+            if (match) visible++;
+        });
+        countEl.textContent = visible + (visible === 1 ? ' documento indexado' : ' documentos indexados');
+        if (q && visible === 0) {
+            vaziEl.style.display = 'block';
+            termoEl.textContent = q;
+        } else {
+            vaziEl.style.display = 'none';
+        }
+    });
+
+    function perguntarSobre(nomeArquivo) {
+        localStorage.setItem('digiana_prefill_query', nomeArquivo);
+        window.location.href = '/chat/';
+    }
+    window.perguntarSobre = perguntarSobre;
+})();
+</script>
+{% endblock %}

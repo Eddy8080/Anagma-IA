@@ -91,7 +91,7 @@ class AnagmaLLMEngine:
 
             self._llm = Llama(
                 model_path=model_path,
-                n_ctx=8192,
+                n_ctx=16384,
                 n_threads=n_threads,
                 n_batch=512,
                 n_gpu_layers=0,
@@ -327,32 +327,75 @@ class AnagmaLLMEngine:
                 return
 
             # 2. Busca RAG Soberana + Self-Audit
+            excel_bloco = None        # garantia de escopo para o loop de streaming
+            doc_integral_bloco = None
             try:
                 blocos_rag, has_db_hits = self.rag.buscar_documentos(search_query or user_query, user=user)
-                if has_db_hits:
+
+                # --- INTERCEPTOR ARQUITETURAL DE EXCEL (MODO TERMINAL) ---
+                excel_bloco = next((b for b in blocos_rag if "ARQUIVO EXCEL INTEGRAL DA CURADORIA" in b), None)
+                # --- INTERCEPTOR DE DOCUMENTO LONGO NÃO-EXCEL (MODO TRANSCRIÇÃO) ---
+                doc_integral_bloco = next((b for b in blocos_rag if "DOCUMENTO INTEGRAL DA CURADORIA" in b), None) if not excel_bloco else None
+
+                if excel_bloco:
+                    system_msg = f"""VOCÊ É UM TERMINAL DE EXIBIÇÃO FIEL.
+SUA ÚNICA TAREFA: Transcrever INTEGRALMENTE as tabelas abaixo.
+
+### REGRAS TÉCNICAS:
+1. NÃO adicione saudações, comentários ou conclusões.
+2. NÃO use reticências (...) e NÃO resuma.
+3. Transcreva cada aba (## Aba: ...) e sua respectiva tabela em formato markdown puro.
+4. Mantenha a linha de separação (| --- | --- |) imediatamente após o cabeçalho.
+5. NUNCA envolva o conteúdo em cercas de código (``` ou ```markdown). Saída direta, sem wrapper.
+6. Se o arquivo for maior que seu limite, transcreva até onde conseguir.
+
+### CONTEÚDO PARA TRANSCRIÇÃO:
+{excel_bloco}
+
+ATENÇÃO: Sua resposta começa AGORA. A primeira linha DEVE ser "## Aba:" ou "|". Nenhum texto introdutório é permitido."""
+
+                elif doc_integral_bloco:
+                    system_msg = f"""VOCÊ É UM TRANSCRITOR FIEL DE DOCUMENTOS.
+SUA ÚNICA TAREFA: Reproduzir o conteúdo abaixo de forma INTEGRAL e FIEL, sem interpretação.
+
+### REGRAS:
+1. NÃO adicione saudações, comentários, títulos extras ou conclusões.
+2. NÃO resuma e NÃO interprete — reproduza cada parágrafo, seção e dado exatamente como está.
+3. NÃO use reticências (...) para indicar corte — se atingir o limite de tokens, encerre de forma limpa na última frase completa.
+4. Preserve a hierarquia de títulos (#, ##, ###) e a formatação original do documento.
+5. Se houver tabelas no conteúdo, mantenha-as em formato markdown (| col | col |).
+
+### CONTEÚDO PARA TRANSCRIÇÃO:
+{doc_integral_bloco}
+
+Comece a transcrição imediatamente, sem texto introdutório."""
+
+                elif has_db_hits:
                     blocos_rag = self._self_audit_documentos(user_query, blocos_rag)
                     has_db_hits = bool(blocos_rag)
-                contexto_rag = "\n\n---\n\n".join(blocos_rag)
-                if contexto_rag and len(contexto_rag) > 15000:
-                    contexto_rag = contexto_rag[:15000] + "... [Conteúdo truncado por limite de contexto]"
-            except Exception as e:
-                print(f"[ERRO RAG] {e}")
-                traceback.print_exc()
-                contexto_rag, has_db_hits = "", False
+                    contexto_rag = "\n\n---\n\n".join(blocos_rag)
+                    if contexto_rag and len(contexto_rag) > 25000:
+                        contexto_rag = contexto_rag[:25000] + "... [Truncado]"
+                    
+                    # Detecta se há algum Excel no meio dos blocos para decidir o nível de instrução
+                    tem_excel = "ARQUIVO EXCEL INTEGRAL" in contexto_rag
+                    
+                    instr_excel = ""
+                    if tem_excel:
+                        instr_excel = """
+1. Se houver um bloco marcado como "ARQUIVO EXCEL INTEGRAL", seu único trabalho é transcrever TODAS as abas e tabelas contidas nele, do início ao fim.
+2. NUNCA resuma, nunca use reticências (...) e nunca invente ou oculte dados.
+3. Se o conteúdo for uma tabela, use obrigatoriamente a linha de separação (| --- |)."""
 
-            # --- LOG DE DEPURAÇÃO VISUAL (Terminal) ---
-            print("\n" + "█" * 60)
-            print(f"  DIAGNÓSTICO RAG - Pergunta: {user_query}")
-            print(f"  Hits na Biblioteca/Ideias: {'SIM' if has_db_hits else 'NÃO'}")
-            if contexto_rag:
-                print(f"  Contexto Localizado:\n{contexto_rag[:500]}...")
-            else:
-                print("  AVISO: NENHUM CONTEXTO LOCALIZADO NO RAG.")
-            print("█" * 60 + "\n", flush=True)
+                    regra_ouro_excel = ""
+                    if tem_excel:
+                        regra_ouro_excel = """
+### REGRA DE OURO PARA EXCEL (DIRETRIZ UNIVERSAL):
+1. Se você encontrar nomes de abas (ex: "## Aba: Parte A"), você DEVE transcrever o nome da aba e a tabela correspondente logo abaixo.
+2. Repita isso para TODAS as abas encontradas no contexto.
+3. A exibição deve ser INTEGRAL e FIEL ao arquivo original, agindo apenas como um meio de visualização."""
 
-            # 3. Montagem do System Prompt (MODO DE SEGURANÇA REFORÇADO)
-            if has_db_hits:
-                system_msg = f"""Você é a **Digiana**, assistente oficial de contabilidade da **Anagma**.
+                    system_msg = f"""Você é a **Digiana**, assistente oficial de contabilidade da **Anagma**.
 
 ### MODO: BIBLIOTECA INTERNA ATIVA
 
@@ -360,24 +403,22 @@ class AnagmaLLMEngine:
 Você DEVE responder sempre neste formato de duas seções, sem exceção:
 
 **Verificação:**
-Transcreva aqui os trechos literais dos documentos abaixo que respondem diretamente à pergunta.
-Se nenhum documento contém o dado específico perguntado, escreva exatamente:
-"O documento [nome do documento] aborda [tema geral do documento] mas não contém dados específicos sobre [assunto da pergunta]."
+Transcreva LITERALMENTE os trechos dos documentos abaixo que fundamentam sua resposta.
+— Se o dado não estiver no texto, declare explicitamente que a informação está ausente no documento consultado.
+— NÃO inclua saudações ou interpretações nesta seção.{instr_excel}
 
 **Resposta:**
 Responda baseando-se EXCLUSIVAMENTE no que foi declarado em Verificação acima.
-— Se a Verificação encontrou o dado: cite-o com precisão e indique o documento de origem.
-— Se a Verificação declarou ausência: informe que a biblioteca não detalha esse dado e indique a fonte oficial adequada (Receita Federal, Portal do Simples Nacional, eSocial, etc.).
-Nunca adicione dados, alíquotas, obrigações ou artigos de lei que não estejam na Verificação.
-Se os dados contiverem tabelas markdown, reproduza-as exatamente como tabela.
+— PRIORIDADE ABSOLUTA: Use as definições e siglas conforme aparecem nos documentos (ex: PAT). Ignore definições externas se o documento trouxer uma específica.
+— FORMATAÇÃO: Organize dados numéricos ou listas em tabelas markdown (| Coluna |).{regra_ouro_excel}
 
-### CONTEXTO DA EMPRESA:
+### CONTEXTO DA EMPRESA (DNA):
 {perfil_anagma if perfil_anagma else 'Base Técnica Anagma.'}
 
-### DADOS DA BIBLIOTECA INTERNA:
+### DADOS DA BIBLIOTECA INTERNA (FONTE ÚNICA DE VERDADE):
 {contexto_rag}"""
-            else:
-                system_msg = f"""Você é a **Digiana**, assistente oficial de contabilidade da **Anagma**.
+                else:
+                    system_msg = f"""Você é a **Digiana**, assistente oficial de contabilidade da **Anagma**.
 
 ### MODO: BIBLIOTECA OMISSA
 
@@ -390,15 +431,20 @@ Escreva exatamente: "Nenhum documento encontrado na biblioteca da Anagma sobre [
 **Resposta:**
 — Informe que a biblioteca não possui registros específicos sobre este tema.
 — Indique a fonte oficial adequada (Receita Federal, Portal do Simples Nacional, eSocial, Prefeitura, etc.).
-— Você pode contextualizar brevemente o que é o tema (conceito geral), mas NUNCA cite alíquotas, valores, datas, artigos de lei ou obrigações específicas.
+— NUNCA gere tabelas, valores, alíquotas, datas ou obrigações específicas se a biblioteca for omissa. Se você fizer isso, estará cometendo um erro grave de segurança contábil.
 — Encerre recomendando a consulta à fonte oficial.
 
 ### CONTEXTO DA EMPRESA:
 {perfil_anagma if perfil_anagma else 'Base Técnica Anagma.'}"""
 
+            except Exception as e:
+                print(f"[ERRO RAG] {e}", flush=True)
+                system_msg = f"""Você é a **Digiana**, assistente oficial de contabilidade da **Anagma**.
+Ocorreu um erro ao consultar a biblioteca. Por favor, tente reformular a pergunta."""
+
             # 4. Gestão de Mensagens com controle de budget de tokens
-            # n_ctx=8192, reservamos 1200 para a resposta → ~7000 disponíveis para input
-            MAX_INPUT_TOKENS = 7000
+            # n_ctx=16384, reservamos 1500 para a resposta → ~14000 disponíveis para input
+            MAX_INPUT_TOKENS = 14000
             tokens_sistema = self._contar_tokens_aprox(system_msg)
             tokens_query   = self._contar_tokens_aprox(user_query)
             budget_historico = MAX_INPUT_TOKENS - tokens_sistema - tokens_query
@@ -419,20 +465,57 @@ Escreva exatamente: "Nenhum documento encontrado na biblioteca da Anagma sobre [
             messages.append({'role': 'user', 'content': user_query})
 
             # 5. Loop de Streaming
-            full_response = ""
+            # Modo Excel recebe budget máximo; Modo Transcrição (PDF longo) recebe budget elevado.
+            if excel_bloco:
+                max_tokens_saida = 4096
+            elif doc_integral_bloco:
+                max_tokens_saida = 3000
+            else:
+                max_tokens_saida = 1000
+
             stream = self._llm.create_chat_completion(
                 messages=messages,
-                max_tokens=1000,
-                temperature=0.0, # Temperatura zero para eliminar alucinações
+                max_tokens=max_tokens_saida,
+                temperature=0.0,
                 stream=True,
                 stop=['<|end|>', '<|endoftext|>', '<|user|>']
             )
-            for chunk in stream:
-                delta = chunk['choices'][0]['delta']
-                if 'content' in delta:
-                    token = delta['content']
-                    full_response += token
-                    yield token
+
+            if excel_bloco:
+                # Modo Terminal: descarta deterministicamente qualquer preamble
+                # antes do início real da tabela (## Aba: ou |)
+                buffer_pre = ""
+                tabela_iniciada = False
+                for chunk in stream:
+                    delta = chunk['choices'][0]['delta']
+                    if 'content' in delta:
+                        token = delta['content']
+                        if not tabela_iniciada:
+                            buffer_pre += token
+                            idx = -1
+                            for marcador in ('## ', '|'):
+                                pos = buffer_pre.find(marcador)
+                                if pos >= 0:
+                                    idx = pos if idx < 0 else min(idx, pos)
+                            if idx >= 0:
+                                tabela_iniciada = True
+                                yield buffer_pre[idx:]
+                            elif len(buffer_pre) > 400:
+                                tabela_iniciada = True
+                                yield buffer_pre
+                        else:
+                            yield token
+            elif doc_integral_bloco:
+                # Modo Transcrição: entrega o stream diretamente, sem descarte de preamble
+                for chunk in stream:
+                    delta = chunk['choices'][0]['delta']
+                    if 'content' in delta:
+                        yield delta['content']
+            else:
+                for chunk in stream:
+                    delta = chunk['choices'][0]['delta']
+                    if 'content' in delta:
+                        yield delta['content']
 
         except Exception as e:
             traceback.print_exc()
@@ -566,7 +649,9 @@ Escreva exatamente: "Nenhum documento encontrado na biblioteca da Anagma sobre [
         # Usa search_query (contextualizada) para busca no RAG, mas responde ao user_query original
         try:
             blocos_rag, has_db_hits = self.rag.buscar_documentos(search_query or user_query, user=user)
-            if has_db_hits:
+            # Modo Transcrição não passa pelo Self-Audit (entrega integral, sem filtro de chunks)
+            doc_integral_bloco = next((b for b in blocos_rag if "DOCUMENTO INTEGRAL DA CURADORIA" in b), None)
+            if has_db_hits and not doc_integral_bloco:
                 blocos_rag = self._self_audit_documentos(user_query, blocos_rag)
                 has_db_hits = bool(blocos_rag)
             contexto_rag = "\n\n---\n\n".join(blocos_rag)
@@ -575,10 +660,23 @@ Escreva exatamente: "Nenhum documento encontrado na biblioteca da Anagma sobre [
         except Exception as e:
             print(f"[ERRO RAG] {e}")
             contexto_rag, has_db_hits = "", False
+            doc_integral_bloco = None
 
         # --- Montagem do System Message (condicional: biblioteca vs. conhecimento geral) ---
         try:
-            if has_db_hits:
+            if doc_integral_bloco:
+                system_msg = f"""VOCÊ É UM TRANSCRITOR FIEL DE DOCUMENTOS.
+SUA ÚNICA TAREFA: Reproduzir o conteúdo abaixo de forma INTEGRAL e FIEL, sem interpretação.
+
+### REGRAS:
+1. NÃO adicione saudações, comentários, títulos extras ou conclusões.
+2. NÃO resuma e NÃO interprete — reproduza cada parágrafo, seção e dado exatamente como está.
+3. Preserve a hierarquia de títulos (#, ##, ###) e a formatação original do documento.
+4. Se houver tabelas no conteúdo, mantenha-as em formato markdown (| col | col |).
+
+### CONTEÚDO PARA TRANSCRIÇÃO:
+{doc_integral_bloco}"""
+            elif has_db_hits:
                 system_msg = f"""Você é a **Digiana**, assistente oficial de contabilidade da **Anagma**.
 
 ### MODO: BIBLIOTECA INTERNA ATIVA
@@ -587,16 +685,23 @@ Escreva exatamente: "Nenhum documento encontrado na biblioteca da Anagma sobre [
 Você DEVE responder sempre neste formato de duas seções, sem exceção:
 
 **Verificação:**
-Transcreva aqui os trechos literais dos documentos abaixo que respondem diretamente à pergunta.
-Se nenhum documento contém o dado específico perguntado, escreva exatamente:
-"O documento [nome do documento] aborda [tema geral do documento] mas não contém dados específicos sobre [assunto da pergunta]."
+Aja como um ESPELHO dos documentos abaixo. 
+1. Se houver um bloco marcado como "ARQUIVO EXCEL INTEGRAL", seu único trabalho é transcrever TODAS as abas e tabelas contidas nele, do início ao fim.
+2. NUNCA resuma, nunca use reticências (...) e nunca invente ou oculte dados.
+3. Se o conteúdo for uma tabela, use obrigatoriamente a linha de separação (| --- |).
 
 **Resposta:**
 Responda baseando-se EXCLUSIVAMENTE no que foi declarado em Verificação acima.
-— Se a Verificação encontrou o dado: cite-o com precisão e indique o documento de origem.
-— Se a Verificação declarou ausência: informe que a biblioteca não detalha esse dado e indique a fonte oficial adequada (Receita Federal, Portal do Simples Nacional, eSocial, etc.).
-Nunca adicione dados, alíquotas, obrigações ou artigos de lei que não estejam na Verificação.
-Se os dados contiverem tabelas markdown, reproduza-as exatamente como tabela.
+— Se for um arquivo Excel: transcreva o conteúdo integral aqui novamente para garantir a visualização correta.
+— FORMATAÇÃO: Sempre organize dados de planilhas em tabelas markdown reais (| Coluna |). Deixe uma linha em branco antes de começar cada tabela.
+— BOTÃO VISUALIZAR: Garanta que a tabela esteja bem formada para que o botão "Ver Tabela" apareça no chat.
+
+### REGRA DE OURO PARA EXCEL (DIRETRIZ UNIVERSAL):
+ESTA REGRA SE APLICA A QUALQUER ARQUIVO INSERIDO NA BIBLIOTECA DE CURADORIA EM FORMATO XLS OU XLSX. 
+1. Se você encontrar nomes de abas (ex: "## Aba: Parte A"), você DEVE transcrever o nome da aba e a tabela correspondente logo abaixo. 
+2. Repita isso para TODAS as abas encontradas no contexto. 
+3. Nunca invente dados para preencher abas. 
+4. A exibição deve ser INTEGRAL e FIEL ao arquivo original, agindo apenas como um meio de visualização para o usuário.
 
 ### CONTEXTO DA EMPRESA (DNA):
 {perfil_anagma if perfil_anagma else 'Base Técnica Anagma.'}
@@ -617,7 +722,7 @@ Escreva exatamente: "Nenhum documento encontrado na biblioteca da Anagma sobre [
 **Resposta:**
 — Informe que a biblioteca não possui registros específicos sobre este tema.
 — Indique a fonte oficial adequada (Receita Federal, Portal do Simples Nacional, eSocial, Prefeitura, etc.).
-— Você pode contextualizar brevemente o que é o tema (conceito geral), mas NUNCA cite alíquotas, valores, datas, artigos de lei ou obrigações específicas.
+— NUNCA gere tabelas, valores, alíquotas, datas ou obrigações específicas se a biblioteca for omissa. Se você fizer isso, estará cometendo um erro grave de segurança contábil.
 — Encerre recomendando a consulta à fonte oficial.
 
 ### CONTEXTO DA EMPRESA (DNA):
