@@ -143,7 +143,7 @@
     .empty-state { text-align: center; padding: 40px; }
 
     /* ── Modais ────────────────────────────────────────── */
-    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center; -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
     .modal-overlay-darker { background: rgba(0,0,0,0.85); }
     .modal-content-sm { padding: 32px; width: 90%; max-width: 380px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
     .modal-content-md { padding: 32px; width: 90%; max-width: 420px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
@@ -179,8 +179,9 @@
     /* ── Modal de Progresso de Upload ──────────────────── */
     #upload-progress-modal {
         display: none; position: fixed; inset: 0;
-        background: rgba(0,0,0,0.4); backdrop-filter: blur(10px);
+        background: rgba(0,0,0,0.4);
         -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
         z-index: 20000; align-items: center; justify-content: center;
     }
     .progress-card {
@@ -221,6 +222,28 @@
     .progress-list::-webkit-scrollbar { width: 4px; }
     .progress-list::-webkit-scrollbar-track { background: transparent; }
     .progress-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+    /* ── Utilitários (no-inline-styles) ─────────────────── */
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    #progress-status { font-size: 0.85rem; margin: 0; }
+    #progress-actions { margin-top: 24px; display: none; }
+    #btn-close-progress { width: 100%; font-weight: 700; color: #131314; }
+    #upload-msg { display: none; margin-bottom: 16px; }
+    .alert-curadoria { display: flex; margin-bottom: 24px; padding: 16px; border-radius: 12px; border: 1px solid rgba(251,191,36,0.25); background: rgba(251,191,36,0.05); align-items: center; gap: 16px; animation: fadeIn 0.5s ease; }
+    .alert-curadoria.is-hidden { display: none; }
+    .alert-icon { font-size: 1.8rem; filter: drop-shadow(0 0 8px rgba(251,191,36,0.4)); }
+    .alert-body { font-size: 0.88rem; line-height: 1.5; }
+    .alert-title { color: #fbbf24; display: block; margin-bottom: 2px; font-size: 0.95rem; }
+    #btn-batch-delete { padding: 8px 20px; font-size: 0.85rem; font-weight: 700; }
+    .btn-pad-md { padding: 10px 24px; }
+    #delete-form-real { margin: 0; }
+    #btn-batch-confirm { padding: 10px 24px; font-weight: 600; }
+    #btn-show-visual { display: none; }
+    #rendered-preview { display: none; padding: 20px; overflow-y: auto; flex: 1; }
+    #rejection-box { display: none; margin-bottom: 20px; }
+    .modal-actions-end { justify-content: flex-end; }
+    .btn-reject-audit { background: transparent; padding: 10px 24px; }
+    .btn-approve-audit { padding: 10px 24px; font-weight: 600; color: #131314; }
 </style>
 
 <!-- ── Cabeçalho ─────────────────────────────────────────── -->
@@ -252,7 +275,7 @@
     <div class="card progress-card">
         <div class="progress-header">
             <span class="text-dynamic progress-title">Processando Biblioteca</span>
-            <p id="progress-status" class="text-dynamic-muted" style="font-size: 0.85rem; margin: 0;">
+            <p id="progress-status" class="text-dynamic-muted">
                 Iniciando transferência...
             </p>
         </div>
@@ -265,21 +288,21 @@
             <!-- Itens inseridos dinamicamente -->
         </div>
 
-        <div id="progress-actions" class="modal-actions" style="margin-top: 24px; display: none;">
-            <button id="btn-close-progress" class="btn btn-primary" style="width: 100%; font-weight: 700; color: #131314;">
+        <div id="progress-actions" class="modal-actions">
+            <button id="btn-close-progress" class="btn btn-primary">
                 Concluir e Voltar
             </button>
         </div>
     </div>
 </div>
 
-<div id="upload-msg" style="display:none; margin-bottom:16px;"></div>
+<div id="upload-msg"></div>
 
 <!-- ── Alerta de Política de Curadoria ───────────────────── -->
-<div id="alert-curadoria-global" class="alert-curadoria" style="margin-bottom: 24px; padding: 16px; border-radius: 12px; border: 1px solid rgba(251,191,36,0.25); background: rgba(251,191,36,0.05); display: {% if documentos_com_alerta %}flex{% else %}none{% endif %}; align-items: center; gap: 16px; animation: fadeIn 0.5s ease;">
-    <span style="font-size: 1.8rem; filter: drop-shadow(0 0 8px rgba(251,191,36,0.4));">⚠️</span>
-    <div class="text-dynamic" style="font-size: 0.88rem; line-height: 1.5;">
-        <strong style="color: #fbbf24; display: block; margin-bottom: 2px; font-size: 0.95rem;">Aviso de Integridade da Curadoria</strong>
+<div id="alert-curadoria-global" class="alert-curadoria{% if not documentos_com_alerta %} is-hidden{% endif %}">
+    <span class="alert-icon">⚠️</span>
+    <div class="text-dynamic alert-body">
+        <strong class="alert-title">Aviso de Integridade da Curadoria</strong>
         Detectamos arquivos que podem exigir atenção para garantir a precisão da IA. 
         Caso identifique ruído ou erro na extração, <strong>exclua o item e adicione-o novamente após os ajustes necessários.</strong>
     </div>
@@ -367,7 +390,7 @@
 <!-- ── Barra de ação flutuante (seleção em lote) ────────── -->
 <div id="batch-bar">
     <span class="text-dynamic" id="batch-count">0 selecionado(s)</span>
-    <button id="btn-batch-delete" class="btn btn-danger" style="padding:8px 20px; font-size:0.85rem; font-weight:700;">
+    <button id="btn-batch-delete" class="btn btn-danger">
         🗑️ Excluir selecionados
     </button>
     <button id="btn-deselect" class="text-dynamic-muted">✕ Limpar seleção</button>
@@ -380,10 +403,10 @@
         <h3 class="text-dynamic modal-h3">Excluir este documento?</h3>
         <p class="text-dynamic-muted modal-p">Esta ação é permanente e removerá o arquivo físico da biblioteca da IA.</p>
         <div class="modal-actions">
-            <button onclick="closeDeleteModal()" class="btn btn-outline text-dynamic" style="padding:10px 24px;">Não</button>
-            <form id="delete-form-real" method="post" action="" style="margin:0;">
+            <button onclick="closeDeleteModal()" class="btn btn-outline text-dynamic btn-pad-md">Não</button>
+            <form id="delete-form-real" method="post" action="">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-danger" style="padding:10px 24px; font-weight:600;">Sim, excluir</button>
+                <button type="submit" class="btn btn-danger btn-pad-md">Sim, excluir</button>
             </form>
         </div>
     </div>
@@ -429,8 +452,8 @@ document.getElementById('delete-form-real').addEventListener('submit', async (e)
             Esta ação é permanente. Todos os arquivos físicos e registros serão removidos.
         </p>
         <div class="modal-actions">
-            <button onclick="closeBatchModal()" class="btn btn-outline text-dynamic" style="padding:10px 24px;">Cancelar</button>
-            <button id="btn-batch-confirm" class="btn btn-danger" style="padding:10px 24px; font-weight:600;">
+            <button onclick="closeBatchModal()" class="btn btn-outline text-dynamic btn-pad-md">Cancelar</button>
+            <button id="btn-batch-confirm" class="btn btn-danger">
                 Sim, excluir todos
             </button>
         </div>
@@ -447,12 +470,12 @@ document.getElementById('delete-form-real').addEventListener('submit', async (e)
 
         <div class="view-toggle-btns">
             <button type="button" id="btn-show-code" class="btn-toggle active">📝 Código (Markdown)</button>
-            <button type="button" id="btn-show-visual" class="btn-toggle" style="display:none;">📊 Visualização</button>
+            <button type="button" id="btn-show-visual" class="btn-toggle">📊 Visualização</button>
         </div>
 
         <div id="editor-container">
             <div id="quill-editor" class="text-dynamic"></div>
-            <div id="rendered-preview" class="text-dynamic rendered-content" style="display:none; padding:20px; overflow-y:auto; flex:1;"></div>
+            <div id="rendered-preview" class="text-dynamic rendered-content"></div>
             
             <div id="editor-loading">
                 <svg viewBox="0 0 50 50" fill="none" stroke="#a8c7fa" stroke-width="4">
@@ -468,7 +491,7 @@ document.getElementById('delete-form-real').addEventListener('submit', async (e)
             <input type="hidden" name="acao" id="audit-action" value="approve">
             <input type="hidden" name="conteudo_editado" id="conteudo_editado">
 
-            <div id="rejection-box" style="display:none; margin-bottom:20px;">
+            <div id="rejection-box">
                 <label class="text-dynamic-muted rejection-label">Motivo da Rejeição:</label>
                 <textarea name="motivo_rejeicao"
                           class="text-dynamic rejection-textarea"
@@ -476,10 +499,10 @@ document.getElementById('delete-form-real').addEventListener('submit', async (e)
                           placeholder="Ex: O documento não é do domínio contábil."></textarea>
             </div>
 
-            <div class="modal-actions" style="justify-content: flex-end;">
-                <button type="button" onclick="closePreviewModal()" class="btn btn-outline text-dynamic" style="padding:10px 24px;">Fechar</button>
-                <button type="button" onclick="submitAudit('reject')" class="btn btn-danger" style="background:transparent; padding:10px 24px;">Rejeitar</button>
-                <button type="button" onclick="submitAudit('approve')" class="btn btn-primary" style="padding:10px 24px; font-weight:600; color:#131314;">Aprovar para IA</button>
+            <div class="modal-actions modal-actions-end">
+                <button type="button" onclick="closePreviewModal()" class="btn btn-outline text-dynamic btn-pad-md">Fechar</button>
+                <button type="button" onclick="submitAudit('reject')" class="btn btn-danger btn-reject-audit">Rejeitar</button>
+                <button type="button" onclick="submitAudit('approve')" class="btn btn-primary btn-approve-audit">Aprovar para IA</button>
             </div>
         </form>
     </div>
@@ -743,10 +766,8 @@ document.getElementById('docs-tbody').addEventListener('click', e => {
 function verificarAlertasGlobais() {
     const banner = document.getElementById('alert-curadoria-global');
     if (!banner) return;
-    
-    // Verifica se existe algum ícone de atenção na tabela
     const temAlerta = document.querySelector('.attention-icon') !== null;
-    banner.style.display = temAlerta ? 'flex' : 'none';
+    banner.classList.toggle('is-hidden', !temAlerta);
 }
 
 // ── Upload AJAX com Streaming (Progresso Real) ──────────────

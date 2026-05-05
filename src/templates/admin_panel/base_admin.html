@@ -195,7 +195,7 @@
         <a href="{% url 'admin_panel:perfil_anagma' %}" {% if request.resolver_match.url_name == 'perfil_anagma' %}class="active"{% endif %}>🏢 Perfil Digiana</a>
         <a href="{% url 'admin_panel:insights' %}" {% if request.resolver_match.url_name == 'insights' %}class="active"{% endif %}>📈 Insights de IA</a>
         <div class="sidebar-footer">
-            <a href="/chat/" style="color:var(--muted); font-size:0.85rem;">← Voltar ao Chat</a>
+            <a href="/chat/" onclick="history.back(); return false;" style="color:var(--muted); font-size:0.85rem;">← Voltar ao Chat</a>
         </div>
     </div>
     <div class="main">

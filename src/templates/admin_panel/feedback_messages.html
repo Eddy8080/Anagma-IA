@@ -15,7 +15,7 @@
                 style="padding:10px 24px; font-size:0.85rem; flex-shrink:0;">
             🗑️ Excluir Usuário
         </button>
-        <a href="{% url 'admin_panel:feedback_list' tipo=tipo %}" class="btn-nova-ideia"
+        <a href="{% url 'admin_panel:feedback_list' tipo=tipo %}" class="btn-nova-ideia" onclick="history.back(); return false;"
            style="padding:10px 24px; font-size:0.85rem; flex-shrink:0; white-space:nowrap; text-decoration:none;">
             ← Voltar
         </a>

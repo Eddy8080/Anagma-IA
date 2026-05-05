@@ -154,11 +154,9 @@
     display: flex;
     gap: 6px;
     margin-top: 6px;
-    opacity: 0;
-    transition: opacity 0.15s;
+    opacity: 1;
     align-self: flex-start;
 }
-.message-row:hover .message-toolbar { opacity: 1; }
 .copy-btn {
     background: #232426;
     border: 1px solid #3a3b3e;
@@ -281,6 +279,7 @@
     background: rgba(0,0,0,0.78);
     z-index: 20000;
     display: flex; align-items: center; justify-content: center;
+    -webkit-backdrop-filter: blur(5px);
     backdrop-filter: blur(5px);
     animation: tour-fade-in 0.45s ease;
 }
@@ -348,7 +347,7 @@
 .tour-footer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .tour-no-show {
     display: flex; align-items: center; gap: 7px;
-    color: #555; font-size: 0.81rem; cursor: pointer; user-select: none; flex: 1;
+    color: #555; font-size: 0.81rem; cursor: pointer; -webkit-user-select: none; user-select: none; flex: 1;
 }
 .tour-no-show input { accent-color: #9b72cb; width: 14px; height: 14px; cursor: pointer; }
 .tour-btn {
@@ -363,6 +362,64 @@
     color: #fff; border: none;
 }
 .tour-btn-next:hover { opacity: 0.88; background: linear-gradient(135deg, #4285f4, #9b72cb); }
+
+/* ── Inline-style removals ── */
+#empty-history { font-size: 0.8rem; color: #555; text-align: center; margin-top: 24px; }
+#greeting-center { text-align: center; }
+#greeting-title {
+    background: linear-gradient(to right, #4285f4, #9b72cb, #d96570);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    font-size: 3.5rem; margin-bottom: 12px; font-weight: 500;
+}
+#greeting-subtitle { color: #666; font-size: 1.4rem; }
+#messages-container { display: none; flex-direction: column; gap: 20px; width: 100%; }
+#table-modal {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85); z-index: 11000;
+    align-items: center; justify-content: center;
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+.table-modal-card {
+    width: 95%; max-width: 1200px; max-height: 90vh;
+    display: flex; flex-direction: column; padding: 24px;
+    border: 1px solid #3c4043; box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+}
+.table-modal-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 12px;
+}
+.table-modal-title { margin: 0; color: #a8c7fa; display: flex; align-items: center; gap: 10px; }
+#close-table-modal { background: none; border: none; color: #888; font-size: 1.8rem; cursor: pointer; line-height: 1; }
+.table-modal-footer { margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; }
+#save-xlsx-btn { padding: 8px 24px; }
+#close-table-modal-btn { padding: 8px 24px; }
+#confirm-modal {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.7); z-index: 10000;
+    align-items: center; justify-content: center;
+    -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+}
+.confirm-modal-card {
+    background: #1e1f20; border: 1px solid #3c4043; border-radius: 16px;
+    padding: 24px; width: 90%; max-width: 380px;
+    text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.confirm-modal-icon { font-size: 2rem; margin-bottom: 16px; }
+.confirm-modal-title { margin: 0 0 12px; color: #e3e3e3; font-weight: 500; }
+.confirm-modal-text { color: #999; font-size: 0.9rem; line-height: 1.5; margin-bottom: 24px; }
+.confirm-modal-actions { display: flex; gap: 12px; justify-content: center; }
+#modal-cancel-btn {
+    background: #333537; color: #e3e3e3; border: 1px solid #444;
+    border-radius: 10px; padding: 10px 24px; cursor: pointer; font-weight: 500; transition: background 0.2s;
+}
+#modal-confirm-btn {
+    background: #d93025; color: white; border: none;
+    border-radius: 10px; padding: 10px 24px; cursor: pointer; font-weight: 500; transition: background 0.2s;
+}
+.slide-body-left { text-align: left; margin-bottom: 10px; }
+.slide-body-left-mb12 { text-align: left; margin-bottom: 12px; }
+.tour-verif-blue { border-color: #4285f4; background: rgba(66,133,244,0.06); color: #9ac0f5; margin-top: 8px; }
+.tour-tip-mt { margin-top: 10px; }
 </style>
 {% endblock %}
 
@@ -397,7 +454,7 @@
     {% endfor %}
 </div>
 {% empty %}
-<p id="empty-history" style="font-size:0.8rem; color:#555; text-align:center; margin-top:24px;">
+<p id="empty-history">
     Nenhum histórico ainda.
 </p>
 {% endfor %}
@@ -407,30 +464,28 @@
 {% block content %}
 <div id="chat-window">
     <div id="greeting" class="greeting-container">
-        <div style="text-align:center;">
-            <h1 style="background:linear-gradient(to right,#4285f4,#9b72cb,#d96570);
-                        -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-                        font-size:3.5rem; margin-bottom:12px; font-weight:500;">
+        <div id="greeting-center">
+            <h1 id="greeting-title">
                 Olá, {{ nome_usuario }}
             </h1>
-            <p style="color:#666; font-size:1.4rem;">{{ saudacao }}. Como posso ajudar?</p>
+            <p id="greeting-subtitle">{{ saudacao }}. Como posso ajudar?</p>
         </div>
     </div>
-    <div id="messages-container" style="display:none; flex-direction:column; gap:20px; width:100%;"></div>
+    <div id="messages-container"></div>
 
     {# ── Modal de Visualização de Tabela (Full Screen) ── #}
-    <div id="table-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
-                                   background:rgba(0,0,0,0.85); z-index:11000; align-items:center; justify-content:center; backdrop-filter:blur(8px);">
-        <div class="card" style="width:95%; max-width:1200px; max-height:90vh; display:flex; flex-direction:column; padding:24px; border:1px solid #3c4043; box-shadow: 0 20px 60px rgba(0,0,0,0.7);">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid #333; padding-bottom:12px;">
-                <h3 style="margin:0; color:#a8c7fa; display:flex; align-items:center; gap:10px;">📊 Visualização da Tabela (Modo Excel)</h3>
-                <button id="close-table-modal" style="background:none; border:none; color:#888; font-size:1.8rem; cursor:pointer; line-height:1;">&times;</button>
+    <div id="table-modal" class="modal-overlay">
+        <div class="card table-modal-card">
+            <div class="table-modal-header">
+                <h3 class="table-modal-title">📊 Visualização da Tabela (Modo Excel)</h3>
+                <button id="close-table-modal">&times;</button>
             </div>
-            <div id="table-modal-content" class="message-text" style="flex:1; overflow:auto; padding:10px;">
+            <div id="table-modal-content" class="message-text">
                 <!-- Tabela renderizada entra aqui -->
             </div>
-            <div style="margin-top:20px; text-align:right;">
-                <button id="close-table-modal-btn" class="btn-toggle active" style="padding:8px 24px;">Fechar Visualização</button>
+            <div class="table-modal-footer">
+                <button id="save-xlsx-btn" class="btn-toggle">Salvar</button>
+                <button id="close-table-modal-btn" class="btn-toggle active">Fechar Visualização</button>
             </div>
         </div>
     </div>
@@ -440,15 +495,14 @@
 <div id="copy-toast">Copiado!</div>
 
 {# ── Modal de Confirmação Customizado ── #}
-<div id="confirm-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
-                               background:rgba(0,0,0,0.7); z-index:10000; align-items:center; justify-content:center; backdrop-filter:blur(3px);">
-    <div style="background:#1e1f20; border:1px solid #3c4043; border-radius:16px; padding:24px; width:90%; max-width:380px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
-        <div style="font-size:2rem; margin-bottom:16px;">🗑️</div>
-        <h3 style="margin:0 0 12px; color:#e3e3e3; font-weight:500;">Excluir esta conversa?</h3>
-        <p style="color:#999; font-size:0.9rem; line-height:1.5; margin-bottom:24px;">Esta ação é permanente e não poderá ser desfeita.</p>
-        <div style="display:flex; gap:12px; justify-content:center;">
-            <button id="modal-cancel-btn" style="background:#333537; color:#e3e3e3; border:1px solid #444; border-radius:10px; padding:10px 24px; cursor:pointer; font-weight:500; transition:background 0.2s;">Não</button>
-            <button id="modal-confirm-btn" style="background:#d93025; color:white; border:none; border-radius:10px; padding:10px 24px; cursor:pointer; font-weight:500; transition:background 0.2s;">Sim, excluir</button>
+<div id="confirm-modal">
+    <div class="confirm-modal-card">
+        <div class="confirm-modal-icon">🗑️</div>
+        <h3 class="confirm-modal-title">Excluir esta conversa?</h3>
+        <p class="confirm-modal-text">Esta ação é permanente e não poderá ser desfeita.</p>
+        <div class="confirm-modal-actions">
+            <button id="modal-cancel-btn">Não</button>
+            <button id="modal-confirm-btn">Sim, excluir</button>
         </div>
     </div>
 </div>
@@ -500,7 +554,7 @@
         <div class="tour-slide-icon">💬</div>
         <div class="tour-slide-title">Perguntas em linguagem natural</div>
         <div class="tour-slide-body">
-          <p style="text-align:left; margin-bottom:10px;">Faça perguntas contábeis diretamente. Exemplos:</p>
+          <p class="slide-body-left">Faça perguntas contábeis diretamente. Exemplos:</p>
           <div class="tour-example">"Qual a alíquota do DAS para MEI em 2024?"</div>
           <div class="tour-example">"Quais obrigações acessórias do Simples Nacional?"</div>
           <div class="tour-example">"Qual o prazo de entrega da ECD para 2024?"</div>
@@ -513,10 +567,10 @@
         <div class="tour-slide-icon">🔍</div>
         <div class="tour-slide-title">Entenda as respostas</div>
         <div class="tour-slide-body">
-          <p style="text-align:left; margin-bottom:12px;">Toda resposta segue <strong>dois blocos fixos</strong>:</p>
+          <p class="slide-body-left-mb12">Toda resposta segue <strong>dois blocos fixos</strong>:</p>
           <div class="tour-verif"><strong>Verificação:</strong> trecho copiado literalmente do documento da biblioteca que responde à sua pergunta — ou aviso explícito de que o dado não está disponível.</div>
-          <div class="tour-verif" style="border-color:#4285f4; background:rgba(66,133,244,0.06); color:#9ac0f5; margin-top:8px;"><strong>Resposta:</strong> baseada <em>exclusivamente</em> na Verificação acima. Se a biblioteca não tiver o dado, a Digiana indica a fonte oficial — <strong>nunca inventa valores ou alíquotas</strong>.</div>
-          <div class="tour-tip" style="margin-top:10px;">📋 Use <code>/lista</code> no chat para ver todos os seus documentos e ideias enviados com o status de cada um.</div>
+          <div class="tour-verif tour-verif-blue"><strong>Resposta:</strong> baseada <em>exclusivamente</em> na Verificação acima. Se a biblioteca não tiver o dado, a Digiana indica a fonte oficial — <strong>nunca inventa valores ou alíquotas</strong>.</div>
+          <div class="tour-tip tour-tip-mt">📋 Use <code>/lista</code> no chat para ver todos os seus documentos e ideias enviados com o status de cada um.</div>
         </div>
       </div>
 
@@ -585,6 +639,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 {% if messages_json %}{{ messages_json|json_script:"messages-data" }}{% endif %}
 
 <script>
@@ -871,12 +926,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             toolbar.appendChild(btn);
 
+            // toolbar precisa estar no DOM antes de addFeedbackButtons consultar via querySelector
+            row.appendChild(toolbar);
+
             // Botões de feedback e tabela (somente se tiver ID da mensagem - fim do streaming ou histórico)
             if (msgId) {
-                addFeedbackButtons(row, msgId);
+                addFeedbackButtons(row, msgId, initialFeedback);
             }
-
-            row.appendChild(toolbar);
         }
 
         // Rastreia mensagem sob cursor para Ctrl+C
@@ -1102,33 +1158,35 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // msgId capturado aqui para ser acessível no onerror (fallback)
+        let finalMsgId = null;
+
         activeEventSource.addEventListener('message_id', (e) => {
-            const msgId = parseInt(e.data, 10);
-            if (aiMsgObj && msgId) {
-                // Renderização final: remove cercas, normaliza separadores e repara tabelas
+            finalMsgId = parseInt(e.data, 10);
+            if (aiMsgObj && finalMsgId) {
+                // Renderização final garantida pelo message_id
                 if (window.marked) {
                     const cleaned = repairMarkdownTables(normalizeSeparators(stripCodeFences(fullResponse)));
                     aiMsgObj.textElement.innerHTML = marked.parse(cleaned);
                 }
-                addFeedbackButtons(aiMsgObj.row, msgId);
+                addFeedbackButtons(aiMsgObj.row, finalMsgId);
             }
         });
 
         activeEventSource.onmessage = (e) => {
             if (loader) { loader.remove(); }
 
-            // Cria a bolha da IA na primeira recepção de token
             if (!aiMsgObj) {
                 aiMsgObj = buildMessage('assistant', "", now, true);
             }
 
-            // Acumula token e renderiza markdown parcial sem repair
-            // (repair só é aplicado na renderização final, evento message_id)
             const token = e.data;
             fullResponse += token;
 
+            // normalizeSeparators é seguro mid-stream (corrige existentes, não injeta novos)
+            // repairMarkdownTables fica apenas para o final (evita injeção errada de separador)
             if (window.marked) {
-                aiMsgObj.textElement.innerHTML = marked.parse(fullResponse);
+                aiMsgObj.textElement.innerHTML = marked.parse(normalizeSeparators(stripCodeFences(fullResponse)));
             } else {
                 aiMsgObj.textElement.textContent = fullResponse;
             }
@@ -1142,6 +1200,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 activeEventSource = null;
             }
             setLoading(false);
+
+            // Fallback: aplica pipeline completo caso message_id não tenha disparado
+            // (race condition Chrome/Edge: onerror consome o EventSource antes do message_id)
+            if (aiMsgObj && fullResponse && window.marked) {
+                const cleaned = repairMarkdownTables(normalizeSeparators(stripCodeFences(fullResponse)));
+                aiMsgObj.textElement.innerHTML = marked.parse(cleaned);
+                if (finalMsgId && !aiMsgObj.row.querySelector('.feedback-btn')) {
+                    addFeedbackButtons(aiMsgObj.row, finalMsgId);
+                }
+            }
+
             if (!fullResponse && !aiMsgObj) {
                 if (loader) loader.remove();
                 buildMessage('assistant', "Erro na conexão com o servidor.", now, true);
@@ -1252,12 +1321,12 @@ document.addEventListener('DOMContentLoaded', () => {
         input.addEventListener('blur', save);
     }
 
-    function addFeedbackButtons(row, msgId) {
+    function addFeedbackButtons(row, msgId, initialFeedback = null) {
         const toolbar = row.querySelector('.message-toolbar');
         const txt = row.querySelector('.message-text');
-        if (!toolbar) return;
+        if (!toolbar || !txt) return;
 
-        // 1. Adiciona Botão Ver Tabela (se houver tabela e o botão ainda não existir)
+        // 1. Botão Ver Tabela (se houver tabela e ainda não existir)
         if (txt.querySelector('table') && !toolbar.querySelector('.btn-table-view')) {
             const tableBtn = document.createElement('button');
             tableBtn.className = 'copy-btn btn-table-view';
@@ -1267,10 +1336,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tableModal = document.getElementById('table-modal');
                 const modalContent = document.getElementById('table-modal-content');
                 modalContent.innerHTML = '';
-                // Clona as tabelas e remove o limite de altura para visualização completa
                 txt.querySelectorAll('table').forEach(tbl => {
                     const clone = tbl.cloneNode(true);
-                    clone.style.display = 'table'; // Força comportamento de tabela real
+                    clone.style.display = 'table';
                     modalContent.appendChild(clone);
                 });
                 tableModal.style.display = 'flex';
@@ -1278,7 +1346,7 @@ document.addEventListener('DOMContentLoaded', () => {
             toolbar.appendChild(tableBtn);
         }
 
-        // 2. Adiciona Botões de Like/Dislike (se ainda não existirem)
+        // 2. Botões de Like/Dislike (se ainda não existirem)
         if (!toolbar.querySelector('.feedback-btn')) {
             const likeBtn = document.createElement('button');
             likeBtn.className = 'feedback-btn';
@@ -1289,6 +1357,10 @@ document.addEventListener('DOMContentLoaded', () => {
             dislikeBtn.className = 'feedback-btn';
             dislikeBtn.title = 'Não curtir resposta';
             dislikeBtn.innerHTML = '👎';
+
+            // Restaura estado visual do feedback já registrado
+            if (initialFeedback === 'like')    likeBtn.classList.add('active-like');
+            if (initialFeedback === 'dislike') dislikeBtn.classList.add('active-dislike');
 
             likeBtn.addEventListener('click',    () => doFeedback(msgId, 'like',    likeBtn, dislikeBtn));
             dislikeBtn.addEventListener('click', () => doFeedback(msgId, 'dislike', likeBtn, dislikeBtn));
@@ -1524,11 +1596,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const tableModal = document.getElementById('table-modal');
     const closeX = document.getElementById('close-table-modal');
     const closeBtn = document.getElementById('close-table-modal-btn');
+    const saveXlsxBtn = document.getElementById('save-xlsx-btn');
 
     const hideTableModal = () => { if (tableModal) tableModal.style.display = 'none'; };
     if (closeX) closeX.addEventListener('click', hideTableModal);
     if (closeBtn) closeBtn.addEventListener('click', hideTableModal);
     window.addEventListener('click', (e) => { if (e.target === tableModal) hideTableModal(); });
+
+    if (saveXlsxBtn) {
+        saveXlsxBtn.addEventListener('click', () => {
+            const tables = document.querySelectorAll('#table-modal-content table');
+            if (!tables.length || typeof XLSX === 'undefined') return;
+
+            const wb = XLSX.utils.book_new();
+            tables.forEach((tbl, i) => {
+                const ws = XLSX.utils.table_to_sheet(tbl);
+                XLSX.utils.book_append_sheet(wb, ws, `Aba_${i + 1}`);
+            });
+            XLSX.writeFile(wb, 'tabela_digiana.xlsx');
+        });
+    }
 });
 </script>
 

@@ -473,49 +473,48 @@ Ocorreu um erro ao consultar a biblioteca. Por favor, tente reformular a pergunt
             else:
                 max_tokens_saida = 1000
 
-            stream = self._llm.create_chat_completion(
-                messages=messages,
-                max_tokens=max_tokens_saida,
-                temperature=0.0,
-                stream=True,
-                stop=['<|end|>', '<|endoftext|>', '<|user|>']
-            )
+            # Coleta todos os tokens com o lock — serializa o acesso ao objeto C.
+            # llama-cpp-python não é thread-safe; dois create_chat_completion(stream=True)
+            # simultâneos no mesmo objeto Llama corrompem o KV cache interno da biblioteca.
+            with self._lock:
+                raw_stream = self._llm.create_chat_completion(
+                    messages=messages,
+                    max_tokens=max_tokens_saida,
+                    temperature=0.0,
+                    stream=True,
+                    stop=['<|end|>', '<|endoftext|>', '<|user|>']
+                )
+                tokens = [
+                    chunk['choices'][0]['delta']['content']
+                    for chunk in raw_stream
+                    if 'content' in chunk['choices'][0]['delta']
+                ]
 
+            # Lock liberado — entrega os tokens coletados ao cliente via SSE.
             if excel_bloco:
                 # Modo Terminal: descarta deterministicamente qualquer preamble
                 # antes do início real da tabela (## Aba: ou |)
                 buffer_pre = ""
                 tabela_iniciada = False
-                for chunk in stream:
-                    delta = chunk['choices'][0]['delta']
-                    if 'content' in delta:
-                        token = delta['content']
-                        if not tabela_iniciada:
-                            buffer_pre += token
-                            idx = -1
-                            for marcador in ('## ', '|'):
-                                pos = buffer_pre.find(marcador)
-                                if pos >= 0:
-                                    idx = pos if idx < 0 else min(idx, pos)
-                            if idx >= 0:
-                                tabela_iniciada = True
-                                yield buffer_pre[idx:]
-                            elif len(buffer_pre) > 400:
-                                tabela_iniciada = True
-                                yield buffer_pre
-                        else:
-                            yield token
-            elif doc_integral_bloco:
-                # Modo Transcrição: entrega o stream diretamente, sem descarte de preamble
-                for chunk in stream:
-                    delta = chunk['choices'][0]['delta']
-                    if 'content' in delta:
-                        yield delta['content']
+                for token in tokens:
+                    if not tabela_iniciada:
+                        buffer_pre += token
+                        idx = -1
+                        for marcador in ('## ', '|'):
+                            pos = buffer_pre.find(marcador)
+                            if pos >= 0:
+                                idx = pos if idx < 0 else min(idx, pos)
+                        if idx >= 0:
+                            tabela_iniciada = True
+                            yield buffer_pre[idx:]
+                        elif len(buffer_pre) > 400:
+                            tabela_iniciada = True
+                            yield buffer_pre
+                    else:
+                        yield token
             else:
-                for chunk in stream:
-                    delta = chunk['choices'][0]['delta']
-                    if 'content' in delta:
-                        yield delta['content']
+                for token in tokens:
+                    yield token
 
         except Exception as e:
             traceback.print_exc()

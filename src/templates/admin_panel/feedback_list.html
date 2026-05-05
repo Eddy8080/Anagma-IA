@@ -8,7 +8,7 @@
         <a href="{% url 'admin_panel:dashboard' %}" style="text-decoration:none; color:inherit;">📊 Dashboard</a> 
         / {{ label }}
     </div>
-    <a href="{% url 'admin_panel:dashboard' %}" class="btn-nova-ideia"
+    <a href="{% url 'admin_panel:dashboard' %}" class="btn-nova-ideia" onclick="history.back(); return false;"
        style="padding:10px 24px; text-decoration:none; font-size:0.85rem; margin-right:120px;">
         ← Voltar ao Dashboard
     </a>
