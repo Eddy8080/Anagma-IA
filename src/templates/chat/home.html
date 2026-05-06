@@ -3,460 +3,926 @@
 
 {% block extra_css %}
 <style>
-/* ── Mensagens ── */
-#chat-window {
-    flex-grow: 1;
-    overflow-y: auto;
-    padding: 20px 20px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    scroll-behavior: smooth;
-}
-.message-row {
-    display: flex;
-    flex-direction: column;
-    max-width: 850px;
-    width: 100%;
-    margin: 0 auto;
-}
-.message-row.user-row { align-items: flex-end; }
-.message-row.ai-row   { align-items: flex-start; }
+    /* ── Mensagens ── */
+    #chat-window {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 20px 20px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        scroll-behavior: smooth;
+    }
 
-.message-bubble {
-    padding: 12px 18px;
-    border-radius: 18px;
-    max-width: 82%;
-    font-size: 1.02rem;
-    line-height: 1.65;
-    word-break: break-word;
-}
-.user-bubble {
-    background: #2a2b2e;
-    color: #fff;
-    border-bottom-right-radius: 4px;
-    white-space: pre-wrap;
-    text-align: justify;
-}
-.ai-bubble {
-    background: transparent;
-    color: #e3e3e3;
-    padding-left: 0;
-    max-width: 95%; /* Aumentado para acomodar tabelas */
-}
+    .message-row {
+        display: flex;
+        flex-direction: column;
+        max-width: 850px;
+        width: 100%;
+        margin: 0 auto;
+    }
 
-/* ── Estilo de Tabela Markdown (Excel Style) ── */
-.message-text table {
-    display: block;
-    width: 100%;
-    overflow-x: auto !important; /* Barra de rolagem horizontal ativa */
-    overflow-y: hidden;
-    border-collapse: collapse;
-    margin: 16px 0;
-    font-size: 0.92rem;
-    background: #1e1f20;
-    border: 1px solid #3c4043;
-    border-radius: 8px;
-    max-width: 100%;
-}
-/* Força as colunas a manterem seu tamanho original, gerando o scroll horizontal */
-.message-text table thead, .message-text table tbody {
-    min-width: max-content;
-    display: block;
-}
-.message-text th {
-    background: #2a2b2e;
-    color: var(--accent-color);
-    font-weight: 600;
-    text-align: left;
-    padding: 10px 14px;
-    border: 1px solid #3c4043;
-    white-space: nowrap;
-}
-.message-text td {
-    padding: 8px 14px;
-    border: 1px solid #3c4043;
-    color: #d1d1d1;
-    white-space: nowrap;
-}
+    .message-row.user-row {
+        align-items: flex-end;
+    }
 
-/* Customização da Barra de Rolagem (Estilo Anagma) */
-.message-text table::-webkit-scrollbar, 
-#table-modal-content::-webkit-scrollbar {
-    height: 10px; /* Largura da barra horizontal */
-    width: 10px;  /* Largura da barra vertical */
-}
-.message-text table::-webkit-scrollbar-track,
-#table-modal-content::-webkit-scrollbar-track {
-    background: #131314;
-    border-radius: 10px;
-}
-.message-text table::-webkit-scrollbar-thumb,
-#table-modal-content::-webkit-scrollbar-thumb {
-    background: #3c4043;
-    border-radius: 10px;
-    border: 2px solid #131314;
-}
-.message-text table::-webkit-scrollbar-thumb:hover,
-#table-modal-content::-webkit-scrollbar-thumb:hover {
-    background: var(--accent-color);
-}
+    .message-row.ai-row {
+        align-items: flex-start;
+    }
 
-/* Modal de Tabela - Ajuste de Rolagem Full */
-#table-modal-content {
-    flex: 1;
-    overflow: auto !important; 
-    padding: 20px;
-    background: #131314;
-    display: block;
-}
-#table-modal-content table {
-    display: table !important; 
-    width: auto;
-    min-width: 100%; /* Ocupa tudo, mas expande se as colunas forem maiores */
-    border-collapse: collapse;
-}
-.message-text tr:nth-child(even) {
-    background: #191a1c;
-}
-.message-text tr:hover {
-    background: #252628;
-}
+    .message-bubble {
+        padding: 12px 18px;
+        border-radius: 18px;
+        max-width: 82%;
+        font-size: 1.02rem;
+        line-height: 1.65;
+        word-break: break-word;
+    }
 
-/* Ajustes gerais de Markdown */
-.message-text p { margin-bottom: 12px; }
-.message-text p:last-child { margin-bottom: 0; }
-.message-text strong { color: var(--accent-color); font-weight: 600; }
-.message-text code {
-    background: #2a2b2e;
-    padding: 2px 5px;
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 0.9em;
-}
-.ai-label {
-    color: var(--accent-color);
-    font-weight: 600;
-    font-size: 0.88rem;
-    display: block;
-    margin-bottom: 6px;
-    letter-spacing: 0.02em;
-}
-.msg-time {
-    font-size: 0.71rem;
-    color: #484848;
-    margin-top: 4px;
-    padding: 0 4px;
-}
+    .user-bubble {
+        background: #2a2b2e;
+        color: #fff;
+        border-bottom-right-radius: 4px;
+        white-space: pre-wrap;
+        text-align: justify;
+    }
 
-/* ── Toolbar de cópia ── */
-.message-toolbar {
-    display: flex;
-    gap: 6px;
-    margin-top: 6px;
-    opacity: 1;
-    align-self: flex-start;
-}
-.copy-btn {
-    background: #232426;
-    border: 1px solid #3a3b3e;
-    color: #888;
-    cursor: pointer;
-    padding: 4px 12px;
-    border-radius: 8px;
-    font-size: 0.78rem;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-    font-family: inherit;
-}
-.copy-btn:hover {
-    background: #2e2f32;
-    color: #e3e3e3;
-    border-color: #555;
-}
-.copy-btn.copied {
-    color: #4ade80;
-    border-color: #4ade80;
-}
-.feedback-btn {
-    background: #232426;
-    border: 1px solid #3a3b3e;
-    color: #888;
-    cursor: pointer;
-    padding: 4px 10px;
-    border-radius: 8px;
-    font-size: 0.78rem;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-    font-family: inherit;
-}
-.feedback-btn:hover { background: #2e2f32; color: #e3e3e3; border-color: #555; }
-.feedback-btn.active-like    { color: #4ade80; border-color: #4ade80; background: #1a2e1a; }
-.feedback-btn.active-dislike { color: #f87171; border-color: #f87171; background: #2e1a1a; }
+    .ai-bubble {
+        background: transparent;
+        color: #e3e3e3;
+        padding-left: 0;
+        max-width: 95%;
+        /* Aumentado para acomodar tabelas */
+    }
 
-/* ── Toast ── */
-#copy-toast {
-    position: fixed;
-    bottom: 90px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #2e2f32;
-    color: #e3e3e3;
-    padding: 8px 20px;
-    border-radius: 10px;
-    font-size: 0.85rem;
-    z-index: 9999;
-    opacity: 0;
-    transition: opacity 0.18s;
-    pointer-events: none;
-    border: 1px solid #444;
-}
+    /* ── Estilo de Tabela Markdown (Excel Style) ── */
+    .message-text table {
+        display: block;
+        width: 100%;
+        overflow-x: auto !important;
+        /* Barra de rolagem horizontal ativa */
+        overflow-y: hidden;
+        border-collapse: collapse;
+        margin: 16px 0;
+        font-size: 0.92rem;
+        background: #1e1f20;
+        border: 1px solid #3c4043;
+        border-radius: 8px;
+        max-width: 100%;
+    }
 
-/* ── Indicador pensando ── */
-.thinking-dots { display: inline-flex; gap: 3px; align-items: center; height: 22px; }
-.thinking-dots span {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--accent-color);
-    animation: blink-dot 1.4s infinite;
-    display: inline-block;
-}
-.thinking-dots span:nth-child(2) { animation-delay: 0.22s; }
-.thinking-dots span:nth-child(3) { animation-delay: 0.44s; }
-@keyframes blink-dot {
-    0%, 80%, 100% { opacity: 0.15; transform: scale(0.8); }
-    40%            { opacity: 1;    transform: scale(1);   }
-}
-/* ── Itens fixados ── */
-.history-group-label.pinned-label { color: #9b72cb; }
-.history-item.pinned-item { border-color: #4a3070; background: #1c1828; }
-.history-item.pinned-item:hover { border-color: #6b4fa0; background: #221d30; }
-.history-item.pinned-item.active { border-color: #9b72cb; border-left: 3px solid #9b72cb; background: #1e1535; padding-left: 8px; }
-/* ── Item pendente (nova conversa aguardando) ── */
-.history-item.pending { border: 1px dashed #4285f4 !important; background: #111827; animation: pendingPulse 2s ease-in-out infinite; }
-.pending-title { font-style: italic; color: #6a8fc0; }
-@keyframes pendingPulse {
-    0%, 100% { border-color: #4285f4; box-shadow: 0 0 0 0 rgba(66,133,244,0); }
-    50%       { border-color: #9b72cb; box-shadow: 0 0 6px 1px rgba(155,114,203,0.2); }
-}
+    /* Força as colunas a manterem seu tamanho original, gerando o scroll horizontal */
+    .message-text table thead,
+    .message-text table tbody {
+        min-width: max-content;
+        display: block;
+    }
 
-/* ── Status de Anexo ── */
-.status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border-radius: 8px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    margin-top: 8px;
-    border: 1px solid transparent;
-}
-.status-approved {
-    background: rgba(74, 222, 128, 0.1);
-    color: #4ade80;
-    border-color: rgba(74, 222, 128, 0.2);
-}
-.status-rejected {
-    background: rgba(248, 113, 113, 0.1);
-    color: #f87171;
-    border-color: rgba(248, 113, 113, 0.2);
-}
-.status-pending {
-    background: rgba(251, 191, 36, 0.1);
-    color: #fbbf24;
-    border-color: rgba(251, 191, 36, 0.2);
-}
+    .message-text th {
+        background: #2a2b2e;
+        color: var(--accent-color);
+        font-weight: 600;
+        text-align: left;
+        padding: 10px 14px;
+        border: 1px solid #3c4043;
+        white-space: nowrap;
+    }
 
-/* ── Tour de Boas-vindas ── */
-#tour-overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.78);
-    z-index: 20000;
-    display: flex; align-items: center; justify-content: center;
-    -webkit-backdrop-filter: blur(5px);
-    backdrop-filter: blur(5px);
-    animation: tour-fade-in 0.45s ease;
-}
-#tour-overlay.tour-hidden { display: none; }
-@keyframes tour-fade-in  { from { opacity:0 } to { opacity:1 } }
-@keyframes tour-fade-out { from { opacity:1 } to { opacity:0 } }
-.tour-modal {
-    background: #1a1b1d;
-    border: 1px solid #2e2f33;
-    border-radius: 22px;
-    padding: 38px 42px 28px;
-    width: 92%; max-width: 500px;
-    box-shadow: 0 24px 70px rgba(0,0,0,0.65);
-}
-.tour-slide { display: none; flex-direction: column; align-items: center; min-height: 290px; }
-.tour-slide.tour-active {
-    display: flex;
-    animation: tour-slide-in 0.32s ease;
-}
-@keyframes tour-slide-in {
-    from { opacity:0; transform:translateX(22px) }
-    to   { opacity:1; transform:translateX(0)    }
-}
-/* Lâmpada flutuante */
-.tour-lamp-wrap { margin-bottom: 18px; }
-@keyframes tour-float {
-    0%,100% { transform: translateY(0px) }
-    50%     { transform: translateY(-11px) }
-}
-.tour-lamp { animation: tour-float 3.2s ease-in-out infinite; display: block; }
-/* Textos */
-.tour-slide-icon { font-size: 2.6rem; margin-bottom: 10px; }
-.tour-slide-title {
-    font-size: 1.38rem; font-weight: 600; text-align: center; margin-bottom: 14px;
-    background: linear-gradient(to right, #4285f4, #9b72cb);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-}
-.tour-slide-body { color: #b8b8b8; font-size: 0.93rem; line-height: 1.7; width: 100%; }
-.tour-slide-body p { text-align: center; color: #999; }
-.tour-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 9px; }
-.tour-item-ic { font-size: 1.05rem; flex-shrink: 0; margin-top: 2px; }
-.tour-example {
-    background: #242527; border-radius: 8px; padding: 7px 13px;
-    margin-bottom: 6px; font-size: 0.87rem; color: #b0b0b0; font-style: italic;
-}
-.tour-verif {
-    background: rgba(155,114,203,0.07); border-left: 3px solid #9b72cb;
-    border-radius: 0 8px 8px 0; padding: 9px 14px; margin-bottom: 8px;
-    font-size: 0.88rem; color: #c0b0d8;
-}
-.tour-tip {
-    background: rgba(66,133,244,0.07); border: 1px solid rgba(66,133,244,0.18);
-    border-radius: 8px; padding: 9px 13px; margin-top: 12px;
-    font-size: 0.86rem; color: #7aabf4;
-}
-/* Dots */
-.tour-dots { display: flex; gap: 8px; justify-content: center; margin: 22px 0 18px; }
-.tour-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: #2e2f33; cursor: pointer;
-    transition: background 0.22s, transform 0.22s;
-}
-.tour-dot.tour-dot-active { background: #9b72cb; transform: scale(1.35); }
-/* Rodapé */
-.tour-footer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.tour-no-show {
-    display: flex; align-items: center; gap: 7px;
-    color: #555; font-size: 0.81rem; cursor: pointer; -webkit-user-select: none; user-select: none; flex: 1;
-}
-.tour-no-show input { accent-color: #9b72cb; width: 14px; height: 14px; cursor: pointer; }
-.tour-btn {
-    background: #252628; color: #b0b0b0; border: 1px solid #2e2f33;
-    border-radius: 10px; padding: 9px 18px; font-size: 0.88rem;
-    cursor: pointer; transition: background 0.16s, color 0.16s; font-family: inherit;
-}
-.tour-btn:hover { background: #2e2f32; color: #e0e0e0; }
-.tour-btn:disabled { opacity: 0.28; cursor: default; pointer-events: none; }
-.tour-btn-next {
-    background: linear-gradient(135deg, #4285f4, #9b72cb);
-    color: #fff; border: none;
-}
-.tour-btn-next:hover { opacity: 0.88; background: linear-gradient(135deg, #4285f4, #9b72cb); }
+    .message-text td {
+        padding: 8px 14px;
+        border: 1px solid #3c4043;
+        color: #d1d1d1;
+        white-space: nowrap;
+    }
 
-/* ── Inline-style removals ── */
-#empty-history { font-size: 0.8rem; color: #555; text-align: center; margin-top: 24px; }
-#greeting-center { text-align: center; }
-#greeting-title {
-    background: linear-gradient(to right, #4285f4, #9b72cb, #d96570);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    font-size: 3.5rem; margin-bottom: 12px; font-weight: 500;
-}
-#greeting-subtitle { color: #666; font-size: 1.4rem; }
-#messages-container { display: none; flex-direction: column; gap: 20px; width: 100%; }
-#table-modal {
-    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.85); z-index: 11000;
-    align-items: center; justify-content: center;
-    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-}
-.table-modal-card {
-    width: 95%; max-width: 1200px; max-height: 90vh;
-    display: flex; flex-direction: column; padding: 24px;
-    border: 1px solid #3c4043; box-shadow: 0 20px 60px rgba(0,0,0,0.7);
-}
-.table-modal-header {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 12px;
-}
-.table-modal-title { margin: 0; color: #a8c7fa; display: flex; align-items: center; gap: 10px; }
-#close-table-modal { background: none; border: none; color: #888; font-size: 1.8rem; cursor: pointer; line-height: 1; }
-.table-modal-footer { margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; }
-#save-xlsx-btn { padding: 8px 24px; }
-#close-table-modal-btn { padding: 8px 24px; }
-#confirm-modal {
-    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.7); z-index: 10000;
-    align-items: center; justify-content: center;
-    -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
-}
-.confirm-modal-card {
-    background: #1e1f20; border: 1px solid #3c4043; border-radius: 16px;
-    padding: 24px; width: 90%; max-width: 380px;
-    text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-}
-.confirm-modal-icon { font-size: 2rem; margin-bottom: 16px; }
-.confirm-modal-title { margin: 0 0 12px; color: #e3e3e3; font-weight: 500; }
-.confirm-modal-text { color: #999; font-size: 0.9rem; line-height: 1.5; margin-bottom: 24px; }
-.confirm-modal-actions { display: flex; gap: 12px; justify-content: center; }
-#modal-cancel-btn {
-    background: #333537; color: #e3e3e3; border: 1px solid #444;
-    border-radius: 10px; padding: 10px 24px; cursor: pointer; font-weight: 500; transition: background 0.2s;
-}
-#modal-confirm-btn {
-    background: #d93025; color: white; border: none;
-    border-radius: 10px; padding: 10px 24px; cursor: pointer; font-weight: 500; transition: background 0.2s;
-}
-.slide-body-left { text-align: left; margin-bottom: 10px; }
-.slide-body-left-mb12 { text-align: left; margin-bottom: 12px; }
-.tour-verif-blue { border-color: #4285f4; background: rgba(66,133,244,0.06); color: #9ac0f5; margin-top: 8px; }
-.tour-tip-mt { margin-top: 10px; }
+    /* Customização da Barra de Rolagem (Estilo Anagma) */
+    .message-text table::-webkit-scrollbar,
+    #table-modal-content::-webkit-scrollbar {
+        height: 10px;
+        /* Largura da barra horizontal */
+        width: 10px;
+        /* Largura da barra vertical */
+    }
+
+    .message-text table::-webkit-scrollbar-track,
+    #table-modal-content::-webkit-scrollbar-track {
+        background: #131314;
+        border-radius: 10px;
+    }
+
+    .message-text table::-webkit-scrollbar-thumb,
+    #table-modal-content::-webkit-scrollbar-thumb {
+        background: #3c4043;
+        border-radius: 10px;
+        border: 2px solid #131314;
+    }
+
+    .message-text table::-webkit-scrollbar-thumb:hover,
+    #table-modal-content::-webkit-scrollbar-thumb:hover {
+        background: var(--accent-color);
+    }
+
+    /* Modal de Tabela - Ajuste de Rolagem Full */
+    #table-modal-content {
+        flex: 1;
+        overflow: auto !important;
+        padding: 20px;
+        background: #131314;
+        display: block;
+    }
+
+    #table-modal-content table {
+        display: table !important;
+        width: auto;
+        min-width: 100%;
+        /* Ocupa tudo, mas expande se as colunas forem maiores */
+        border-collapse: collapse;
+    }
+
+    .message-text tr:nth-child(even) {
+        background: #191a1c;
+    }
+
+    .message-text tr:hover {
+        background: #252628;
+    }
+
+    /* Ajustes gerais de Markdown */
+    .message-text p {
+        margin-bottom: 12px;
+    }
+
+    .message-text p:last-child {
+        margin-bottom: 0;
+    }
+
+    .message-text strong {
+        color: var(--accent-color);
+        font-weight: 600;
+    }
+
+    .message-text code {
+        background: #2a2b2e;
+        padding: 2px 5px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.9em;
+    }
+
+    .ai-label {
+        color: var(--accent-color);
+        font-weight: 600;
+        font-size: 0.88rem;
+        display: block;
+        margin-bottom: 6px;
+        letter-spacing: 0.02em;
+    }
+
+    .msg-time {
+        font-size: 0.71rem;
+        color: #484848;
+        margin-top: 4px;
+        padding: 0 4px;
+    }
+
+    /* ── Toolbar de cópia ── */
+    .message-toolbar {
+        display: flex;
+        gap: 6px;
+        margin-top: 6px;
+        opacity: 1;
+        align-self: flex-start;
+    }
+
+    .copy-btn {
+        background: #232426;
+        border: 1px solid #3a3b3e;
+        color: #888;
+        cursor: pointer;
+        padding: 4px 12px;
+        border-radius: 8px;
+        font-size: 0.78rem;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+        font-family: inherit;
+    }
+
+    .copy-btn:hover {
+        background: #2e2f32;
+        color: #e3e3e3;
+        border-color: #555;
+    }
+
+    .copy-btn.copied {
+        color: #4ade80;
+        border-color: #4ade80;
+    }
+
+    .feedback-btn {
+        background: #232426;
+        border: 1px solid #3a3b3e;
+        color: #888;
+        cursor: pointer;
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-size: 0.78rem;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+        font-family: inherit;
+    }
+
+    .feedback-btn:hover {
+        background: #2e2f32;
+        color: #e3e3e3;
+        border-color: #555;
+    }
+
+    .feedback-btn.active-like {
+        color: #4ade80;
+        border-color: #4ade80;
+        background: #1a2e1a;
+    }
+
+    .feedback-btn.active-dislike {
+        color: #f87171;
+        border-color: #f87171;
+        background: #2e1a1a;
+    }
+
+    /* ── Toast ── */
+    #copy-toast {
+        position: fixed;
+        bottom: 90px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #2e2f32;
+        color: #e3e3e3;
+        padding: 8px 20px;
+        border-radius: 10px;
+        font-size: 0.85rem;
+        z-index: 9999;
+        opacity: 0;
+        transition: opacity 0.18s;
+        pointer-events: none;
+        border: 1px solid #444;
+    }
+
+    /* ── Indicador pensando ── */
+    .thinking-dots {
+        display: inline-flex;
+        gap: 3px;
+        align-items: center;
+        height: 22px;
+    }
+
+    .thinking-dots span {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--accent-color);
+        animation: blink-dot 1.4s infinite;
+        display: inline-block;
+    }
+
+    .thinking-dots span:nth-child(2) {
+        animation-delay: 0.22s;
+    }
+
+    .thinking-dots span:nth-child(3) {
+        animation-delay: 0.44s;
+    }
+
+    @keyframes blink-dot {
+
+        0%,
+        80%,
+        100% {
+            opacity: 0.15;
+            transform: scale(0.8);
+        }
+
+        40% {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    /* ── Itens fixados ── */
+    .history-group-label.pinned-label {
+        color: #9b72cb;
+    }
+
+    .history-item.pinned-item {
+        border-color: #4a3070;
+        background: #1c1828;
+    }
+
+    .history-item.pinned-item:hover {
+        border-color: #6b4fa0;
+        background: #221d30;
+    }
+
+    .history-item.pinned-item.active {
+        border-color: #9b72cb;
+        border-left: 3px solid #9b72cb;
+        background: #1e1535;
+        padding-left: 8px;
+    }
+
+    /* ── Item pendente (nova conversa aguardando) ── */
+    .history-item.pending {
+        border: 1px dashed #4285f4 !important;
+        background: #111827;
+        animation: pendingPulse 2s ease-in-out infinite;
+    }
+
+    .pending-title {
+        font-style: italic;
+        color: #6a8fc0;
+    }
+
+    @keyframes pendingPulse {
+
+        0%,
+        100% {
+            border-color: #4285f4;
+            box-shadow: 0 0 0 0 rgba(66, 133, 244, 0);
+        }
+
+        50% {
+            border-color: #9b72cb;
+            box-shadow: 0 0 6px 1px rgba(155, 114, 203, 0.2);
+        }
+    }
+
+    /* ── Status de Anexo ── */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-top: 8px;
+        border: 1px solid transparent;
+    }
+
+    .status-approved {
+        background: rgba(74, 222, 128, 0.1);
+        color: #4ade80;
+        border-color: rgba(74, 222, 128, 0.2);
+    }
+
+    .status-rejected {
+        background: rgba(248, 113, 113, 0.1);
+        color: #f87171;
+        border-color: rgba(248, 113, 113, 0.2);
+    }
+
+    .status-pending {
+        background: rgba(251, 191, 36, 0.1);
+        color: #fbbf24;
+        border-color: rgba(251, 191, 36, 0.2);
+    }
+
+    /* ── Tour de Boas-vindas ── */
+    #tour-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.78);
+        z-index: 20000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-backdrop-filter: blur(5px);
+        backdrop-filter: blur(5px);
+        animation: tour-fade-in 0.45s ease;
+    }
+
+    #tour-overlay.tour-hidden {
+        display: none;
+    }
+
+    @keyframes tour-fade-in {
+        from {
+            opacity: 0
+        }
+
+        to {
+            opacity: 1
+        }
+    }
+
+    @keyframes tour-fade-out {
+        from {
+            opacity: 1
+        }
+
+        to {
+            opacity: 0
+        }
+    }
+
+    .tour-modal {
+        background: #1a1b1d;
+        border: 1px solid #2e2f33;
+        border-radius: 22px;
+        padding: 38px 42px 28px;
+        width: 500px;
+        max-width: 92%;
+        min-height: 620px;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65);
+    }
+
+    .tour-slide {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        height: 480px;
+        overflow-y: auto;
+    }
+
+    .tour-slide.tour-active {
+        display: flex;
+        animation: tour-slide-in 0.32s ease;
+    }
+
+    @keyframes tour-slide-in {
+        from {
+            opacity: 0;
+            transform: translateX(22px)
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0)
+        }
+    }
+
+    /* Lâmpada flutuante */
+    .tour-lamp-wrap {
+        margin-bottom: 18px;
+    }
+
+    @keyframes tour-wave-left {
+        0%, 100% { transform: rotate(0deg); }
+        50% { transform: rotate(-25deg); }
+    }
+    @keyframes tour-wave-right {
+        0%, 100% { transform: rotate(0deg); }
+        50% { transform: rotate(25deg); }
+    }
+
+    .tour-lamp {
+        display: block;
+    }
+    .tour-arm-left {
+        transform-origin: 140px 138px;
+        animation: tour-wave-left 1.8s ease-in-out infinite;
+    }
+    .tour-arm-right {
+        transform-origin: 60px 138px;
+        animation: tour-wave-right 1.8s ease-in-out infinite;
+    }
+
+    /* Textos */
+    .tour-slide-icon {
+        font-size: 2.6rem;
+        margin-bottom: 10px;
+    }
+
+    .tour-slide-title {
+        font-size: 1.38rem;
+        font-weight: 600;
+        text-align: center;
+        margin-bottom: 14px;
+        background: linear-gradient(to right, #4285f4, #9b72cb);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .tour-slide-body {
+        color: #b8b8b8;
+        font-size: 0.93rem;
+        line-height: 1.7;
+        width: 100%;
+    }
+
+    .tour-slide-body p {
+        text-align: center;
+        color: #999;
+    }
+
+    .tour-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 9px;
+    }
+
+    .tour-item-ic {
+        font-size: 1.05rem;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    .tour-example {
+        background: #242527;
+        border-radius: 8px;
+        padding: 7px 13px;
+        margin-bottom: 6px;
+        font-size: 0.87rem;
+        color: #b0b0b0;
+        font-style: italic;
+    }
+
+    .tour-verif {
+        background: rgba(155, 114, 203, 0.07);
+        border-left: 3px solid #9b72cb;
+        border-radius: 0 8px 8px 0;
+        padding: 9px 14px;
+        margin-bottom: 8px;
+        font-size: 0.88rem;
+        color: #c0b0d8;
+    }
+
+    .tour-tip {
+        background: rgba(66, 133, 244, 0.07);
+        border: 1px solid rgba(66, 133, 244, 0.18);
+        border-radius: 8px;
+        padding: 9px 13px;
+        margin-top: 12px;
+        font-size: 0.86rem;
+        color: #7aabf4;
+    }
+
+    /* Dots */
+    .tour-dots {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        margin: 22px 0 18px;
+    }
+
+    .tour-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #2e2f33;
+        cursor: pointer;
+        transition: background 0.22s, transform 0.22s;
+    }
+
+    .tour-dot.tour-dot-active {
+        background: #9b72cb;
+        transform: scale(1.35);
+    }
+
+    /* Rodapé */
+    .tour-footer {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .tour-no-show {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: #555;
+        font-size: 0.81rem;
+        cursor: pointer;
+        -webkit-user-select: none;
+        user-select: none;
+        flex: 1;
+    }
+
+    .tour-no-show input {
+        accent-color: #9b72cb;
+        width: 14px;
+        height: 14px;
+        cursor: pointer;
+    }
+
+    .tour-btn {
+        background: #252628;
+        color: #b0b0b0;
+        border: 1px solid #2e2f33;
+        border-radius: 10px;
+        padding: 9px 18px;
+        font-size: 0.88rem;
+        cursor: pointer;
+        transition: background 0.16s, color 0.16s;
+        font-family: inherit;
+    }
+
+    .tour-btn:hover {
+        background: #2e2f32;
+        color: #e0e0e0;
+    }
+
+    .tour-btn:disabled {
+        opacity: 0.28;
+        cursor: default;
+        pointer-events: none;
+    }
+
+    .tour-btn-next {
+        background: linear-gradient(135deg, #4285f4, #9b72cb);
+        color: #fff;
+        border: none;
+    }
+
+    .tour-btn-next:hover {
+        opacity: 0.88;
+        background: linear-gradient(135deg, #4285f4, #9b72cb);
+    }
+
+    /* ── Inline-style removals ── */
+    #empty-history {
+        font-size: 0.8rem;
+        color: #555;
+        text-align: center;
+        margin-top: 24px;
+    }
+
+    #greeting-center {
+        text-align: center;
+    }
+
+    #greeting-title {
+        background: linear-gradient(to right, #4285f4, #9b72cb, #d96570);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-size: 3.5rem;
+        margin-bottom: 12px;
+        font-weight: 500;
+    }
+
+    #greeting-subtitle {
+        color: #666;
+        font-size: 1.4rem;
+    }
+
+    #messages-container {
+        display: none;
+        flex-direction: column;
+        gap: 20px;
+        width: 100%;
+    }
+
+    #table-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        z-index: 11000;
+        align-items: center;
+        justify-content: center;
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+    }
+
+    .table-modal-card {
+        width: 95%;
+        max-width: 1200px;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        padding: 24px;
+        border: 1px solid #3c4043;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+    }
+
+    .table-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #333;
+        padding-bottom: 12px;
+    }
+
+    .table-modal-title {
+        margin: 0;
+        color: #a8c7fa;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    #close-table-modal {
+        background: none;
+        border: none;
+        color: #888;
+        font-size: 1.8rem;
+        cursor: pointer;
+        line-height: 1;
+    }
+
+    .table-modal-footer {
+        margin-top: 20px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    #save-xlsx-btn {
+        padding: 8px 24px;
+    }
+
+    #close-table-modal-btn {
+        padding: 8px 24px;
+    }
+
+    #confirm-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+        -webkit-backdrop-filter: blur(3px);
+        backdrop-filter: blur(3px);
+    }
+
+    .confirm-modal-card {
+        background: #1e1f20;
+        border: 1px solid #3c4043;
+        border-radius: 16px;
+        padding: 24px;
+        width: 90%;
+        max-width: 380px;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .confirm-modal-icon {
+        font-size: 2rem;
+        margin-bottom: 16px;
+    }
+
+    .confirm-modal-title {
+        margin: 0 0 12px;
+        color: #e3e3e3;
+        font-weight: 500;
+    }
+
+    .confirm-modal-text {
+        color: #999;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        margin-bottom: 24px;
+    }
+
+    .confirm-modal-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+    }
+
+    #modal-cancel-btn {
+        background: #333537;
+        color: #e3e3e3;
+        border: 1px solid #444;
+        border-radius: 10px;
+        padding: 10px 24px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: background 0.2s;
+    }
+
+    #modal-confirm-btn {
+        background: #d93025;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 10px 24px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: background 0.2s;
+    }
+
+    .slide-body-left {
+        text-align: left;
+        margin-bottom: 10px;
+    }
+
+    .slide-body-left-mb12 {
+        text-align: left;
+        margin-bottom: 12px;
+    }
+
+    .tour-verif-blue {
+        border-color: #4285f4;
+        background: rgba(66, 133, 244, 0.06);
+        color: #9ac0f5;
+        margin-top: 8px;
+    }
+
+    .tour-tip-mt {
+        margin-top: 10px;
+    }
+
+    /* ── Modo Claro (Light Mode) Overrides para o Tour ── */
+    html.light-mode #tour-overlay {
+        background: rgba(255, 255, 255, 0.82);
+    }
+
+    html.light-mode .tour-modal {
+        background: #ffffff;
+        border-color: #e0e0e0;
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.15);
+    }
+
+    html.light-mode .tour-slide-body {
+        color: #444;
+    }
+
+    html.light-mode .tour-slide-body p {
+        color: #666;
+    }
+
+    html.light-mode .tour-example {
+        background: #f5f5f7;
+        color: #555;
+    }
+
+    html.light-mode .tour-verif {
+        background: rgba(155, 114, 203, 0.1);
+        color: #5b3e8c;
+    }
+
+    html.light-mode .tour-verif-blue {
+        background: rgba(66, 133, 244, 0.1);
+        color: #2b579a;
+    }
+
+    html.light-mode .tour-dot {
+        background: #ddd;
+    }
+
+    html.light-mode .tour-no-show {
+        color: #888;
+    }
+
+    html.light-mode .tour-btn {
+        background: #f0f0f2;
+        color: #666;
+        border-color: #ddd;
+    }
+
+    html.light-mode .tour-btn:hover {
+        background: #e8e8eb;
+        color: #333;
+    }
 </style>
 {% endblock %}
 
 {# ── Sidebar: histórico agrupado ── #}
 {% block sidebar_history %}
 {% for group_label, group_sessions in grouped_sessions %}
-<div class="history-group" data-group="{{ group_label }}">
-    <div class="history-group-label{% if group_label == 'Fixadas' %} pinned-label{% endif %}">
-        {% if group_label == 'Fixadas' %}📌 {% endif %}{{ group_label }}
-    </div>
-    {% for session in group_sessions %}
-    <div class="history-item{% if current_session and session.id == current_session.id %} active{% endif %}{% if session.pinned %} pinned-item{% endif %}"
-         data-session-id="{{ session.id }}"
-         data-session-title="{{ session.titulo|escapejs }}"
-         data-pinned="{{ session.pinned|yesno:'1,0' }}">
-        <a class="session-link" href="/chat/s/{{ session.id }}/" title="{{ session.titulo }}">
-            <span class="session-title">{{ session.titulo }}</span>
-        </a>
-        <div class="session-actions">
-            <button class="session-action-btn" data-action="pin"
-                    data-session-id="{{ session.id }}"
-                    title="{% if session.pinned %}Desafixar{% else %}Fixar{% endif %}"
-                    type="button">{% if session.pinned %}📍{% else %}📌{% endif %}</button>
-            <button class="session-action-btn" data-action="rename"
-                    data-session-id="{{ session.id }}"
-                    title="Renomear" type="button">✏️</button>
-            <button class="session-action-btn" data-action="delete"
-                    data-session-id="{{ session.id }}"
-                    title="Excluir" type="button">🗑️</button>
+    <div class="history-group" data-group="{{ group_label }}">
+        <div class="history-group-label{% if group_label == 'Fixadas' %} pinned-label{% endif %}">
+            {% if group_label == 'Fixadas' %}📌 {% endif %}{{ group_label }}
         </div>
+        {% for session in group_sessions %}
+        <div class="history-item{% if current_session and session.id == current_session.id %} active{% endif %}{% if session.pinned %} pinned-item{% endif %}"
+            data-session-id="{{ session.id }}" data-session-title="{{ session.titulo|escapejs }}"
+            data-pinned="{{ session.pinned|yesno:'1,0' }}">
+            <a class="session-link" href="/chat/s/{{ session.id }}/" title="{{ session.titulo }}">
+                <span class="session-title">{{ session.titulo }}</span>
+            </a>
+            <div class="session-actions">
+                <button class="session-action-btn" data-action="pin" data-session-id="{{ session.id }}"
+                    title="{{ session.pinned|yesno:'Desafixar,Fixar' }}" type="button">
+                    {{ session.pinned|yesno:'📍,📌' }}
+                </button>
+                <button class="session-action-btn" data-action="rename" data-session-id="{{ session.id }}" title="Renomear"
+                    type="button">✏️</button>
+                <button class="session-action-btn" data-action="delete" data-session-id="{{ session.id }}" title="Excluir"
+                    type="button">🗑️</button>
+            </div>
+        </div>
+        {% endfor %}
     </div>
-    {% endfor %}
-</div>
 {% empty %}
-<p id="empty-history">
-    Nenhum histórico ainda.
-</p>
+    <p id="empty-history">Nenhum histórico ainda.</p>
 {% endfor %}
 {% endblock %}
 
@@ -508,133 +974,187 @@
 </div>
 {# ── Tour de Boas-vindas ── #}
 <div id="tour-overlay" class="tour-hidden">
-  <div class="tour-modal">
-    <div id="tour-slides">
+    <div class="tour-modal">
+        <div id="tour-slides">
 
-      {# Slide 1 — Boas-vindas #}
-      <div class="tour-slide tour-active">
-        <div class="tour-lamp-wrap">
-          <svg class="tour-lamp" viewBox="55 42 150 165" xmlns="http://www.w3.org/2000/svg" width="108" height="108">
-            <defs>
-              <filter id="tg" x="-60%" y="-60%" width="220%" height="220%">
-                <feGaussianBlur stdDeviation="13" result="b"/>
-                <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-              </filter>
-            </defs>
-            <circle cx="100" cy="98" r="54" fill="#f1c40f" filter="url(#tg)" opacity="0.55"/>
-            <path d="M 85 158 L 115 158 L 110 188 L 90 188 Z" fill="#7f8c8d"/>
-            <line x1="86" y1="163" x2="114" y2="163" stroke="#34495e" stroke-width="2"/>
-            <line x1="87" y1="173" x2="113" y2="173" stroke="#34495e" stroke-width="2"/>
-            <line x1="88" y1="183" x2="112" y2="183" stroke="#34495e" stroke-width="2"/>
-            <path d="M 95 188 Q 100 198 105 188 Z" fill="#2c3e50"/>
-            <path d="M 60 133 C 60 158 85 158 85 158 L 115 158 C 115 158 140 158 140 133 A 50 50 0 1 0 60 133 Z" fill="#f9d71c" stroke="#e6b800" stroke-width="1.5" opacity="0.92"/>
-            <circle cx="85" cy="93" r="4" fill="#2c3e50"/>
-            <circle cx="115" cy="93" r="4" fill="#2c3e50"/>
-            <circle cx="83" cy="91" r="1.5" fill="#ffffff"/>
-            <circle cx="113" cy="91" r="1.5" fill="#ffffff"/>
-            <circle cx="71" cy="104" r="6" fill="#e8a89c" opacity="0.42"/>
-            <circle cx="129" cy="104" r="6" fill="#e8a89c" opacity="0.42"/>
-            <path d="M 88 109 Q 100 123 112 109" fill="transparent" stroke="#2c3e50" stroke-width="2.5" stroke-linecap="round"/>
-            {# Óculos intelectuais #}
-            <circle cx="85" cy="94" r="13" fill="rgba(200,150,20,0.07)" stroke="#c8961e" stroke-width="2.2"/>
-            <circle cx="115" cy="94" r="13" fill="rgba(200,150,20,0.07)" stroke="#c8961e" stroke-width="2.2"/>
-            <line x1="98" y1="94" x2="102" y2="94" stroke="#c8961e" stroke-width="2"/>
-            <line x1="72" y1="95" x2="62" y2="99" stroke="#c8961e" stroke-width="1.8" stroke-linecap="round"/>
-            <line x1="128" y1="95" x2="138" y2="99" stroke="#c8961e" stroke-width="1.8" stroke-linecap="round"/>
-          </svg>
-        </div>
-        <div class="tour-slide-title">Bem-vindo à Digiana!</div>
-        <div class="tour-slide-body">
-          <p>Sua assistente contábil com inteligência artificial,<br>pronta para responder dúvidas fiscais e tributárias<br>com base na biblioteca de documentos da Anagma.</p>
-        </div>
-      </div>
+            {# Slide 1 — Boas-vindas #}
+            <div class="tour-slide tour-active">
+                <div class="tour-lamp-wrap">
+                    <svg class="tour-lamp" viewBox="55 42 150 165" xmlns="http://www.w3.org/2000/svg" width="108"
+                        height="108">
+                        <defs>
+                            <filter id="tg" x="-60%" y="-60%" width="220%" height="220%">
+                                <feGaussianBlur stdDeviation="13" result="b" />
+                                <feMerge>
+                                    <feMergeNode in="b" />
+                                    <feMergeNode in="SourceGraphic" />
+                                </feMerge>
+                            </filter>
+                        </defs>
+                        <circle cx="100" cy="98" r="54" fill="#f1c40f" filter="url(#tg)" opacity="0.55" />
+                        <path d="M 85 158 L 115 158 L 110 188 L 90 188 Z" fill="#7f8c8d" />
+                        <line x1="86" y1="163" x2="114" y2="163" stroke="#34495e" stroke-width="2" />
+                        <line x1="87" y1="173" x2="113" y2="173" stroke="#34495e" stroke-width="2" />
+                        <line x1="88" y1="183" x2="112" y2="183" stroke="#34495e" stroke-width="2" />
+                        <path d="M 95 188 Q 100 198 105 188 Z" fill="#2c3e50" />
+                        <path
+                            d="M 60 133 C 60 158 85 158 85 158 L 115 158 C 115 158 140 158 140 133 A 50 50 0 1 0 60 133 Z"
+                            fill="#f9d71c" stroke="#e6b800" stroke-width="1.5" opacity="0.92" />
+                        <circle cx="85" cy="93" r="4" fill="#2c3e50" />
+                        <circle cx="115" cy="93" r="4" fill="#2c3e50" />
+                        <circle cx="83" cy="91" r="1.5" fill="#ffffff" />
+                        <circle cx="113" cy="91" r="1.5" fill="#ffffff" />
+                        <circle cx="71" cy="104" r="6" fill="#e8a89c" opacity="0.42" />
+                        <circle cx="129" cy="104" r="6" fill="#e8a89c" opacity="0.42" />
+                        <path d="M 88 109 Q 100 123 112 109" fill="transparent" stroke="#2c3e50" stroke-width="2.5"
+                            stroke-linecap="round" />
+                        {# Óculos intelectuais #}
+                        <circle cx="85" cy="94" r="13" fill="rgba(200,150,20,0.07)" stroke="#c8961e"
+                            stroke-width="2.2" />
+                        <circle cx="115" cy="94" r="13" fill="rgba(200,150,20,0.07)" stroke="#c8961e"
+                            stroke-width="2.2" />
+                        <line x1="98" y1="94" x2="102" y2="94" stroke="#c8961e" stroke-width="2" />
+                        <line x1="72" y1="95" x2="62" y2="99" stroke="#c8961e" stroke-width="1.8"
+                            stroke-linecap="round" />
+                        <line x1="128" y1="95" x2="138" y2="99" stroke="#c8961e" stroke-width="1.8"
+                            stroke-linecap="round" />
+                        
+                        {# Braços animados (Saudação) #}
+                        <g class="tour-arm-left">
+                            <circle cx="140" cy="138" r="6" fill="#e8a87c"/>
+                            <line x1="140" y1="138" x2="148" y2="122" stroke="#d4845a" stroke-width="7" stroke-linecap="round"/>
+                            <line x1="148" y1="122" x2="152" y2="110" stroke="#d4845a" stroke-width="6" stroke-linecap="round"/>
+                        </g>
+                        <g class="tour-arm-right">
+                            <circle cx="60" cy="138" r="6" fill="#e8a87c"/>
+                            <line x1="60" y1="138" x2="52" y2="122" stroke="#d4845a" stroke-width="7" stroke-linecap="round"/>
+                            <line x1="52" y1="122" x2="48" y2="110" stroke="#d4845a" stroke-width="6" stroke-linecap="round"/>
+                        </g>
+                    </svg>
+                </div>
+                <div class="tour-slide-title">Bem-vindo à Digiana!</div>
+                <div class="tour-slide-body">
+                    <p>Sua assistente contábil com inteligência artificial,<br>pronta para responder dúvidas fiscais e
+                        tributárias<br>com base na biblioteca de documentos da Anagma.</p>
+                </div>
+            </div>
 
-      {# Slide 2 — Como perguntar #}
-      <div class="tour-slide">
-        <div class="tour-slide-icon">💬</div>
-        <div class="tour-slide-title">Perguntas em linguagem natural</div>
-        <div class="tour-slide-body">
-          <p class="slide-body-left">Faça perguntas contábeis diretamente. Exemplos:</p>
-          <div class="tour-example">"Qual a alíquota do DAS para MEI em 2024?"</div>
-          <div class="tour-example">"Quais obrigações acessórias do Simples Nacional?"</div>
-          <div class="tour-example">"Qual o prazo de entrega da ECD para 2024?"</div>
-          <div class="tour-tip">💡 Seja específico — inclua ano, regime tributário ou número do artigo quando souber. Quanto mais detalhada a pergunta, mais precisa a resposta.</div>
-        </div>
-      </div>
+            {# Slide 2 — Como perguntar #}
+            <div class="tour-slide">
+                <div class="tour-slide-icon">💬</div>
+                <div class="tour-slide-title">Perguntas em linguagem natural</div>
+                <div class="tour-slide-body">
+                    <p class="slide-body-left">Faça perguntas contábeis diretamente. Exemplos:</p>
+                    <div class="tour-example">"Qual a alíquota do DAS para MEI em 2024?"</div>
+                    <div class="tour-example">"Quais obrigações acessórias do Simples Nacional?"</div>
+                    <div class="tour-example">"Qual o prazo de entrega da ECD para 2024?"</div>
+                    <div class="tour-tip">💡 Seja específico — inclua ano, regime tributário ou número do artigo quando
+                        souber. Quanto mais detalhada a pergunta, mais precisa a resposta.</div>
+                </div>
+            </div>
 
-      {# Slide 3 — Formato das respostas #}
-      <div class="tour-slide">
-        <div class="tour-slide-icon">🔍</div>
-        <div class="tour-slide-title">Entenda as respostas</div>
-        <div class="tour-slide-body">
-          <p class="slide-body-left-mb12">Toda resposta segue <strong>dois blocos fixos</strong>:</p>
-          <div class="tour-verif"><strong>Verificação:</strong> trecho copiado literalmente do documento da biblioteca que responde à sua pergunta — ou aviso explícito de que o dado não está disponível.</div>
-          <div class="tour-verif tour-verif-blue"><strong>Resposta:</strong> baseada <em>exclusivamente</em> na Verificação acima. Se a biblioteca não tiver o dado, a Digiana indica a fonte oficial — <strong>nunca inventa valores ou alíquotas</strong>.</div>
-          <div class="tour-tip tour-tip-mt">📋 Use <code>/lista</code> no chat para ver todos os seus documentos e ideias enviados com o status de cada um.</div>
-        </div>
-      </div>
+            {# Slide 3 — Formato das respostas #}
+            <div class="tour-slide">
+                <div class="tour-slide-icon">🔍</div>
+                <div class="tour-slide-title">Entenda as respostas</div>
+                <div class="tour-slide-body">
+                    <p class="slide-body-left-mb12">Toda resposta segue <strong>dois blocos fixos</strong>:</p>
+                    <div class="tour-verif"><strong>Verificação:</strong> trecho copiado literalmente do documento da
+                        biblioteca que responde à sua pergunta — ou aviso explícito de que o dado não está disponível.
+                    </div>
+                    <div class="tour-verif tour-verif-blue"><strong>Resposta:</strong> baseada <em>exclusivamente</em>
+                        na Verificação acima. Se a biblioteca não tiver o dado, a Digiana indica a fonte oficial —
+                        <strong>nunca inventa valores ou alíquotas</strong>.</div>
+                    <div class="tour-tip tour-tip-mt">📋 Use <code>/lista</code> no chat para ver todos os seus
+                        documentos e ideias enviados com o status de cada um.</div>
+                </div>
+            </div>
 
-      {# Slide 4 — Biblioteca e Nova Ideia #}
-      <div class="tour-slide">
-        <div class="tour-slide-icon">📚</div>
-        <div class="tour-slide-title">Biblioteca e Nova Ideia</div>
-        <div class="tour-slide-body">
-          <div class="tour-item"><span class="tour-item-ic">📚</span><span><strong>Biblioteca</strong> — clique na barra lateral para abrir o catálogo sem recarregar a página. Pesquise por nome e clique em <strong>💬 Perguntar</strong> para pré-preencher o chat com o documento escolhido.</span></div>
-          <div class="tour-item"><span class="tour-item-ic">💡</span><span><strong>Nova Ideia</strong> — abre um formulário inline (sem sair do chat) para registrar orientações, procedimentos internos ou correções de processo. Sua ideia passa por aprovação antes de influenciar as respostas.</span></div>
-          <div class="tour-tip">🔧 Use <code>/manual</code> a qualquer momento para abrir este guia novamente no chat.</div>
-        </div>
-      </div>
+            {# Slide 4 — Biblioteca e Nova Ideia #}
+            <div class="tour-slide">
+                <div class="tour-slide-icon">📚</div>
+                <div class="tour-slide-title">Biblioteca e Nova Ideia</div>
+                <div class="tour-slide-body">
+                    <div class="tour-item"><span class="tour-item-ic">📚</span><span><strong>Biblioteca</strong> —
+                            clique na barra lateral para abrir o catálogo sem recarregar a página. Pesquise por nome e
+                            clique em <strong>💬 Perguntar</strong> para pré-preencher o chat com o documento
+                            escolhido.</span></div>
+                    <div class="tour-item"><span class="tour-item-ic">💡</span><span><strong>Nova Ideia</strong> — abre
+                            um formulário inline (sem sair do chat) para registrar orientações, procedimentos internos
+                            ou correções de processo. Sua ideia passa por aprovação antes de influenciar as
+                            respostas.</span></div>
+                    <div class="tour-tip">🔧 Use <code>/manual</code> a qualquer momento para abrir este guia novamente
+                        no chat.</div>
+                </div>
+            </div>
 
-      {# Slide 5 — Documentos e feedback #}
-      <div class="tour-slide">
-        <div class="tour-slide-icon">📎</div>
-        <div class="tour-slide-title">Documentos e Integridade</div>
-        <div class="tour-slide-body">
-          <div class="tour-item"><span class="tour-item-ic">⚠️</span><span><strong>Pontos de Atenção</strong> — O ícone ⚠️ na biblioteca indica arquivos com extração complexa. Eles podem gerar respostas imprecisas enquanto não forem revisados.</span></div>
-          <div class="tour-item"><span class="tour-item-ic">📝</span><span><strong>Configuração Ideal</strong> — Evite tabelas aninhadas em DOCX. Prefira <strong>PDFs de texto (não imagem)</strong> ou arquivos <strong>.txt</strong> para dados críticos.</span></div>
-          <div class="tour-item"><span class="tour-item-ic">🗂️</span><span><strong>Um assunto por arquivo</strong> — Documentos que misturam temas aumentam o ruído. Mantenha os arquivos focados em um único tópico contábil.</span></div>
-          <div class="tour-item"><span class="tour-item-ic">👎</span><span><strong>Feedback</strong> — Se a resposta estiver errada, use o 👎. O time técnico analisa e grava a correção como aprendizado permanente.</span></div>
-        </div>
-      </div>
+            {# Slide 5 — Documentos e feedback #}
+            <div class="tour-slide">
+                <div class="tour-slide-icon">📎</div>
+                <div class="tour-slide-title">Documentos e Integridade</div>
+                <div class="tour-slide-body">
+                    <div class="tour-item"><span class="tour-item-ic">⚠️</span><span><strong>Pontos de Atenção</strong>
+                            — O ícone ⚠️ na biblioteca indica arquivos com extração complexa. Eles podem gerar respostas
+                            imprecisas enquanto não forem revisados.</span></div>
+                    <div class="tour-item"><span class="tour-item-ic">📝</span><span><strong>Configuração Ideal</strong>
+                            — Evite tabelas aninhadas em DOCX. Prefira <strong>PDFs de texto (não imagem)</strong> ou
+                            arquivos <strong>.txt</strong> para dados críticos.</span></div>
+                    <div class="tour-item"><span class="tour-item-ic">🗂️</span><span><strong>Um assunto por
+                                arquivo</strong> — Documentos que misturam temas aumentam o ruído. Mantenha os arquivos
+                            focados em um único tópico contábil.</span></div>
+                    <div class="tour-item"><span class="tour-item-ic">👎</span><span><strong>Feedback</strong> — Se a
+                            resposta estiver errada, use o 👎. O time técnico analisa e grava a correção como
+                            aprendizado permanente.</span></div>
+                </div>
+            </div>
 
-      {% if user.is_superuser %}
-      {# Slide 6 — Os 3 pilares (superusuário) #}
-      <div class="tour-slide">
-        <div class="tour-slide-icon">📚</div>
-        <div class="tour-slide-title">Como a Digiana aprende</div>
-        <div class="tour-slide-body">
-          <div class="tour-item"><span class="tour-item-ic">📄</span><span><strong>Biblioteca:</strong> documentos aprovados são vetorizados no ChromaDB. Tabelas de alíquotas e calendários de obrigações têm maior impacto.</span></div>
-          <div class="tour-item"><span class="tour-item-ic">💡</span><span><strong>Ideias:</strong> orientações da equipe injetadas como contexto nas perguntas relacionadas.</span></div>
-          <div class="tour-item"><span class="tour-item-ic">🔄</span><span><strong>RLHF:</strong> cada 👎 curado no painel vira aprendizado permanente — a correção é vetorizada e recuperada em perguntas similares futuras.</span></div>
-        </div>
-      </div>
+            {% if user.is_superuser %}
+            {# Slide 6 — Os 3 pilares (superusuário) #}
+            <div class="tour-slide">
+                <div class="tour-slide-icon">📚</div>
+                <div class="tour-slide-title">Como a Digiana aprende</div>
+                <div class="tour-slide-body">
+                    <div class="tour-item"><span class="tour-item-ic">📄</span><span><strong>Biblioteca:</strong>
+                            documentos aprovados são vetorizados no ChromaDB. Tabelas de alíquotas e calendários de
+                            obrigações têm maior impacto.</span></div>
+                    <div class="tour-item"><span class="tour-item-ic">💡</span><span><strong>Ideias:</strong>
+                            orientações da equipe injetadas como contexto nas perguntas relacionadas.</span></div>
+                    <div class="tour-item"><span class="tour-item-ic">🔄</span><span><strong>RLHF:</strong> cada 👎
+                            curado no painel vira aprendizado permanente — a correção é vetorizada e recuperada em
+                            perguntas similares futuras.</span></div>
+                </div>
+            </div>
 
-      {# Slide 7 — Painel Admin (superusuário) #}
-      <div class="tour-slide">
-        <div class="tour-slide-icon">⚙️</div>
-        <div class="tour-slide-title">Painel Administrativo</div>
-        <div class="tour-slide-body">
-          <div class="tour-item"><span class="tour-item-ic">📊</span><span><strong>Dashboard:</strong> métricas em tempo real — usuários online, sessões, curtidas.</span></div>
-          <div class="tour-item"><span class="tour-item-ic">📂</span><span><strong>Biblioteca:</strong> upload em lote, auditoria de pendentes, edição do conteúdo extraído.</span></div>
-          <div class="tour-item"><span class="tour-item-ic">👎</span><span><strong>Feedback:</strong> veja não curtidas, abra a mensagem e grave a correção ideal.</span></div>
-          <div class="tour-item"><span class="tour-item-ic">👤</span><span><strong>Usuários:</strong> criar, ativar, pausar e redefinir senhas.</span></div>
-          <div class="tour-tip">Acesse em <strong>/painel/</strong> ou pelo botão ⚙️ na barra lateral.</div>
-        </div>
-      </div>
-      {% endif %}
+            {# Slide 7 — Painel Admin (superusuário) #}
+            <div class="tour-slide">
+                <div class="tour-slide-icon">⚙️</div>
+                <div class="tour-slide-title">Painel Administrativo</div>
+                <div class="tour-slide-body">
+                    <div class="tour-item"><span class="tour-item-ic">📊</span><span><strong>Dashboard:</strong>
+                            métricas em tempo real — usuários online, sessões, curtidas.</span></div>
+                    <div class="tour-item"><span class="tour-item-ic">📂</span><span><strong>Biblioteca:</strong> upload
+                            em lote, auditoria de pendentes, edição do conteúdo extraído.</span></div>
+                    <div class="tour-item"><span class="tour-item-ic">👎</span><span><strong>Feedback:</strong> veja não
+                            curtidas, abra a mensagem e grave a correção ideal.</span></div>
+                    <div class="tour-item"><span class="tour-item-ic">👤</span><span><strong>Usuários:</strong> criar,
+                            ativar, pausar e redefinir senhas.</span></div>
+                    <div class="tour-tip">Acesse em <strong>/painel/</strong> ou pelo botão ⚙️ na barra lateral.</div>
+                </div>
+            </div>
+            {% endif %}
 
+        </div>
+
+        <div class="tour-dots" id="tour-dots"></div>
+
+        <div class="tour-footer">
+            <label class="tour-no-show" for="tour-nao-exibir">
+                <input type="checkbox" id="tour-nao-exibir"> Não exibir novamente
+            </label>
+            <button class="tour-btn tour-btn-prev" id="tour-prev" disabled>← Anterior</button>
+            <button class="tour-btn tour-btn-next" id="tour-next">Próximo →</button>
+        </div>
     </div>
-
-    <div class="tour-dots" id="tour-dots"></div>
-
-    <div class="tour-footer">
-      <label class="tour-no-show" for="tour-nao-exibir">
-        <input type="checkbox" id="tour-nao-exibir"> Não exibir novamente
-      </label>
-      <button class="tour-btn tour-btn-prev" id="tour-prev" disabled>← Anterior</button>
-      <button class="tour-btn tour-btn-next" id="tour-next">Próximo →</button>
-    </div>
-  </div>
 </div>
 {% endblock %}
 
@@ -643,27 +1163,27 @@
 {% if messages_json %}{{ messages_json|json_script:"messages-data" }}{% endif %}
 
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    // ── Elementos ───────────────────────────────────────────
-    const chatInput    = document.getElementById('chat-input');
-    const sendBtn      = document.getElementById('send-btn');
-    const stopBtn      = document.getElementById('stop-btn');
-    const attachBtn    = document.getElementById('attach-btn');
-    const fileInput    = document.getElementById('file-input');
-    const chatWindow   = document.getElementById('chat-window');
-    const greeting     = document.getElementById('greeting');
-    const msgContainer = document.getElementById('messages-container');
-    const filePreview  = document.getElementById('file-preview');
-    const historyList  = document.querySelector('.history-list');
-    const copyToast    = document.getElementById('copy-toast');
+    document.addEventListener('DOMContentLoaded', () => {
+        // ── Elementos ───────────────────────────────────────────
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const attachBtn = document.getElementById('attach-btn');
+        const fileInput = document.getElementById('file-input');
+        const chatWindow = document.getElementById('chat-window');
+        const greeting = document.getElementById('greeting');
+        const msgContainer = document.getElementById('messages-container');
+        const filePreview = document.getElementById('file-preview');
+        const historyList = document.querySelector('.history-list');
+        const copyToast = document.getElementById('copy-toast');
 
-    // ── Estado ──────────────────────────────────────────────
-    let currentSessionId     = {% if current_session %}{{ current_session.id }}{% else %}null{% endif %};
-    let hoveredMsgContent    = null;
-    let isSending            = false;
-    let pendingItem          = null;
-    let abortController      = null;
-    let activeEventSource    = null; // Referência global para o stream atual
+        // ── Estado ──────────────────────────────────────────────
+        let currentSessionId = {{ current_session.id|default:"null" }};
+    let hoveredMsgContent = null;
+    let isSending = false;
+    let pendingItem = null;
+    let abortController = null;
+    let activeEventSource = null; // Referência global para o stream atual
 
     // ── Interromper Geração ──────────────────────────────────
     function stopGeneration() {
@@ -673,7 +1193,7 @@ document.addEventListener('DOMContentLoaded', () => {
             activeEventSource = null;
             console.log('Stream SSE interrompido.');
         }
-        
+
         // Para Fetch comum (Upload)
         if (abortController) {
             abortController.abort();
@@ -727,7 +1247,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function escHtml(s) {
-        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     // ── Toast de cópia ──────────────────────────────────────
@@ -806,11 +1326,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function repairMarkdownTables(text) {
         if (!text.includes('|')) return text;
 
-        const isTableRow  = s => { const t = s.trim(); return t.startsWith('|') && t.endsWith('|'); };
+        const isTableRow = s => { const t = s.trim(); return t.startsWith('|') && t.endsWith('|'); };
         const isSeparator = s => /^\|[\s\-:]+(\|[\s\-:]+)*\|$/.test(s.trim());
 
         const lines = text.split('\n');
-        const out   = [];
+        const out = [];
 
         for (let i = 0; i < lines.length; i++) {
             out.push(lines[i]);
@@ -868,7 +1388,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const txt = document.createElement('div');
         txt.className = 'message-text';
-        
+
         // Renderiza Markdown para IA, texto puro para Usuário
         if (role === 'assistant' && window.marked) {
             const cleaned = repairMarkdownTables(normalizeSeparators(stripCodeFences(content)));
@@ -876,17 +1396,17 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             txt.textContent = content;
         }
-        
+
         bubble.appendChild(txt);
 
         // Se houver status de anexo, renderiza a badge
         if (statusAnexo) {
             const badge = document.createElement('div');
             badge.className = `status-badge status-${statusAnexo}`;
-            
+
             let icon = '⏳';
             let label = 'Pendente';
-            
+
             if (statusAnexo === 'approved') { icon = '✓'; label = 'Aprovado'; }
             else if (statusAnexo === 'rejected') { icon = '✕'; label = 'Reprovado'; }
 
@@ -955,11 +1475,11 @@ document.addEventListener('DOMContentLoaded', () => {
         row.className = 'message-row ai-row';
         row.innerHTML =
             '<div class="message-bubble ai-bubble">' +
-                '<div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">' +
-                    '<div class="ai-avatar ai-avatar-thinking"><img src="{% static "Logo.png" %}" alt="Pensando..." style="width:100%; height:100%; object-fit:cover; transform: scale(1.1);"></div>' +
-                    '<span class="ai-label logo-digiana" style="margin:0;">Dig<span class="ia-glow">IA</span>na</span>' +
-                '</div>' +
-                '<span class="thinking-dots"><span></span><span></span><span></span></span>' +
+            '<div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">' +
+            '<div class="ai-avatar ai-avatar-thinking"><img src="{% static "Logo.png" %}" alt="Pensando..." style="width:100%; height:100%; object-fit:cover; transform: scale(1.1);"></div>' +
+            '<span class="ai-label logo-digiana" style="margin:0;">Dig<span class="ia-glow">IA</span>na</span>' +
+            '</div>' +
+            '<span class="thinking-dots"><span></span><span></span><span></span></span>' +
             '</div>';
         msgContainer.appendChild(row);
         scrollToBottom();
@@ -1111,11 +1631,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const formData = new FormData();
             formData.append('file', selectedFile);
             if (currentSessionId) formData.append('session_id', currentSessionId);
-            
+
             buildMessage('user', `[Anexo: ${selectedFile.name}]`, now, true);
-            
+
             chatInput.value = ''; fileInput.value = ''; filePreview.innerHTML = '';
-            
+
             try {
                 const res = await fetch('/chat/upload/', {
                     method: 'POST',
@@ -1141,14 +1661,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // SALTO PARA O UX: Streaming de Texto
         buildMessage('user', text, now, true);
         chatInput.value = ''; chatInput.style.height = 'auto';
-        
+
         const loader = addLoader();
         let aiMsgObj = null;
         let fullResponse = "";
 
         // Conecta ao canal SSE dedicado ao Chat
         activeEventSource = new EventSource(`/chat/stream/?message=${encodeURIComponent(text)}&session_id=${currentSessionId || ''}`);
-        
+
         activeEventSource.addEventListener('session_id', (e) => {
             if (!currentSessionId) {
                 currentSessionId = e.data;
@@ -1236,17 +1756,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // <div> wrapper — botões FORA do <a> de navegação
         const div = document.createElement('div');
         div.className = 'history-item active';
-        div.dataset.sessionId    = id;
+        div.dataset.sessionId = id;
         div.dataset.sessionTitle = title;
-        div.dataset.pinned       = '0';
+        div.dataset.pinned = '0';
         div.innerHTML =
             `<a class="session-link" href="/chat/s/${id}/" title="${escHtml(title)}">` +
-                `<span class="session-title">${escHtml(title)}</span>` +
+            `<span class="session-title">${escHtml(title)}</span>` +
             `</a>` +
             `<div class="session-actions">` +
-                `<button class="session-action-btn" data-action="pin"    data-session-id="${id}" title="Fixar"    type="button">📌</button>` +
-                `<button class="session-action-btn" data-action="rename" data-session-id="${id}" title="Renomear" type="button">✏️</button>` +
-                `<button class="session-action-btn" data-action="delete" data-session-id="${id}" title="Excluir"  type="button">🗑️</button>` +
+            `<button class="session-action-btn" data-action="pin"    data-session-id="${id}" title="Fixar"    type="button">📌</button>` +
+            `<button class="session-action-btn" data-action="rename" data-session-id="${id}" title="Renomear" type="button">✏️</button>` +
+            `<button class="session-action-btn" data-action="delete" data-session-id="${id}" title="Excluir"  type="button">🗑️</button>` +
             `</div>`;
 
         // Remove active de outros itens
@@ -1264,11 +1784,11 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             e.stopPropagation();
 
-            const action    = btn.dataset.action;
+            const action = btn.dataset.action;
             const sessionId = btn.dataset.sessionId;
-            const item      = btn.closest('.history-item');
+            const item = btn.closest('.history-item');
 
-            if (action === 'pin')    doPin(sessionId, item, btn);
+            if (action === 'pin') doPin(sessionId, item, btn);
             else if (action === 'rename') startRename(sessionId, item);
             else if (action === 'delete') doDelete(sessionId, item);
         });
@@ -1276,12 +1796,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function startRename(sessionId, item) {
         // Substitui o <a class="session-link"> inteiro — evita navegação acidental durante digitação
-        const linkEl     = item.querySelector('.session-link');
+        const linkEl = item.querySelector('.session-link');
         const savedTitle = item.dataset.sessionTitle;
 
         const input = document.createElement('input');
-        input.type      = 'text';
-        input.value     = savedTitle;
+        input.type = 'text';
+        input.value = savedTitle;
         input.className = 'rename-input';
         linkEl.replaceWith(input);
         input.focus();
@@ -1315,7 +1835,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         input.addEventListener('keydown', e => {
-            if (e.key === 'Enter')  { e.preventDefault(); save(); }
+            if (e.key === 'Enter') { e.preventDefault(); save(); }
             if (e.key === 'Escape') { done = true; input.replaceWith(linkEl); }
         });
         input.addEventListener('blur', save);
@@ -1359,10 +1879,10 @@ document.addEventListener('DOMContentLoaded', () => {
             dislikeBtn.innerHTML = '👎';
 
             // Restaura estado visual do feedback já registrado
-            if (initialFeedback === 'like')    likeBtn.classList.add('active-like');
+            if (initialFeedback === 'like') likeBtn.classList.add('active-like');
             if (initialFeedback === 'dislike') dislikeBtn.classList.add('active-dislike');
 
-            likeBtn.addEventListener('click',    () => doFeedback(msgId, 'like',    likeBtn, dislikeBtn));
+            likeBtn.addEventListener('click', () => doFeedback(msgId, 'like', likeBtn, dislikeBtn));
             dislikeBtn.addEventListener('click', () => doFeedback(msgId, 'dislike', likeBtn, dislikeBtn));
 
             toolbar.appendChild(likeBtn);
@@ -1380,15 +1900,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const d = await r.json();
             if (d.status !== 'success') return;
-            likeBtn.classList.toggle('active-like',    d.feedback === 'like');
+            likeBtn.classList.toggle('active-like', d.feedback === 'like');
             dislikeBtn.classList.toggle('active-dislike', d.feedback === 'dislike');
         } catch (err) {
             console.error('Erro ao enviar feedback:', err);
         }
     }
 
-    const confirmModal   = document.getElementById('confirm-modal');
-    const modalCancelBtn  = document.getElementById('modal-cancel-btn');
+    const confirmModal = document.getElementById('confirm-modal');
+    const modalCancelBtn = document.getElementById('modal-cancel-btn');
     const modalConfirmBtn = document.getElementById('modal-confirm-btn');
     let deleteCallback = null;
 
@@ -1412,7 +1932,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const d = await r.json();
             if (d.status !== 'success') return;
-            
+
             // Em vez de reload, marcamos que precisa de reload para a próxima vez 
             // ou apenas mudamos o ícone e movemos o item se quiser ser 100% SPA.
             // Para garantir consistência total com a lógica de grupos do Django,
@@ -1420,12 +1940,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // Por enquanto, apenas mudamos o ícone para evitar o reload que incomoda o usuário.
             btn.innerHTML = d.pinned ? '📍' : '📌';
             btn.title = d.pinned ? 'Desafixar' : 'Fixar';
-            
+
             // Opcional: mover para o grupo "Fixadas" (lógica complexa de DOM, simplificada aqui)
             if (d.pinned) {
-                 item.classList.add('pinned');
+                item.classList.add('pinned');
             } else {
-                 item.classList.remove('pinned');
+                item.classList.remove('pinned');
             }
         } catch (err) {
             console.error('Erro ao fixar sessão:', err);
@@ -1465,11 +1985,11 @@ document.addEventListener('DOMContentLoaded', () => {
     historyList.addEventListener('click', async (e) => {
         const link = e.target.closest('.session-link');
         if (!link) return;
-        
+
         e.preventDefault();
         const url = link.getAttribute('href');
         const sessionId = url.split('/s/')[1].split('/')[0];
-        
+
         if (String(currentSessionId) === String(sessionId)) return;
 
         try {
@@ -1506,7 +2026,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Nova Conversa sem reload ─────────────────────────────
     const newChatBtn = document.querySelector('.new-chat-btn');
     if (newChatBtn) {
-        newChatBtn.addEventListener('click', function(e) {
+        newChatBtn.addEventListener('click', function (e) {
             e.preventDefault();
 
             // Reseta estado
@@ -1563,7 +2083,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Atualiza título do item pendente ao digitar
-    chatInput?.addEventListener('input', function() {
+    chatInput?.addEventListener('input', function () {
         if (!pendingItem) return;
         const text = this.value.trim();
         const titleEl = pendingItem.querySelector('.pending-title');
@@ -1620,77 +2140,77 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <script>
-(function () {
-    const TOUR_KEY = 'digiana_tour_visto';
-    const overlay  = document.getElementById('tour-overlay');
-    if (!overlay) return;
-    if (localStorage.getItem(TOUR_KEY)) return;
+    (function () {
+        const TOUR_KEY = 'digiana_tour_visto';
+        const overlay = document.getElementById('tour-overlay');
+        if (!overlay) return;
+        if (localStorage.getItem(TOUR_KEY)) return;
 
-    const slides   = overlay.querySelectorAll('.tour-slide');
-    const dotsWrap = document.getElementById('tour-dots');
-    const prevBtn  = document.getElementById('tour-prev');
-    const nextBtn  = document.getElementById('tour-next');
-    const checkbox = document.getElementById('tour-nao-exibir');
-    let current = 0;
+        const slides = overlay.querySelectorAll('.tour-slide');
+        const dotsWrap = document.getElementById('tour-dots');
+        const prevBtn = document.getElementById('tour-prev');
+        const nextBtn = document.getElementById('tour-next');
+        const checkbox = document.getElementById('tour-nao-exibir');
+        let current = 0;
 
-    // Gera dots dinamicamente (funciona para 4 slides [usuário] ou 6 [superusuário])
-    slides.forEach(function(_, i) {
-        const d = document.createElement('div');
-        d.className = 'tour-dot' + (i === 0 ? ' tour-dot-active' : '');
-        d.addEventListener('click', function() { goTo(i); });
-        dotsWrap.appendChild(d);
-    });
+        // Gera dots dinamicamente (funciona para 4 slides [usuário] ou 6 [superusuário])
+        slides.forEach(function (_, i) {
+            const d = document.createElement('div');
+            d.className = 'tour-dot' + (i === 0 ? ' tour-dot-active' : '');
+            d.addEventListener('click', function () { goTo(i); });
+            dotsWrap.appendChild(d);
+        });
 
-    function goTo(n) {
-        slides[current].classList.remove('tour-active');
-        dotsWrap.children[current].classList.remove('tour-dot-active');
-        current = Math.max(0, Math.min(n, slides.length - 1));
-        slides[current].classList.add('tour-active');
-        dotsWrap.children[current].classList.add('tour-dot-active');
-        prevBtn.disabled = current === 0;
-        nextBtn.textContent = current === slides.length - 1 ? 'Começar ✓' : 'Próximo →';
-    }
-
-    // Função para fechar o tour e salvar no localStorage
-    function fechar() {
-        if (checkbox && checkbox.checked) {
-            localStorage.setItem(TOUR_KEY, '1');
+        function goTo(n) {
+            slides[current].classList.remove('tour-active');
+            dotsWrap.children[current].classList.remove('tour-dot-active');
+            current = Math.max(0, Math.min(n, slides.length - 1));
+            slides[current].classList.add('tour-active');
+            dotsWrap.children[current].classList.add('tour-dot-active');
+            prevBtn.disabled = current === 0;
+            nextBtn.textContent = current === slides.length - 1 ? 'Começar ✓' : 'Próximo →';
         }
-        overlay.style.animation = 'tour-fade-out 0.3s ease forwards';
-        setTimeout(function() { 
-            overlay.classList.add('tour-hidden'); 
-        }, 300);
-    }
 
-    // Eventos dos botões
-    if (prevBtn) prevBtn.addEventListener('click', function() { if (current > 0) goTo(current - 1); });
-    if (nextBtn) nextBtn.addEventListener('click', function() {
-        if (current < slides.length - 1) goTo(current + 1);
-        else fechar();
-    });
-
-    // Inicialização da visibilidade
-    if (localStorage.getItem(TOUR_KEY) === '1') {
-        overlay.classList.add('tour-hidden');
-    } else {
-        overlay.classList.remove('tour-hidden');
-        goTo(0); // Garante que comece no primeiro slide
-    }
-})();
-
-// Prefill vindo da Biblioteca (botão "💬 Perguntar")
-(function() {
-    const prefill = localStorage.getItem('digiana_prefill_query');
-    if (prefill) {
-        localStorage.removeItem('digiana_prefill_query');
-        const input = document.getElementById('chat-input');
-        if (input) {
-            input.value = prefill;
-            input.style.height = 'auto';
-            input.style.height = Math.min(input.scrollHeight, 200) + 'px';
-            input.focus();
+        // Função para fechar o tour e salvar no localStorage
+        function fechar() {
+            if (checkbox && checkbox.checked) {
+                localStorage.setItem(TOUR_KEY, '1');
+            }
+            overlay.style.animation = 'tour-fade-out 0.3s ease forwards';
+            setTimeout(function () {
+                overlay.classList.add('tour-hidden');
+            }, 300);
         }
-    }
-})();
+
+        // Eventos dos botões
+        if (prevBtn) prevBtn.addEventListener('click', function () { if (current > 0) goTo(current - 1); });
+        if (nextBtn) nextBtn.addEventListener('click', function () {
+            if (current < slides.length - 1) goTo(current + 1);
+            else fechar();
+        });
+
+        // Inicialização da visibilidade
+        if (localStorage.getItem(TOUR_KEY) === '1') {
+            overlay.classList.add('tour-hidden');
+        } else {
+            overlay.classList.remove('tour-hidden');
+            goTo(0); // Garante que comece no primeiro slide
+        }
+    })();
+
+    // Prefill vindo da Biblioteca (botão "💬 Perguntar")
+    (function () {
+        const prefill = localStorage.getItem('digiana_prefill_query');
+        if (prefill) {
+            localStorage.removeItem('digiana_prefill_query');
+            const input = document.getElementById('chat-input');
+            if (input) {
+                input.value = prefill;
+                input.style.height = 'auto';
+                input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+                input.focus();
+            }
+        }
+    })();
 </script>
 {% endblock %}

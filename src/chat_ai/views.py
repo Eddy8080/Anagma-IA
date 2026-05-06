@@ -493,9 +493,12 @@ def chat_stream(request):
             search_query=search_query,
             user=request.user
         ):
-            full_response += token
-            safe_token = token.replace('\n', '\ndata: ')
-            yield f"data: {safe_token}\n\n"
+            if token.startswith(': '):  # Comentário SSE keepalive — passa direto sem acumular
+                yield token
+            else:
+                full_response += token
+                safe_token = token.replace('\n', '\ndata: ')
+                yield f"data: {safe_token}\n\n"
 
         # Solução C — Aviso de exibição parcial de planilha
         aviso = _verificar_truncamento_excel(search_query, full_response, request.user)
@@ -739,7 +742,7 @@ def meus_envios(request):
             {
                 'nome': d['nome_arquivo'],
                 'status': d['status'],
-                'criado_em': d['criado_em'].strftime('%d/%m/%Y'),
+                'criado_em': timezone.localtime(d['criado_em']).strftime('%d/%m/%Y'),
             }
             for d in docs
         ],
@@ -747,7 +750,7 @@ def meus_envios(request):
             {
                 'titulo': i['titulo'],
                 'ativa': i['ativa'],
-                'criado_em': i['criado_em'].strftime('%d/%m/%Y'),
+                'criado_em': timezone.localtime(i['criado_em']).strftime('%d/%m/%Y'),
             }
             for i in ideias
         ],

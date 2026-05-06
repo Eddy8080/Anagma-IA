@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 import os
 
 class ChatSession(models.Model):
@@ -20,7 +21,7 @@ class ChatSession(models.Model):
 
     def __str__(self):
         user_name = self.user.username if self.user else "Anônimo/Ex-Colaborador"
-        return f"{user_name} - {self.titulo} ({self.criado_em.strftime('%d/%m/%Y %H:%M')})"
+        return f"{user_name} - {self.titulo} ({timezone.localtime(self.criado_em).strftime('%d/%m/%Y %H:%M')})"
 
 class ChatMessage(models.Model):
     """

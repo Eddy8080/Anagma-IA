@@ -1,5 +1,6 @@
 import os
 import re
+import unicodedata
 import pandas as pd
 from langchain_community.document_loaders import UnstructuredFileLoader, PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -84,6 +85,15 @@ class AnagmaRAGEngine:
         return self._vetorizar_documentos([doc])
 
     @staticmethod
+    def _normalizar_texto(texto):
+        """Remove artefatos de extração de PDF já armazenados no banco."""
+        if not texto:
+            return texto
+        texto = unicodedata.normalize('NFKC', texto)
+        texto = texto.replace('Ɵ', 'ti')  # ligadura "ti" mal mapeada em PDFs brasileiros
+        return texto
+
+    @staticmethod
     def _extrair_trecho_relevante(texto, palavras_query, max_chars=8000):
         """Extrai o trecho do texto mais próximo das palavras da query."""
         if not texto:
@@ -157,11 +167,12 @@ class AnagmaRAGEngine:
                 score = calcular_relevancia(doc.page_content, fonte)
 
                 # Se for planilha, aumentamos drasticamente a relevância e o tamanho do bloco
+                conteudo_normalizado = self._normalizar_texto(doc.page_content)
                 if fonte.lower().endswith(('.xls', '.xlsx')):
                     score += 5
-                    bloco_texto = f"DOCUMENTO EXCEL INTEGRAL ({fonte}):\n{doc.page_content}"
+                    bloco_texto = f"DOCUMENTO EXCEL INTEGRAL ({fonte}):\n{conteudo_normalizado}"
                 else:
-                    bloco_texto = f"DOCUMENTO APROVADO ({fonte}):\n{doc.page_content}"
+                    bloco_texto = f"DOCUMENTO APROVADO ({fonte}):\n{conteudo_normalizado}"
 
                 # THRESHOLD DE SEGURANÇA (Rigor Contábil):
                 if score >= 5:
@@ -204,7 +215,7 @@ class AnagmaRAGEngine:
 
                 if melhor_doc:
                     ext_doc = melhor_doc.extensao.lower()
-                    conteudo_doc = melhor_doc.conteudo_extraido or ''
+                    conteudo_doc = self._normalizar_texto(melhor_doc.conteudo_extraido or '')
                     fontes_vetoriais.add(melhor_doc.nome_arquivo)
                     has_db_hits = True
                     if ext_doc in ('xls', 'xlsx'):
@@ -262,7 +273,7 @@ class AnagmaRAGEngine:
                 )
                 for doc_bib in docs_bib:
                     trecho = self._extrair_trecho_relevante(
-                        doc_bib.conteudo_extraido or '', palavras_query
+                        self._normalizar_texto(doc_bib.conteudo_extraido or ''), palavras_query
                     )
                     if trecho:
                         contexto_final.append(

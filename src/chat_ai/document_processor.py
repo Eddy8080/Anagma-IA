@@ -4,6 +4,7 @@ import io
 import tempfile
 import contextlib
 import sys
+import unicodedata
 from PIL import Image
 
 # Motor de extração de alta fidelidade
@@ -54,6 +55,19 @@ class AnagmaDocumentProcessor:
         return cls._ocr_reader
 
     @staticmethod
+    def _normalizar_texto(texto):
+        """
+        Remove artefatos de extração de PDF: ligaduras mal mapeadas e caracteres fora de lugar.
+        - NFKC: normaliza ligaduras padrão Unicode (ﬁ→fi, ﬂ→fl, ﬀ→ff, ﬃ→ffi, ﬄ→ffl)
+        - U+019F Ɵ → 'ti': ligadura tipográfica "ti" mapeada incorretamente em PDFs brasileiros
+        """
+        if not texto:
+            return texto
+        texto = unicodedata.normalize('NFKC', texto)
+        texto = texto.replace('Ɵ', 'ti')
+        return texto
+
+    @staticmethod
     def extrair_texto(file_obj, extensao):
         """
         Ponto de entrada único para extração de texto.
@@ -69,14 +83,15 @@ class AnagmaDocumentProcessor:
             'aviso': None
         }
 
+        norm = AnagmaDocumentProcessor._normalizar_texto
         try:
             # 1. Tenta Docling para formatos modernos (PDF, DOCX, XLSX, PPTX)
             if DOCLING_AVAILABLE and ext in ['pdf', 'docx', 'xlsx', 'pptx']:
                 resultado = AnagmaDocumentProcessor._processar_via_docling(file_obj, ext)
                 if resultado:
                     meta.update({'motor': 'docling', 'sucesso': True})
-                    return resultado, meta
-                
+                    return norm(resultado), meta
+
                 # Docling falhou ou retornou vazio — reposiciona e cai nos fallbacks
                 if hasattr(file_obj, 'seek'):
                     file_obj.seek(0)
@@ -88,19 +103,19 @@ class AnagmaDocumentProcessor:
             if ext in ['png', 'jpg', 'jpeg']:
                 res = AnagmaDocumentProcessor._processar_imagem(file_obj)
                 meta['sucesso'] = bool(res and not res.startswith('Erro'))
-                return res, meta
+                return norm(res), meta
             elif ext == 'doc':
                 res = AnagmaDocumentProcessor._processar_doc_legado(file_obj)
                 meta['sucesso'] = bool(res and not res.startswith('Erro'))
-                return res, meta
+                return norm(res), meta
             elif ext == 'xls':
                 res = AnagmaDocumentProcessor._processar_excel_legado(file_obj)
                 meta['sucesso'] = bool(res and not res.startswith('Erro'))
-                return res, meta
+                return norm(res), meta
             elif ext == 'txt':
                 res = AnagmaDocumentProcessor._processar_txt(file_obj)
                 meta['sucesso'] = True
-                return res, meta
+                return norm(res), meta
 
             # 3. Fallbacks legados para PDF / DOCX / XLSX quando Docling não extraiu
             res = ""
@@ -110,7 +125,7 @@ class AnagmaDocumentProcessor:
 
             if res:
                 meta['sucesso'] = True
-                return res, meta
+                return norm(res), meta
 
             print(f"[DEBUG] Alerta: Extensão '{ext}' não possui processador.")
             return "", meta

@@ -130,7 +130,7 @@ def biblioteca_catalogo(request):
                 'nome_arquivo': d.nome_arquivo,
                 'extensao': d.extensao,
                 'precisa_revisao': d.precisa_revisao,
-                'processado_em': d.processado_em.strftime('%d/%m/%Y') if d.processado_em else '',
+                'processado_em': timezone.localtime(d.processado_em).strftime('%d/%m/%Y') if d.processado_em else '',
             }
             for d in qs
         ]
@@ -262,7 +262,7 @@ def admin_ideias_stream(request):
                         'titulo': ideia.titulo,
                         'conteudo': ideia.conteudo,
                         'autor': ideia.autor.username if ideia.autor else "—",
-                        'criado_em': ideia.criado_em.strftime('%d/%m/%Y %H:%M'),
+                        'criado_em': timezone.localtime(ideia.criado_em).strftime('%d/%m/%Y %H:%M'),
                         'ativa': ideia.ativa
                     }
                     yield f"data: {json.dumps(data)}\n\n"

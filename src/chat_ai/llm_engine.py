@@ -331,6 +331,7 @@ class AnagmaLLMEngine:
             doc_integral_bloco = None
             try:
                 blocos_rag, has_db_hits = self.rag.buscar_documentos(search_query or user_query, user=user)
+                yield ": keepalive\n\n"  # RAG concluído — mantém a conexão SSE viva
 
                 # --- INTERCEPTOR ARQUITETURAL DE EXCEL (MODO TERMINAL) ---
                 excel_bloco = next((b for b in blocos_rag if "ARQUIVO EXCEL INTEGRAL DA CURADORIA" in b), None)
@@ -372,6 +373,7 @@ Comece a transcrição imediatamente, sem texto introdutório."""
 
                 elif has_db_hits:
                     blocos_rag = self._self_audit_documentos(user_query, blocos_rag)
+                    yield ": keepalive\n\n"  # Self-audit concluído — mantém a conexão SSE viva
                     has_db_hits = bool(blocos_rag)
                     contexto_rag = "\n\n---\n\n".join(blocos_rag)
                     if contexto_rag and len(contexto_rag) > 25000:
@@ -399,42 +401,39 @@ Comece a transcrição imediatamente, sem texto introdutório."""
 
 ### MODO: BIBLIOTECA INTERNA ATIVA
 
-### FORMATO DE RESPOSTA OBRIGATÓRIO
-Você DEVE responder sempre neste formato de duas seções, sem exceção:
+### REGRAS ABSOLUTAS:
+1. NUNCA invente dados, valores, alíquotas, prazos ou percentuais que não estejam nos documentos abaixo.
+2. NUNCA copie estas instruções na sua resposta — escreva apenas conteúdo real.
+3. Responda SEMPRE em duas seções com os cabeçalhos exatos abaixo.{instr_excel}
 
 **Verificação:**
-Transcreva LITERALMENTE os trechos dos documentos abaixo que fundamentam sua resposta.
-— Se o dado não estiver no texto, declare explicitamente que a informação está ausente no documento consultado.
-— NÃO inclua saudações ou interpretações nesta seção.{instr_excel}
+<Trecho copiado literalmente do documento que responde a pergunta. Se não houver trecho específico, escreva apenas: Dado não encontrado nos documentos consultados.>
 
 **Resposta:**
-Responda baseando-se EXCLUSIVAMENTE no que foi declarado em Verificação acima.
-— PRIORIDADE ABSOLUTA: Use as definições e siglas conforme aparecem nos documentos (ex: PAT). Ignore definições externas se o documento trouxer uma específica.
-— FORMATAÇÃO: Organize dados numéricos ou listas em tabelas markdown (| Coluna |).{regra_ouro_excel}
+<Interpretação baseada EXCLUSIVAMENTE no trecho acima. Use definições e siglas conforme os documentos. Organize dados em tabelas markdown quando pertinente.>{regra_ouro_excel}
 
-### CONTEXTO DA EMPRESA (DNA):
+### EMPRESA:
 {perfil_anagma if perfil_anagma else 'Base Técnica Anagma.'}
 
-### DADOS DA BIBLIOTECA INTERNA (FONTE ÚNICA DE VERDADE):
+### DOCUMENTOS DA BIBLIOTECA (fonte única de verdade):
 {contexto_rag}"""
                 else:
                     system_msg = f"""Você é a **Digiana**, assistente oficial de contabilidade da **Anagma**.
 
 ### MODO: BIBLIOTECA OMISSA
 
-### FORMATO DE RESPOSTA OBRIGATÓRIO
-Você DEVE responder neste formato de duas seções, sem exceção:
+### REGRAS ABSOLUTAS:
+1. A biblioteca não possui documentos sobre este tema.
+2. NUNCA gere valores, alíquotas, datas, percentuais ou obrigações específicas — isso é erro grave de segurança contábil.
+3. Responda SEMPRE em duas seções com os cabeçalhos exatos abaixo.
 
 **Verificação:**
-Escreva exatamente: "Nenhum documento encontrado na biblioteca da Anagma sobre [descreva o assunto da pergunta]."
+<Escreva exatamente: Nenhum documento encontrado na biblioteca da Anagma sobre [assunto da pergunta].>
 
 **Resposta:**
-— Informe que a biblioteca não possui registros específicos sobre este tema.
-— Indique a fonte oficial adequada (Receita Federal, Portal do Simples Nacional, eSocial, Prefeitura, etc.).
-— NUNCA gere tabelas, valores, alíquotas, datas ou obrigações específicas se a biblioteca for omissa. Se você fizer isso, estará cometendo um erro grave de segurança contábil.
-— Encerre recomendando a consulta à fonte oficial.
+<Informe que a biblioteca não possui o dado. Indique a fonte oficial adequada (Receita Federal, Portal do Simples Nacional, eSocial, Prefeitura, etc.). Encerre recomendando consulta à fonte oficial.>
 
-### CONTEXTO DA EMPRESA:
+### EMPRESA:
 {perfil_anagma if perfil_anagma else 'Base Técnica Anagma.'}"""
 
             except Exception as e:
@@ -473,9 +472,11 @@ Ocorreu um erro ao consultar a biblioteca. Por favor, tente reformular a pergunt
             else:
                 max_tokens_saida = 1000
 
-            # Coleta todos os tokens com o lock — serializa o acesso ao objeto C.
-            # llama-cpp-python não é thread-safe; dois create_chat_completion(stream=True)
-            # simultâneos no mesmo objeto Llama corrompem o KV cache interno da biblioteca.
+            # Streaming dentro do lock — serializa o acesso ao objeto Llama (C++).
+            # llama-cpp-python não é thread-safe; o lock é mantido durante toda a geração
+            # para evitar corrupção do KV cache com requisições concorrentes.
+            # yield dentro de "with lock" é válido em geradores Python: o lock é preservado
+            # entre yields pois o gerador retoma na mesma thread que o chamou.
             with self._lock:
                 raw_stream = self._llm.create_chat_completion(
                     messages=messages,
@@ -484,37 +485,34 @@ Ocorreu um erro ao consultar a biblioteca. Por favor, tente reformular a pergunt
                     stream=True,
                     stop=['<|end|>', '<|endoftext|>', '<|user|>']
                 )
-                tokens = [
-                    chunk['choices'][0]['delta']['content']
-                    for chunk in raw_stream
-                    if 'content' in chunk['choices'][0]['delta']
-                ]
-
-            # Lock liberado — entrega os tokens coletados ao cliente via SSE.
-            if excel_bloco:
-                # Modo Terminal: descarta deterministicamente qualquer preamble
-                # antes do início real da tabela (## Aba: ou |)
-                buffer_pre = ""
-                tabela_iniciada = False
-                for token in tokens:
-                    if not tabela_iniciada:
-                        buffer_pre += token
-                        idx = -1
-                        for marcador in ('## ', '|'):
-                            pos = buffer_pre.find(marcador)
-                            if pos >= 0:
-                                idx = pos if idx < 0 else min(idx, pos)
-                        if idx >= 0:
-                            tabela_iniciada = True
-                            yield buffer_pre[idx:]
-                        elif len(buffer_pre) > 400:
-                            tabela_iniciada = True
-                            yield buffer_pre
-                    else:
-                        yield token
-            else:
-                for token in tokens:
-                    yield token
+                if excel_bloco:
+                    # Modo Terminal: descarta deterministicamente qualquer preamble
+                    # antes do início real da tabela (## Aba: ou |)
+                    buffer_pre = ""
+                    tabela_iniciada = False
+                    for chunk in raw_stream:
+                        if 'content' not in chunk['choices'][0]['delta']:
+                            continue
+                        token = chunk['choices'][0]['delta']['content']
+                        if not tabela_iniciada:
+                            buffer_pre += token
+                            idx = -1
+                            for marcador in ('## ', '|'):
+                                pos = buffer_pre.find(marcador)
+                                if pos >= 0:
+                                    idx = pos if idx < 0 else min(idx, pos)
+                            if idx >= 0:
+                                tabela_iniciada = True
+                                yield buffer_pre[idx:]
+                            elif len(buffer_pre) > 400:
+                                tabela_iniciada = True
+                                yield buffer_pre
+                        else:
+                            yield token
+                else:
+                    for chunk in raw_stream:
+                        if 'content' in chunk['choices'][0]['delta']:
+                            yield chunk['choices'][0]['delta']['content']
 
         except Exception as e:
             traceback.print_exc()
@@ -539,9 +537,33 @@ Ocorreu um erro ao consultar a biblioteca. Por favor, tente reformular a pergunt
         # Perfil carregado cedo (cache < 1ms) para estar disponível nos interceptores
         perfil_anagma = self._get_perfil_anagma()
 
-        # Intercepta saudações simples
+        # Intercepta saudações, agradecimentos e despedidas
         if self._e_saudacao(user_query):
             query_l = user_query.lower()
+
+            # — Despedida —
+            _despedidas = ('tchau', 'xau', 'adeus', 'até mais', 'ate mais',
+                           'até logo', 'ate logo', 'até a próxima', 'ate a proxima',
+                           'até breve', 'ate breve', 'até amanhã', 'ate amanha')
+            if any(d in query_l for d in _despedidas):
+                opcoes = [
+                    f"Até a próxima, {primeiro_nome}! {cumprimento}.",
+                    f"Até logo, {primeiro_nome}! {cumprimento}. Estarei aqui quando precisar.",
+                    f"{cumprimento}, {primeiro_nome}! Até a próxima. Qualquer dúvida é só chamar.",
+                ]
+                return random.choice(opcoes)
+
+            # — Agradecimento —
+            _agradecimentos = ('obrigad', 'valeu', 'valew', 'grato', 'grata', 'agradeç')
+            if any(a in query_l for a in _agradecimentos):
+                opcoes = [
+                    f"De nada, {primeiro_nome}! Fico à disposição sempre que precisar.",
+                    f"Por nada! Se tiver mais dúvidas sobre contabilidade ou tributação, é só chamar.",
+                    f"Disponha, {primeiro_nome}! Estarei aqui quando precisar.",
+                ]
+                return random.choice(opcoes)
+
+            # — Cumprimento de abertura —
             resp_cumprimento = cumprimento
             if 'bom dia' in query_l: resp_cumprimento = "Bom dia"
             elif 'boa tarde' in query_l: resp_cumprimento = "Boa tarde"

@@ -11,10 +11,38 @@ Para adicionar novos gatilhos ou termos, edite apenas este arquivo.
 # Saudações — interceptadas antes de chamar o modelo
 # ---------------------------------------------------------------------------
 SAUDACOES = frozenset({
+    # Cumprimentos de abertura
     'bom dia', 'boa tarde', 'boa noite',
     'olá', 'ola', 'oi', 'oi!', 'olá!',
     'bom dia!', 'boa tarde!', 'boa noite!',
-    'hello', 'hi', 'hey', 'iai beleza?'
+    'hello', 'hi', 'hey', 'iai beleza?',
+    # Agradecimentos (sem conteúdo técnico)
+    'obrigado', 'obrigada',
+    'muito obrigado', 'muito obrigada',
+    'ok obrigado', 'ok obrigada',
+    'valeu', 'valeu mesmo', 'valew',
+    'grato', 'grata',
+    'agradeço', 'agradecida', 'agradecido',
+    'perfeito obrigado', 'perfeito obrigada',
+    'ok valeu', 'tá bom obrigado', 'ta bom obrigado',
+    'certo obrigado', 'certo obrigada',
+    'entendi obrigado', 'entendi obrigada',
+    'ótimo obrigado', 'otimo obrigado',
+    'ótima obrigada', 'otima obrigada',
+    'excelente obrigado', 'excelente obrigada',
+    # Despedidas (sem conteúdo técnico)
+    'tchau', 'xau', 'adeus',
+    'até mais', 'ate mais',
+    'até logo', 'ate logo',
+    'até a próxima', 'ate a proxima',
+    'até a próxima!', 'ate a proxima!',
+    'até mais!', 'ate mais!',
+    'até logo!', 'ate logo!',
+    'tchau!', 'xau!', 'adeus!',
+    'até breve', 'ate breve',
+    'até amanhã', 'ate amanha',
+    'até semana', 'ate semana',
+    'foi bom', 'foi ótimo',
 })
 
 # ---------------------------------------------------------------------------
