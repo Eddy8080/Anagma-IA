@@ -34,6 +34,7 @@ src/db.sqlite3
 src/db.sqlite3-journal
 media/
 staticfiles/
+como_usar.md
 
 # Variáveis de Ambiente
 .env
@@ -65,3 +66,5 @@ chroma/
 Thumbs.db
 google.md
 banco_de_ideias.md
+gerar_estudo.py
+estudo.html

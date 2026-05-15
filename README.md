@@ -1,5 +1,10 @@
 # Digiana — Inteligência Contábil da Anagma
 
+<p align="center">
+  <img src="DIGIANA.jpg" width="48%" />
+  <img src="DIGIANA2.jpg" width="48%" />
+</p>
+
 A **Digiana** é uma plataforma de Inteligência Artificial local (Edge AI), projetada para ser a autoridade consultiva em Contabilidade Brasileira e Internacional da **Anagma**. Cada resposta é ancorada na biblioteca oficial de documentos e no Banco de Ideias da organização — sem dependência de APIs externas, sem envio de dados para a nuvem.
 
 ---
